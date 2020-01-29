@@ -86,7 +86,7 @@
   </link>
   <joint
     name="1"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="0.145467828474498 -0.103472193336681 0.055903737730272"
       rpy="0 0 0" />
@@ -97,10 +97,10 @@
     <axis
       xyz="0 -1 0" />
     <limit
-      lower="0"
-      upper="0"
+      lower="-1.57."
+      upper="1.57."
       effort="0"
-      velocity="0" />
+      velocity="1000" />
   </joint>
   <link
     name="left tibiotarsus">
@@ -144,7 +144,7 @@
   </link>
   <joint
     name="2"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="-0.0496499999999997 0.0516500000000001 -0.114"
       rpy="0 0 0" />
@@ -155,10 +155,10 @@
     <axis
       xyz="-1 0 0" />
     <limit
-      lower="0"
-      upper="0"
+      lower="-1.57."
+      upper="1.57."
       effort="0"
-      velocity="0" />
+      velocity="1000" />
   </joint>
   <link
     name="left tarsometatarsus">
@@ -202,7 +202,7 @@
   </link>
   <joint
     name="3"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="-0.000500000000000944 0.105453933582409 -0.168761571135128"
       rpy="0 0 0" />
@@ -213,10 +213,10 @@
     <axis
       xyz="-1 0 0" />
     <limit
-      lower="0"
-      upper="0"
+      lower="-1.57."
+      upper="1.57."
       effort="0"
-      velocity="0" />
+      velocity="1000" />
   </joint>
   <link
     name="left toe">
@@ -260,7 +260,7 @@
   </link>
   <joint
     name="4"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="0.0444000000000008 -0.122958145890606 -0.482725854452568"
       rpy="0 0 0" />
@@ -271,10 +271,10 @@
     <axis
       xyz="-1 0 0" />
     <limit
-      lower="0"
-      upper="0"
+      lower="-1.57."
+      upper="1.57."
       effort="0"
-      velocity="0" />
+      velocity="1000" />
   </joint>
   <link
     name="right femur">
@@ -318,7 +318,7 @@
   </link>
   <joint
     name="5"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="-0.1425321715255 -0.103472193336681 0.0559037377302649"
       rpy="0 0 0" />
@@ -329,10 +329,10 @@
     <axis
       xyz="0 -1 0" />
     <limit
-      lower="0"
-      upper="0"
+      lower="-1.57."
+      upper="1.57."
       effort="0"
-      velocity="0" />
+      velocity="1000" />
   </joint>
   <link
     name="right tibiotarsus">
@@ -376,7 +376,7 @@
   </link>
   <joint
     name="6"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="0.04965 0.0516500000000001 -0.114"
       rpy="0 0 0" />
@@ -387,10 +387,10 @@
     <axis
       xyz="1 0 0" />
     <limit
-      lower="0"
-      upper="0"
+      lower="-1.57."
+      upper="1.57."
       effort="0"
-      velocity="0" />
+      velocity="1000" />
   </joint>
   <link
     name="right tarsometatarsus">
@@ -434,7 +434,7 @@
   </link>
   <joint
     name="7"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="0.000500000000003886 0.105453933582128 -0.168761571135296"
       rpy="0 0 0" />
@@ -445,10 +445,10 @@
     <axis
       xyz="1 0 0" />
     <limit
-      lower="0"
-      upper="0"
+      lower="-1.57."
+      upper="1.57."
       effort="0"
-      velocity="0" />
+      velocity="1000" />
   </joint>
   <link
     name="right toe">
@@ -492,7 +492,7 @@
   </link>
   <joint
     name="8"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="-0.0339000000000053 -0.105453933613821 -0.488752972251687"
       rpy="0 0 0" />
@@ -503,9 +503,9 @@
     <axis
       xyz="-1 0 0" />
     <limit
-      lower="0"
-      upper="0"
+      lower="-1.57."
+      upper="1.57."
       effort="0"
-      velocity="0" />
+      velocity="1000" />
   </joint>
 </robot>

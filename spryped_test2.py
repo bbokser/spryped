@@ -10,12 +10,12 @@ p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.resetSimulation()
 planeID = p.loadURDF("plane.urdf")
 robotStartOrientation = p.getQuaternionFromEuler([0,0,0])
-robot = p.loadURDF("Desktop/spryped rev03/urdf/spryped rev03.urdf", [0,0,0.8], robotStartOrientation, useFixedBase=0)
+robot = p.loadURDF("spryped rev03/urdf/spryped rev03.urdf", [0,0,0.8], robotStartOrientation, useFixedBase=0)
 
 p.setGravity(0,0, GRAVITY)
 p.setTimeStep(dt)
 
-def moveLeg( subject=None, id=0, position=0, force=10  ):
+def moveLeg( subject=None, id=0, position=0, force=500 ):
     if(robot is None):
         return;
     p.setJointMotorControl2(
@@ -27,6 +27,18 @@ def moveLeg( subject=None, id=0, position=0, force=10  ):
         maxVelocity=5
     )
 
+def moveLegVel( subject=None, id=0, vel=0, force=100  ):
+    if(robot is None):
+        return;
+    p.setJointMotorControl2(
+        robot,
+        id,
+        p.VELOCITY_CONTROL,
+        targetVelocity=vel,
+        force=force,
+        maxVelocity=50
+    )
+
 pixelWidth = 1000
 pixelHeight = 1000
 camTargetPos = [0,0,0]
@@ -36,41 +48,48 @@ roll=0
 upAxisIndex = 2
 yaw = 0
 
-viewMatrix = p.computeViewMatrixFromYawPitchRoll(camTargetPos, camDistance, yaw, pitch, roll, upAxisIndex)
+#viewMatrix = p.computeViewMatrixFromYawPitchRoll(camTargetPos, camDistance, yaw, pitch, roll, upAxisIndex)
 
-toggle = 1000
+toggle = 150
 #enableJointForceTorqueSensor(robot,3,1)
-p.setRealTimeSimulation(1)
-for i in range (10000):
-    #p.stepSimulation()
 
-    moveLeg( subject=robot, id=0,  position= toggle * 1 ) #LEFT_FEMUR
-    moveLeg( subject=robot, id=1,  position= toggle * 1 ) #LEFT_TIBIOTARSUS
-    moveLeg( subject=robot, id=2,  position= toggle * 1 ) #LEFT_TARSOMETATARSUS
-    moveLeg( subject=robot, id=3,  position= toggle * 1 ) #LEFT_TOE
+useRealTime = 0
 
-    moveLeg( subject=robot, id=4,  position= toggle * 1 ) #RIGHT_FEMUR
-    moveLeg( subject=robot, id=5,  position= toggle * 1 ) #RIGHT_TIBIOTARSUS
-    moveLeg( subject=robot, id=6,  position= toggle * 1 ) #RIGHT_TARSOMETATARSUS
-    moveLeg( subject=robot, id=7,  position= toggle * 1 ) #RIGHT_TOE
-    #time.sleep(1./140.)g
-    #time.sleep(0.01)
-    #pront=p.getJointInfo(robot,3)
-    #pront=[j[0] for j in p.getJointStates(robot,range(7))]
+p.setRealTimeSimulation(useRealTime)
+
+for i in range(p.getNumJoints(robot)):
+  p.setJointMotorControl2(robot, i, p.POSITION_CONTROL, targetPosition=0, force=500)
+
+while(1):
+    time.sleep(dt)
+    moveLeg( subject=robot, id=0,  position= toggle ) #LEFT_FEMUR
+    moveLeg( subject=robot, id=1,  position= toggle ) #LEFT_TIBIOTARSUS
+    moveLeg( subject=robot, id=2,  position= toggle ) #LEFT_TARSOMETATARSUS
+    moveLeg( subject=robot, id=3,  position= toggle ) #LEFT_TOE
+
+    moveLeg( subject=robot, id=4,  position= toggle ) #RIGHT_FEMUR
+    moveLeg( subject=robot, id=5,  position= toggle ) #RIGHT_TIBIOTARSUS
+    moveLeg( subject=robot, id=6,  position= toggle ) #RIGHT_TARSOMETATARSUS
+    moveLeg( subject=robot, id=7,  position= toggle ) #RIGHT_TOE
+    
+    pront=p.getJointInfo(robot,3)
+    pront=[j[0] for j in p.getJointStates(robot,range(7))]
     pront=p.getJointState(robot,3)
     prunt='%s' % float('%.1g' % pront[3])
     print(prunt)
-    time.sleep(1)
+    
 
     toggle = toggle * -1
-
+    if (useRealTime == 0):
+        p.stepSimulation()
 #maxForce = 5000
 #p.setJointMotorControl2(robot, jointIndex=1, controlMode=p.POSITION_CONTROL, targetPosition = 2)
 #p.setJointMotorControlArray(robot, range(7), p.POSITION_CONTROL,targetPositions=[1.5]*7)
 #for _ in range(10000):
 #	p.stepSimulation()
 #	time.sleep(1./240.)
-#time.sleep(10000)
+
+time.sleep(10000)
 
 #robot = model[0]
 #ordered_joints = []
