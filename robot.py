@@ -75,6 +75,6 @@ class Robot:
             M[5, 5] = float(izz[i])
             #self.MM.insert(i,M)
             self.MM.append(M)
-
+        JCOM2 = np.zeros(
 robert = Robot()
 print(robert.MM[7])

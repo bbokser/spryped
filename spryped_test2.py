@@ -10,7 +10,7 @@ p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.resetSimulation()
 planeID = p.loadURDF("plane.urdf")
 robotStartOrientation = p.getQuaternionFromEuler([0,0,0])
-robot = p.loadURDF("spryped rev03/urdf/spryped rev03.urdf", [0,0,0.8], robotStartOrientation, useFixedBase=0)
+robot = p.loadURDF("spryped_urdf_rev04/urdf/spryped_urdf_rev04.urdf", [0,0,0.8], robotStartOrientation, useFixedBase=0)
 
 p.setGravity(0,0, GRAVITY)
 p.setTimeStep(dt)
