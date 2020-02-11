@@ -7,31 +7,64 @@
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import numpy as np
+import math
+import csv
 
-import xml.etree.ElementTree as ET
+values = []
+with open('spryped_urdf_rev05/urdf/spryped_urdf_rev05.csv', 'r') as csvfile:
+    data = csv.reader(csvfile, delimiter=',') 
+    next(data) # skip headers
+    values = list(zip(*(row for row in data))) # transpose rows to columns
+    values = np.array(values) # convert list of nested lists to array
 
-xmltree = ET.parse('spryped rev03/urdf/spryped rev03.urdf')
+comx = values[1].astype(np.float)
+comy = values[2].astype(np.float)
+comz = values[3].astype(np.float)
 
-#matrix = np.zeros(shape=(3,3))
+mass = values[7].astype(np.float)
+ixx = values[8].astype(np.float)
+ixy = values[9].astype(np.float)
+ixz = values[10].astype(np.float)
+iyy = values[11].astype(np.float)
+iyz = values[12].astype(np.float)
+izz = values[13].astype(np.float)
 
-ixx, ixy, ixz, iyy, iyz, izz, mass = ([] for i in range(7))
+ox = values[38].astype(np.float)
+oy = values[39].astype(np.float)
+oz = values[40].astype(np.float)
 
-for v in xmltree.iter('mass'):
-    mass.append((v.attrib['value']))
-    
-for v in xmltree.iter('inertia'):
-    ixx.append((v.attrib['ixx']))
-    ixy.append((v.attrib['ixy']))
-    ixz.append((v.attrib['ixz']))
-    iyy.append((v.attrib['iyy']))
-    iyz.append((v.attrib['iyz']))
-    izz.append((v.attrib['izz']))
+coml = []
+for j in range(9):
+     # joint origin to COM length ignoring y axis
+    comlen = math.sqrt((comx[j]**2)+(comz[j]**2))
+    #comlen = math.sqrt((comx[j]**2)+(comy[j]**2)+(comz[j]**2)) # joint origin to COM length
+    coml.append(comlen)
+print(coml[2])
+
+# estimating init link angles
+#p = 4
+#dist = math.sqrt((ox[p]**2)+(oz[p]**2))
+#angle = np.degrees(math.atan(oz[p]/dist))
+#print("dist = ", dist)
+#print("angle p = ", angle)
+               
+# link masses
+if mass[1]!=mass[5]:
+    print("WARNING: femur L/R masses unequal, check CAD")
+if mass[2]!=mass[6]:
+    print("WARNING: tibiotarsus L/R masses unequal, check CAD")
+if mass[3]!=mass[7]:
+    print("WARNING: tarsometatarsus L/R masses unequal, check CAD")
+if mass[4]!=mass[8]:
+    print("WARNING: toe L/R masses unequal, check CAD")
 
 class Robot:
 
-    def __init__(self, **kwargs):
-        # link lengths
-        # Not provided by urdf so update this when you update model
+    def __init__(self, init_q=[np.pi/4, -np.pi*40.3/180, np.pi*84.629/180,
+                               -np.pi*44.329/180, np.pi/4, -np.pi*40.3/180,
+                               np.pi*84.629/180, -np.pi*44.329/180.],
+                               init_dq=[0., 0., 0., 0., 0., 0.], **kwargs):
+        # link lengths must be manually updated
         l1 = 0.05 # femur left
         l2 = 0.199 # tibiotarsus left
         l3 = 0.5 # tarsometatarsus left
@@ -41,40 +74,27 @@ class Robot:
         l7 = 0.5 # tarsometatarsus right
         l8 = 0.05 # toe right
         self.L = np.array([l1, l2, l3, l4, l5, l6, l7, l8])
-        # link masses
-        m0 = mass[0] # body
-        m1 = mass[1] # femur left
-        m2 = mass[2] # tibiotarsus left
-        m3 = mass[3] # tarsometatarsus left
-        m4 = mass[4] # toe left
-        m5 = mass[5] # femur right
-        m6 = mass[6] # tibiotarsus right
-        m7 = mass[7] # tarsometatarsus right
-        m8 = mass[8] # toe left
-        if mass[1]!=mass[5]:
-            print("WARNING: femur L/R masses unequal, check CAD")
-        if mass[2]!=mass[6]:
-            print("WARNING: tibiotarsus L/R masses unequal, check CAD")
-        if mass[3]!=mass[7]:
-            print("WARNING: tarsometatarsus L/R masses unequal, check CAD")
-        if mass[4]!=mass[8]:
-            print("WARNING: toe L/R masses unequal, check CAD")
+
         # mass matrices
         self.MM = []
         for i in range(9):
             M = np.zeros((6, 6))
             M[0:3, 0:3] = np.eye(3)*float(mass[i])
-            M[3, 3] = float(ixx[i])
-            M[3, 4] = float(ixy[i])
-            M[3, 5] = float(ixz[i])
-            M[4, 3] = -float(ixy[i])
-            M[4, 4] = float(iyy[i])
-            M[4, 5] = float(iyz[i])
-            M[5, 3] = -float(ixz[i])
-            M[5, 4] = -float(iyz[i])
-            M[5, 5] = float(izz[i])
+            M[3, 3] = ixx[i]
+            M[3, 4] = ixy[i]
+            M[3, 5] = ixz[i]
+            M[4, 3] = -ixy[i]
+            M[4, 4] = iyy[i]
+            M[4, 5] = iyz[i]
+            M[5, 3] = -ixz[i]
+            M[5, 4] = -iyz[i]
+            M[5, 5] = izz[i]
             #self.MM.insert(i,M)
             self.MM.append(M)
-        JCOM2 = np.zeros(
+        self.JCOM1 = np.zeros((6, 3))
+        self.JCOM1[0, 1] = -2*coml[1]*np.sin(2*q[0])
+        self.JCOM1[0, 2] = 2*coml[1]*np.cos(2*q[0])
+        self.JCOM1[0, 3] = 1
 robert = Robot()
-print(robert.MM[7])
+#print(robert.MM[7])
+print(robert.JCOM1)
