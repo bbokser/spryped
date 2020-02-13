@@ -39,7 +39,7 @@ for j in range(9):
     comlen = math.sqrt((comx[j]**2)+(comz[j]**2))
     #comlen = math.sqrt((comx[j]**2)+(comy[j]**2)+(comz[j]**2)) # joint origin to COM length
     coml.append(comlen)
-print(coml[2])
+#print(coml[1])
 
 # estimating init link angles
 #p = 4
@@ -60,7 +60,7 @@ if mass[4]!=mass[8]:
 
 class Robot:
 
-    def __init__(self, init_q=[np.pi/4, -np.pi*40.3/180, np.pi*84.629/180,
+    def __init__(self, q=np.zeros(8), dq=np.zeros(8), init_q=[np.pi/4, -np.pi*40.3/180, np.pi*84.629/180,
                                -np.pi*44.329/180, np.pi/4, -np.pi*40.3/180,
                                np.pi*84.629/180, -np.pi*44.329/180.],
                                init_dq=[0., 0., 0., 0., 0., 0.], **kwargs):
@@ -92,9 +92,9 @@ class Robot:
             #self.MM.insert(i,M)
             self.MM.append(M)
         self.JCOM1 = np.zeros((6, 3))
-        self.JCOM1[0, 1] = -2*coml[1]*np.sin(2*q[0])
-        self.JCOM1[0, 2] = 2*coml[1]*np.cos(2*q[0])
-        self.JCOM1[0, 3] = 1
+        self.JCOM1[1, 0] = -2*coml[1]*np.sin(2*q[0])
+        self.JCOM1[2, 0] = 2*coml[1]*np.cos(2*q[0])
+        self.JCOM1[3, 0] = 1
 robert = Robot()
 #print(robert.MM[7])
 print(robert.JCOM1)
