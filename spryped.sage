@@ -70,15 +70,14 @@ J3 = block_matrix([[Tcom3.derivative(q1), Tcom3.derivative(q2), Tcom3.derivative
 
 T4_0 = T4_3*T3_2*T2_1*T1_0
 
-Tcom4 = T4_0*com4
-Tcom4simp = matrix([[-sin(q2+q3+q4)*(l4*cos(q1)*cos(q4)+L1*cos(q1)+L2)+L3*sin(q3-q4)+cos(q2+q3+q4)*l4*sin(q4)+L4*sin(q4)],
-                    [cos(q2+q3+q4)*(l4*cos(q1)*cos(q4)+L1*cos(q1))+cos(q3+q4-q2)*L2+L3*cos(q3-q4)+sin(q2+q3+q4)*l4*sin(q4)+L4*cos(q4)],
-                    [l4*cos(q4)*sin(q1) + L1*sin(q1)],
-                    [1]])
+#Tcom4 = T4_0*com4
+Tcom4 = matrix([[l4*(sin(q2 + q3 + 2*q4)/2 - sin(q2 + q3)/2) + L4*sin(q4) + L3*sin(q3 - q4) + L2*cos(q3 + q4)*sin(q2) - L2*sin(q3 + q4)*cos(q2) - (l4*sin(q2 + q3 + q4)*cos(q1 + q4))/2 - L1*sin(q2 + q3 + q4)*cos(q1) - (l4*cos(q1 - q4)*sin(q2 + q3 + q4))/2],
+                [L4*cos(q4) - (l4*(cos(q2 + q3 + 2*q4) - cos(q2 + q3)))/2 + L3*cos(q3 - q4) + L2*cos(q3 + q4)*cos(q2) + L2*sin(q3 + q4)*sin(q2) + (l4*cos(q2 + q3 + q4)*cos(q1 + q4))/2 + L1*cos(q2 + q3 + q4)*cos(q1) + (l4*cos(q1 - q4)*cos(q2 + q3 + q4))/2],
+                [sin(q1)*(L1 + l4*cos(q4))],
+                [1]])
 
 J4 = block_matrix([[Tcom4.derivative(q1), Tcom4.derivative(q2), Tcom4.derivative(q3), Tcom4.derivative(q4)]], subdivide=False)
 
 #print(Tcom4(q1=1,q2=2,q3=3,q4=4,l1=5,l2=6,l3=7,l4=8,L1=9,L2=10,L3=11,L4=12))
 #print(Tcom4simp(q1=1,q2=2,q3=3,q4=4,l1=5,l2=6,l3=7,l4=8,L1=9,L2=10,L3=11,L4=12))
-print("Tcom4 = ", Tcom4)
-print("Tcom4 simplified = ", Tcom4simp)
+print("J4 = ", J4)
