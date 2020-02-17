@@ -35,8 +35,7 @@ oz = values[40].astype(np.float)
 
 coml = []
 for j in range(9):
-     # joint origin to COM length ignoring y axis
-    comlen = math.sqrt((comx[j]**2)+(comz[j]**2))
+    comlen = math.sqrt((comx[j]**2)+(comz[j]**2)) # joint origin to COM ignoring y axis
     #comlen = math.sqrt((comx[j]**2)+(comy[j]**2)+(comz[j]**2)) # joint origin to COM length
     coml.append(comlen)
 #print(coml[1])
@@ -58,22 +57,20 @@ if mass[3]!=mass[7]:
 if mass[4]!=mass[8]:
     print("WARNING: toe L/R masses unequal, check CAD")
 
+# link lengths must be manually updated
+L0 = 0.1 # body
+L1 = 0.1 # femur left
+L2 = 0.199 # tibiotarsus left
+L3 = 0.5 # tarsometatarsus left
+L4 = 0.061 # toe left
+L = np.array([L0, L1, L2, L3, L4, L1, L2, L3, L4])
+
 class Robot:
 
-    def __init__(self, q=np.zeros(8), dq=np.zeros(8), init_q=[np.pi/4, -np.pi*40.3/180, np.pi*84.629/180,
-                               -np.pi*44.329/180, np.pi/4, -np.pi*40.3/180,
-                               np.pi*84.629/180, -np.pi*44.329/180.],
-                               init_dq=[0., 0., 0., 0., 0., 0.], **kwargs):
-        # link lengths must be manually updated
-        l1 = 0.05 # femur left
-        l2 = 0.199 # tibiotarsus left
-        l3 = 0.5 # tarsometatarsus left
-        l4 = 0.05 # toe left
-        l5 = 0.05 # femur right
-        l6 = 0.199 # tibiotarsus right
-        l7 = 0.5 # tarsometatarsus right
-        l8 = 0.05 # toe right
-        self.L = np.array([l1, l2, l3, l4, l5, l6, l7, l8])
+    def __init__(self, q=np.zeros(9), dq=np.zeros(9),
+                 init_q=[0, np.pi/4, -np.pi*40.3/180, np.pi*84.629/180,-np.pi*44.329/180,
+                         np.pi/4, -np.pi*40.3/180, np.pi*84.629/180, -np.pi*44.329/180.],
+                 init_dq=[0., 0., 0., 0., 0., 0., 0.], **kwargs):
 
         # mass matrices
         self.MM = []
@@ -91,13 +88,36 @@ class Robot:
             M[5, 5] = izz[i]
             #self.MM.insert(i,M)
             self.MM.append(M)
-        self.JCOM1 = np.zeros((6, 3))
-        self.JCOM1[1, 0] = -2*coml[1]*np.sin(2*q[0])
-        self.JCOM1[2, 0] = 2*coml[1]*np.cos(2*q[0])
-        self.JCOM1[3, 0] = 1
+        self.JCOM1 = np.zeros((6, 4))
+        self.JCOM1[1, 0] = -L[1]*np.sin(q[1]) - 2*coml[1]*np.sin(2*q[1])
+        self.JCOM1[2, 0] = L[1]*np.cos(q[1]) + 2*coml[1]*np.cos(2*q[1])
+        self.JCOM1[3, :] = 1
 
-        q01 = q[0]+q[1]
+        self.JCOM2 = np.zeros((6, 4))
+        self.JCOM2[0, 1] = L[2]*np.cos(q[2])
+        self.JCOM2[1, 0] = -(L[1]+L[2]*np.cos(q[2])+coml[2])*np.sin(q[1])
+        self.JCOM2[1, 1] = -L[2]*np.sin(q[2])*np.cos(q[1])
+        self.JCOM2[2, 0] = (L[1]+L[2]*np.cos(q[2])+coml[2])*np.cos(q[1])
+        self.JCOM2[2, 1] = -L[2]*np.sin(q[1])*np.sin(q[2])
+        self.JCOM2[5, :] = 1
+
+        self.JCOM3 = np.zeros((6, 4))
+        self.JCOM3[0, 0] = (L[1]+coml[3]*np.cos(q[3]))*np.sin(q[1])*np.sin(q[2]+q[3])
+        self.JCOM3[0, 1] = -L[1]*np.cos(q[1])*np.cos(q[2]+q[3])\
+            + L[2]*np.cos(q[2]-q[3]) - coml[3]*np.sin(q[3])*np.sin(q[2]+q[3])\
+            - coml[3]*np.cos(q[1])*np.cos(q[3])*np.cos(q[2]+q[3])
+        self.JCOM3[0, 2] = -L[1]*np.cos(q[1])*np.cos(q[2] + q[3]) - L[2]*np.cos(q[2] - q[3])\
+            + L[3]*np.cos(q[3]) + coml[3]*np.sin(q[3])*np.sin(q[2] + q[3])*np.cos(q[1])\
+            - coml[3]*np.sin(q[3])*np.sin(q[2] + q[3])\
+            - coml[3]*np.cos(q[1])*np.cos(q[3])*np.cos(q[2] + q[3])\
+            + coml[3]*np.cos(q[3])*np.cos(q[2] + q[3])
+        self.JCOM3[1, 0] = -(L[1]+coml[3]*np.cos(q[3]))*np.sin(q[1])*np.cos(q[2]+q[3])
+        self.JCOM3[1, 1] = -L[1]*np.sin(q[2]+q[3])*np.cos(q[1]) - L[2]*np.sin(q[2]-q[3])\
+            + coml[3]*np.sin(q[3])*np.cos(q[2]+q[3])\
+            - coml[3]*np.sin(q[2]+q[3])*np.cos(q[1])*np.cos(q[3])
+        self.JCOM3[2, 0] = (L[1]+coml[3]*np.cos(q[3]))*np.cos(q[1])
+        self.JCOM3{5, :] = 1
         
 robert = Robot()
 #print(robert.MM[7])
-print(robert.JCOM1)
+print(robert.JCOM2)

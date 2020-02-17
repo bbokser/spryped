@@ -80,11 +80,11 @@ class Robot:
             M[3, 3] = ixx[i]
             M[3, 4] = ixy[i]
             M[3, 5] = ixz[i]
-            M[4, 3] = ixy[i]
+            M[4, 3] = -ixy[i]
             M[4, 4] = iyy[i]
             M[4, 5] = iyz[i]
-            M[5, 3] = ixz[i]
-            M[5, 4] = iyz[i]
+            M[5, 3] = -ixz[i]
+            M[5, 4] = -iyz[i]
             M[5, 5] = izz[i]
             #self.MM.insert(i,M)
             self.MM.append(M)
@@ -115,60 +115,11 @@ class Robot:
         self.JCOM3[1, 1] = -L[1]*np.sin(q[2]+q[3])*np.cos(q[1]) - L[2]*np.sin(q[2]-q[3])\
             + coml[3]*np.sin(q[3])*np.cos(q[2]+q[3])\
             - coml[3]*np.sin(q[2]+q[3])*np.cos(q[1])*np.cos(q[3])
-        self.JCOM3[1, 2] = -L[1]*np.sin(q[2] + q[3])*np.cos(q[1]) + L[2]*np.sin(q[2] - q[3])\
-            - L[3]*np.sin(q[3]) - coml[3]*np.sin(q[3])*np.cos(q[1])*np.cos(q[2] + q[3])\
-            + coml[3]*np.sin(q[3])*np.cos(q[2] + q[3])\
-            - coml[3]*np.sin(q[2] + q[3])*np.cos(q[1])*np.cos(q[3])\
-            + coml[3]*np.sin(q[2] + q[3])*np.cos(q[3])
+        self.JCOM3[1, 2] = -L[1]*np.sin(q2 + q3)*cos(q1) + L2*sin(q2 - q3) - L3*sin(q3) - l3*sin(q3)*cos(q1)*cos(q2 + q3) + l3*sin(q3)*cos(q2 + q3) - l3*sin(q2 + q3)*cos(q1)*cos(q3) + l3*sin(q2 + q3)*cos(q3)
+
         self.JCOM3[2, 0] = (L[1]+coml[3]*np.cos(q[3]))*np.cos(q[1])
-        self.JCOM3[2, 2] = -coml[3]*np.sin(q[1])*np.sin(q[3])
-        self.JCOM3[5, :] = 1
-
-        self.JCOM4 = np.zeros((6, 4))
-        self.JCOM4[0, 0] = (L[1] + coml[4]*np.cos(q[4]))*np.sin(q[1])*np.sin(q[2] + q[3] + q[4])
-        self.JCOM4[0, 1] = -L[1]*np.cos(q[1])*np.cos(q[2] + q[3] + q[4])\
-            + L[2]*np.cos(-q[2] + q[3] + q[4]) - coml[4]*np.sin(q[4])*np.sin(q[2] + q[3] + q[4])\
-            - coml[4]*np.cos(q[1])*np.cos(q[4])*np.cos(q[2] + q[3] + q[4])
-        self.JCOM4[0, 2] = -L[1]*np.cos(q[1])*np.cos(q[2] + q[3] + q[4])\
-            - L[2]*np.cos(-q[2] + q[3] + q[4]) + L[3]*np.cos(q[3] - q[4])\
-            - coml[4]*np.sin(q[4])*np.sin(q[2] + q[3] + q[4])\
-            - coml[4]*np.cos(q[1])*np.cos(q[4])*np.cos(q[2] + q[3] + q[4])
-        self.JCOM4[0, 3] = -L[1]*np.cos(q[1])*np.cos(q[2] + q[3] + q[4])\
-            - L[2]*np.cos(-q[2] + q[3] + q[4]) - L[3]*np.cos(q[3] - q[4]) + L[4]*np.cos(q[4])\
-            + coml[4]*np.sin(q[4])*np.sin(q[2] + q[3] + q[4])*np.cos(q[1])\
-            - coml[4]*np.sin(q[4])*np.sin(q[2] + q[3] + q[4])\
-            - coml[4]*np.cos(q[1])*np.cos(q[4])*np.cos(q[2] + q[3] + q[4])\
-            + coml[4]*np.cos(q[4])*np.cos(q[2] + q[3] + q[4])
-        self.JCOM4[1, 0] = -(L[1] + coml[4]*np.cos(q[4]))*np.sin(q[1])*np.cos(q[2] + q[3] + q[4])
-        self.JCOM4[1, 1] = -L[1]*np.sin(q[2] + q[3] + q[4])*np.cos(q[1])\
-            + L[2]*np.sin(-q[2] + q[3] + q[4]) + coml[4]*np.sin(q[4])*np.cos(q[2] + q[3] + q[4])\
-            - coml[4]*np.sin(q[2] + q[3] + q[4])*np.cos(q[1])*np.cos(q[4])
-        self.JCOM4[1, 2] = -L[1]*np.sin(q[2] + q[3] + q[4])*np.cos(q[1])\
-            - L[2]*np.sin(-q[2] + q[3] + q[4]) - L[3]*np.sin(q[3] - q[4])\
-            + coml[4]*np.sin(q[4])*np.cos(q[2] + q[3] + q[4])\
-            - coml[4]*np.sin(q[2] + q[3] + q[4])*np.cos(q[1])*np.cos(q[4])
-        self.JCOM4[1, 3] = -L[1]*np.sin(q[2] + q[3] + q[4])*np.cos(q[1])\
-            - L[2]*np.sin(-q[2] + q[3] + q[4]) + L[3]*np.sin(q[3] - q[4]) - L[4]*np.sin(q[4])\
-            - coml[4]*np.sin(q[4])*np.cos(q[1])*np.cos(q[2] + q[3] + q[4])\
-            + coml[4]*np.sin(q[4])*np.cos(q[2] + q[3] + q[4])\
-            - coml[4]*np.sin(q[2] + q[3] + q[4])*np.cos(q[1])*np.cos(q[4])\
-            + coml[4]*np.sin(q[2] + q[3] + q[4])*np.cos(q[4])
-        self.JCOM4[2, 0] = (L[1] + coml[4]*np.cos(q[4]))*np.cos(q[1])
-        self.JCOM4[2, 3] = -coml[4]*np.sin(q[1])*np.sin(q[4])
-        self.JCOM4[5, :] = 1
-
-        def gen_Mq(self, q=None):
-            # Mass matrix
-            M1 = self.MM[1]
-            M2 = self.MM[2]
-            M3 = self.MM[3]
-
-            Mq = (np.dot(JCOM1.T, np.dot(M1, JCOM1)) +
-                  np.dot(JCOM2.T, np.dot(M2, JCOM2)) +
-                  np.dot(JCOM3.T, np.dot(M3, JCOM3)) +
-                  np.dot(JCOM4.T, np.dot(M4, JCOM4)))
-
-            return Mq
+        self.JCOM3{5, :] = 1
+        
 robert = Robot()
 #print(robert.MM[7])
-print(robert.JCOM4)
+print(robert.JCOM2)
