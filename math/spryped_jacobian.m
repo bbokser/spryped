@@ -45,6 +45,11 @@ com4 = [[l4*sin(q4)];
         [0];
 	      [1]];
 
+xee = [[L4*sin(q4)]; # position of the end effector
+       [L4*cos(q4)];
+       [0];
+       [0]];
+
 #Tcom1 = simplify(T1_0*com1) # insufficient simplification
 Tcom1 = [[0]; # simplified manually
          [l1*cos(2*q1) + L1*cos(q1)]; # trig identity
@@ -83,6 +88,13 @@ J4(4,:) = 0;
 J4(5,:) = 0;
 J4(6,:) = 1;
 
+Txee = simplify(T4_0*xee);
+
+JEE = simplify(jacobian(Txee, [q1, q2, q3, q4]));
+JEE(4,:) = 0;
+JEE(5,:) = 0;
+JEE(6,:) = 1;
+
 for c=1:6
 dlmwrite('j1.csv', char(J1(c,:)),'','-append')
 end
@@ -99,19 +111,31 @@ for c=1:6
 dlmwrite('j4.csv', char(J4(c,:)),'','-append')
 end
 
+for c=1:6
+dlmwrite('jee.csv', char(JEE(c,:)),'','-append')
+end
+
 %writematrix(J1, 'j.csv') % not supported in Octave yet
 %fprintf('J1:\n %s', latex(J1))
 fprintf('J1:\n')
 J1
+
 fprintf('\n')
 %fprintf('J2:\n %s', latex(J2))
 fprintf('J2:\n')
 J2
+
 fprintf('\n')
 %fprintf('J3:\n %s', latex(J3))
 fprintf('J3:\n')
 J3
+
 fprintf('\n')
 %fprintf('J4:\n %s', latex(J4))
 fprintf('J4:\n')
 J4
+
+fprintf('\n')
+%fprintf('JEE:\n %s', latex(JEE))
+fprintf('JEE:\n')
+JEE

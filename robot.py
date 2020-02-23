@@ -70,7 +70,7 @@ class Robot:
     def __init__(self, q=np.zeros(9), dq=np.zeros(9),
                  init_q=[0, np.pi/4, -np.pi*40.3/180, np.pi*84.629/180,-np.pi*44.329/180,
                          np.pi/4, -np.pi*40.3/180, np.pi*84.629/180, -np.pi*44.329/180.],
-                 init_dq=[0., 0., 0., 0., 0., 0., 0.], **kwargs):
+                 init_dq=[0., 0., 0., 0., 0., 0., 0.], singularity_thresh=.00025, **kwargs):
 
         # mass matrices
         self.MM = []
@@ -88,87 +88,175 @@ class Robot:
             M[5, 5] = izz[i]
             #self.MM.insert(i,M)
             self.MM.append(M)
-        self.JCOM1 = np.zeros((6, 4))
-        self.JCOM1[1, 0] = -L[1]*np.sin(q[1]) - 2*coml[1]*np.sin(2*q[1])
-        self.JCOM1[2, 0] = L[1]*np.cos(q[1]) + 2*coml[1]*np.cos(2*q[1])
-        self.JCOM1[3, :] = 1
 
-        self.JCOM2 = np.zeros((6, 4))
-        self.JCOM2[0, 1] = L[2]*np.cos(q[2])
-        self.JCOM2[1, 0] = -(L[1]+L[2]*np.cos(q[2])+coml[2])*np.sin(q[1])
-        self.JCOM2[1, 1] = -L[2]*np.sin(q[2])*np.cos(q[1])
-        self.JCOM2[2, 0] = (L[1]+L[2]*np.cos(q[2])+coml[2])*np.cos(q[1])
-        self.JCOM2[2, 1] = -L[2]*np.sin(q[1])*np.sin(q[2])
-        self.JCOM2[5, :] = 1
+    def gen_jacCOM1(self, q=None):
+        """Generates the Jacobian from the COM of the first
+        link to the origin frame"""
+        q = self.q if q is None else q
+        q1 = q[1]
+    
+        JCOM1 = np.zeros((6, 4))
+        JCOM1[1, 0] = -L[1]*np.sin(q1) - 2*coml[1]*np.sin(2*q1)
+        JCOM1[2, 0] = L[1]*np.cos(q1) + 2*coml[1]*np.cos(2*q1)
+        JCOM1[3, :] = 1
 
-        self.JCOM3 = np.zeros((6, 4))
-        self.JCOM3[0, 0] = (L[1]+coml[3]*np.cos(q[3]))*np.sin(q[1])*np.sin(q[2]+q[3])
-        self.JCOM3[0, 1] = -L[1]*np.cos(q[1])*np.cos(q[2]+q[3])\
-            + L[2]*np.cos(q[2]-q[3]) - coml[3]*np.sin(q[3])*np.sin(q[2]+q[3])\
-            - coml[3]*np.cos(q[1])*np.cos(q[3])*np.cos(q[2]+q[3])
-        self.JCOM3[0, 2] = -L[1]*np.cos(q[1])*np.cos(q[2] + q[3]) - L[2]*np.cos(q[2] - q[3])\
-            + L[3]*np.cos(q[3]) + coml[3]*np.sin(q[3])*np.sin(q[2] + q[3])*np.cos(q[1])\
-            - coml[3]*np.sin(q[3])*np.sin(q[2] + q[3])\
-            - coml[3]*np.cos(q[1])*np.cos(q[3])*np.cos(q[2] + q[3])\
-            + coml[3]*np.cos(q[3])*np.cos(q[2] + q[3])
-        self.JCOM3[1, 0] = -(L[1]+coml[3]*np.cos(q[3]))*np.sin(q[1])*np.cos(q[2]+q[3])
-        self.JCOM3[1, 1] = -L[1]*np.sin(q[2]+q[3])*np.cos(q[1]) - L[2]*np.sin(q[2]-q[3])\
-            + coml[3]*np.sin(q[3])*np.cos(q[2]+q[3])\
-            - coml[3]*np.sin(q[2]+q[3])*np.cos(q[1])*np.cos(q[3])
-        self.JCOM3[1, 2] = -L[1]*np.sin(q[2] + q[3])*np.cos(q[1]) + L[2]*np.sin(q[2] - q[3])\
-            - L[3]*np.sin(q[3]) - coml[3]*np.sin(q[3])*np.cos(q[1])*np.cos(q[2] + q[3])\
-            + coml[3]*np.sin(q[3])*np.cos(q[2] + q[3])\
-            - coml[3]*np.sin(q[2] + q[3])*np.cos(q[1])*np.cos(q[3])\
-            + coml[3]*np.sin(q[2] + q[3])*np.cos(q[3])
-        self.JCOM3[2, 0] = (L[1]+coml[3]*np.cos(q[3]))*np.cos(q[1])
-        self.JCOM3[2, 2] = -coml[3]*np.sin(q[1])*np.sin(q[3])
-        self.JCOM3[5, :] = 1
+        return JCOM1
+    
+    def gen_jacCOM2(self, q=None):
+        """Generates the Jacobian from the COM of the second
+        link to the origin frame"""
+        q = self.q if q is None else q
+        q1 = q[1]
+        q2 = q[2]
+        
+        JCOM2 = np.zeros((6, 4))
+        JCOM2[0, 1] = L[2]*np.cos(q2)
+        JCOM2[1, 0] = -(L[1]+L[2]*np.cos(q2)+coml[2])*np.sin(q1)
+        JCOM2[1, 1] = -L[2]*np.sin(q2)*np.cos(q1)
+        JCOM2[2, 0] = (L[1]+L[2]*np.cos(q2)+coml[2])*np.cos(q1)
+        JCOM2[2, 1] = -L[2]*np.sin(q1)*np.sin(q2)
+        JCOM2[5, :] = 1
 
-        self.JCOM4 = np.zeros((6, 4))
-        self.JCOM4[0, 0] = (L[1] + coml[4]*np.cos(q[4]))*np.sin(q[1])*np.sin(q[2] + q[3] + q[4])
-        self.JCOM4[0, 1] = -L[1]*np.cos(q[1])*np.cos(q[2] + q[3] + q[4])\
-            + L[2]*np.cos(-q[2] + q[3] + q[4]) - coml[4]*np.sin(q[4])*np.sin(q[2] + q[3] + q[4])\
-            - coml[4]*np.cos(q[1])*np.cos(q[4])*np.cos(q[2] + q[3] + q[4])
-        self.JCOM4[0, 2] = -L[1]*np.cos(q[1])*np.cos(q[2] + q[3] + q[4])\
-            - L[2]*np.cos(-q[2] + q[3] + q[4]) + L[3]*np.cos(q[3] - q[4])\
-            - coml[4]*np.sin(q[4])*np.sin(q[2] + q[3] + q[4])\
-            - coml[4]*np.cos(q[1])*np.cos(q[4])*np.cos(q[2] + q[3] + q[4])
-        self.JCOM4[0, 3] = -L[1]*np.cos(q[1])*np.cos(q[2] + q[3] + q[4])\
-            - L[2]*np.cos(-q[2] + q[3] + q[4]) - L[3]*np.cos(q[3] - q[4]) + L[4]*np.cos(q[4])\
-            + coml[4]*np.sin(q[4])*np.sin(q[2] + q[3] + q[4])*np.cos(q[1])\
-            - coml[4]*np.sin(q[4])*np.sin(q[2] + q[3] + q[4])\
-            - coml[4]*np.cos(q[1])*np.cos(q[4])*np.cos(q[2] + q[3] + q[4])\
-            + coml[4]*np.cos(q[4])*np.cos(q[2] + q[3] + q[4])
-        self.JCOM4[1, 0] = -(L[1] + coml[4]*np.cos(q[4]))*np.sin(q[1])*np.cos(q[2] + q[3] + q[4])
-        self.JCOM4[1, 1] = -L[1]*np.sin(q[2] + q[3] + q[4])*np.cos(q[1])\
-            + L[2]*np.sin(-q[2] + q[3] + q[4]) + coml[4]*np.sin(q[4])*np.cos(q[2] + q[3] + q[4])\
-            - coml[4]*np.sin(q[2] + q[3] + q[4])*np.cos(q[1])*np.cos(q[4])
-        self.JCOM4[1, 2] = -L[1]*np.sin(q[2] + q[3] + q[4])*np.cos(q[1])\
-            - L[2]*np.sin(-q[2] + q[3] + q[4]) - L[3]*np.sin(q[3] - q[4])\
-            + coml[4]*np.sin(q[4])*np.cos(q[2] + q[3] + q[4])\
-            - coml[4]*np.sin(q[2] + q[3] + q[4])*np.cos(q[1])*np.cos(q[4])
-        self.JCOM4[1, 3] = -L[1]*np.sin(q[2] + q[3] + q[4])*np.cos(q[1])\
-            - L[2]*np.sin(-q[2] + q[3] + q[4]) + L[3]*np.sin(q[3] - q[4]) - L[4]*np.sin(q[4])\
-            - coml[4]*np.sin(q[4])*np.cos(q[1])*np.cos(q[2] + q[3] + q[4])\
-            + coml[4]*np.sin(q[4])*np.cos(q[2] + q[3] + q[4])\
-            - coml[4]*np.sin(q[2] + q[3] + q[4])*np.cos(q[1])*np.cos(q[4])\
-            + coml[4]*np.sin(q[2] + q[3] + q[4])*np.cos(q[4])
-        self.JCOM4[2, 0] = (L[1] + coml[4]*np.cos(q[4]))*np.cos(q[1])
-        self.JCOM4[2, 3] = -coml[4]*np.sin(q[1])*np.sin(q[4])
-        self.JCOM4[5, :] = 1
+        return JCOM2
+    
+    def gen_jacCOM3(self, q=None):
+        """Generates the Jacobian from the COM of the third
+        link to the origin frame"""
+        q = self.q if q is None else q
+        q1 = q[1]
+        q2 = q[2]
+        q3 = q[3]
+        
+        JCOM3 = np.zeros((6, 4))
+        JCOM3[0, 0] = (L[1]+coml[3]*np.cos(q3))*np.sin(q1)*np.sin(q2+q3)
+        JCOM3[0, 1] = -L[1]*np.cos(q1)*np.cos(q2+q3)\
+            + L[2]*np.cos(q2-q3) - coml[3]*np.sin(q3)*np.sin(q2+q3)\
+            - coml[3]*np.cos(q1)*np.cos(q3)*np.cos(q2+q3)
+        JCOM3[0, 2] = -L[1]*np.cos(q1)*np.cos(q2 + q3) - L[2]*np.cos(q2 - q3)\
+            + L[3]*np.cos(q3) + coml[3]*np.sin(q3)*np.sin(q2 + q3)*np.cos(q1)\
+            - coml[3]*np.sin(q3)*np.sin(q2 + q3)\
+            - coml[3]*np.cos(q1)*np.cos(q3)*np.cos(q2 + q3)\
+            + coml[3]*np.cos(q3)*np.cos(q2 + q3)
+        JCOM3[1, 0] = -(L[1]+coml[3]*np.cos(q3))*np.sin(q1)*np.cos(q2+q3)
+        JCOM3[1, 1] = -L[1]*np.sin(q2+q3)*np.cos(q1) - L[2]*np.sin(q2-q3)\
+            + coml[3]*np.sin(q3)*np.cos(q2+q3)\
+            - coml[3]*np.sin(q2+q3)*np.cos(q1)*np.cos(q3)
+        JCOM3[1, 2] = -L[1]*np.sin(q2 + q3)*np.cos(q1) + L[2]*np.sin(q2 - q3)\
+            - L[3]*np.sin(q3) - coml[3]*np.sin(q3)*np.cos(q1)*np.cos(q2 + q3)\
+            + coml[3]*np.sin(q3)*np.cos(q2 + q3)\
+            - coml[3]*np.sin(q2 + q3)*np.cos(q1)*np.cos(q3)\
+            + coml[3]*np.sin(q2 + q3)*np.cos(q3)
+        JCOM3[2, 0] = (L[1]+coml[3]*np.cos(q3))*np.cos(q1)
+        JCOM3[2, 2] = -coml[3]*np.sin(q1)*np.sin(q3)
+        JCOM3[5, :] = 1
 
-        def gen_Mq(self, q=None):
-            # Mass matrix
-            M1 = self.MM[1]
-            M2 = self.MM[2]
-            M3 = self.MM[3]
+        return JCOM3
+    
+    def gen_jacCOM4(self, q=None):
+        """Generates the Jacobian from the COM of the fourth
+        link to the origin frame"""
+        q = self.q if q is None else q
+        q1 = q[1]
+        q2 = q[2]
+        q3 = q[3]
+        q4 = q[4]
+        
+        JCOM4 = np.zeros((6, 4))
+        JCOM4[0, 0] = (L[1] + coml[4]*np.cos(q4))*np.sin(q1)*np.sin(q2 + q3 + q4)
+        JCOM4[0, 1] = -L[1]*np.cos(q1)*np.cos(q2 + q3 + q4)\
+            + L[2]*np.cos(-q2 + q3 + q4) - coml[4]*np.sin(q4)*np.sin(q2 + q3 + q4)\
+            - coml[4]*np.cos(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)
+        JCOM4[0, 2] = -L[1]*np.cos(q1)*np.cos(q2 + q3 + q4)\
+            - L[2]*np.cos(-q2 + q3 + q4) + L[3]*np.cos(q3 - q4)\
+            - coml[4]*np.sin(q4)*np.sin(q2 + q3 + q4)\
+            - coml[4]*np.cos(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)
+        JCOM4[0, 3] = -L[1]*np.cos(q1)*np.cos(q2 + q3 + q4)\
+            - L[2]*np.cos(-q2 + q3 + q4) - L[3]*np.cos(q3 - q4) + L[4]*np.cos(q4)\
+            + coml[4]*np.sin(q4)*np.sin(q2 + q3 + q4)*np.cos(q1)\
+            - coml[4]*np.sin(q4)*np.sin(q2 + q3 + q4)\
+            - coml[4]*np.cos(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)\
+            + coml[4]*np.cos(q4)*np.cos(q2 + q3 + q4)
+        JCOM4[1, 0] = -(L[1] + coml[4]*np.cos(q4))*np.sin(q1)*np.cos(q2 + q3 + q4)
+        JCOM4[1, 1] = -L[1]*np.sin(q2 + q3 + q4)*np.cos(q1)\
+            + L[2]*np.sin(-q2 + q3 + q4) + coml[4]*np.sin(q4)*np.cos(q2 + q3 + q4)\
+            - coml[4]*np.sin(q2 + q3 + q4)*np.cos(q1)*np.cos(q4)
+        JCOM4[1, 2] = -L[1]*np.sin(q2 + q3 + q4)*np.cos(q1)\
+            - L[2]*np.sin(-q2 + q3 + q4) - L[3]*np.sin(q3 - q4)\
+            + coml[4]*np.sin(q4)*np.cos(q2 + q3 + q4)\
+            - coml[4]*np.sin(q2 + q3 + q4)*np.cos(q1)*np.cos(q4)
+        JCOM4[1, 3] = -L[1]*np.sin(q2 + q3 + q4)*np.cos(q1)\
+            - L[2]*np.sin(-q2 + q3 + q4) + L[3]*np.sin(q3 - q4) - L[4]*np.sin(q4)\
+            - coml[4]*np.sin(q4)*np.cos(q1)*np.cos(q2 + q3 + q4)\
+            + coml[4]*np.sin(q4)*np.cos(q2 + q3 + q4)\
+            - coml[4]*np.sin(q2 + q3 + q4)*np.cos(q1)*np.cos(q4)\
+            + coml[4]*np.sin(q2 + q3 + q4)*np.cos(q4)
+        JCOM4[2, 0] = (L[1] + coml[4]*np.cos(q4))*np.cos(q1)
+        JCOM4[2, 3] = -coml[4]*np.sin(q1)*np.sin(q4)
+        JCOM4[5, :] = 1
+        
+        return JCOM4
 
-            Mq = (np.dot(JCOM1.T, np.dot(M1, JCOM1)) +
-                  np.dot(JCOM2.T, np.dot(M2, JCOM2)) +
-                  np.dot(JCOM3.T, np.dot(M3, JCOM3)) +
-                  np.dot(JCOM4.T, np.dot(M4, JCOM4)))
+    def gen_jacEE(self, q=None):
+        """Generates the Jacobian from the end effector to the origin frame"""
+        q = self.q if q is None else q
+        q1 = q[1]
+        q2 = q[2]
+        q3 = q[3]
+        q4 = q[4]
+        
+        JEE = np.zeros((3, 4)) # Only x, y, z forces controlled, others dropped
+        JEE[0, 0] = L[4]*np.sin(q1)*np.sin(q2 + q3 + q4)*np.cos(q4)
+        JEE[0, 1] = -L[4]*(np.sin(q4)*np.sin(q2 + q3 + q4)\
+            + np.cos(q1)*np.cos(q4)*np.cos(q2 + q3 + q4))
+        JEE[0, 2] = JEE[0, 1]
+        JEE[0, 3] = L[4]*(np.cos(q2 + q3 + 2*q4)\
+            - np.cos(-q1 + q2 + q3 + 2*q4)/2 - np.cos(q1 + q2 + q3 + 2*q4)/2)
+        JEE[1, 0] = -L[4]*np.sin(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)
+        JEE[1, 1] = L[4]*(np.sin(q4)*np.cos(q2 + q3 + q4)\
+            - np.sin(q2 + q3 + q4)*np.cos(q1)*np.cos(q4))
+        JEE[1, 2] = JEE[1, 1]
+        JEE[1, 3] = L[4]*(np.sin(q2 + q3 + 2*q4)\
+            - np.sin(-q1 + q2 + q3 + 2*q4)/2 - np.sin(q1 + q2 + q3 + 2*q4)/2)
+        JEE[2, 0] = L[4]*np.cos(q1)*np.cos(q4)
+        JEE[2, 3] = -L[4]*np.sin(q1)*np.sin(q4)
 
-            return Mq
+        return JEE
+    
+    def gen_Mx(self, JEE = None, q=None, **kwargs):
+        # Mass matrix
+        M1 = self.MM[1]
+        M2 = self.MM[2]
+        M3 = self.MM[3]
+        
+        JCOM1 = self.gen_jacCOM1(q=q)
+        JCOM2 = self.gen_jacCOM2(q=q)
+        JCOM3 = self.gen_jacCOM3(q=q)
+        JCOM4 = self.gen_jacCOM3(q=q)
+        
+        Mq = (np.dot(JCOM1.T, np.dot(M1, JCOM1)) +
+              np.dot(JCOM2.T, np.dot(M2, JCOM2)) +
+              np.dot(JCOM3.T, np.dot(M3, JCOM3)) +
+              np.dot(JCOM4.T, np.dot(M4, JCOM4)))
+
+        if JEE is None:
+            JEE = self.gen_jacEE(q=q)
+        Mx_inv = np.dot(JEE, np.dot(np.linalg.inv(Mq), JEE.T))
+        u, s, v = np.linalg.svd(Mx_inv)
+        # cut off any singular values that could cause control problems
+        for i in range(len(s)):
+            s[i] = 0 if s[i] < singularity_thresh else 1./float(s[i])
+        # numpy returns U,S,V.T, so have to transpose both here
+        Mx = np.dot(v.T, np.dot(np.diag(s), u.T))
+
+        return Mx
+
+        # calculate force
+        Fx = np.dot(Mx, x_des)
+        self.u = (np.dot(JEE.T, Fx).reshape(-1,) -
+                  np.dot(Mq, self.kv * arm.dq))
+
+        return self.u
+    
 robert = Robot()
 #print(robert.MM[7])
-print(robert.JCOM4)
+print(robert.gen_Mx())
