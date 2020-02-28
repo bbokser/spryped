@@ -1,21 +1,10 @@
 # Copyright 2020 Benjamin Bokser
 
-'''
-Copyright (C) 2013 Travis DeWolf
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-'''
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from ..RobotBase import RobotBase
 
@@ -78,15 +67,13 @@ L3 = 0.5 # tarsometatarsus left
 L4 = 0.061 # toe left
 L = np.array([L0, L1, L2, L3, L4, L1, L2, L3, L4])
 
-class Robot(RobotBase):
+class Robot:
 
-    def __init__(self, init_q=[0, np.pi/4, -np.pi*40.3/180, np.pi*84.629/180,-np.pi*44.329/180,
-                 np.pi/4, -np.pi*40.3/180, np.pi*84.629/180, -np.pi*44.329/180.],
+    def __init__(self, q=np.zeros(9), dq=np.zeros(9),
+                 init_q=[0, np.pi/4, -np.pi*40.3/180, np.pi*84.629/180,-np.pi*44.329/180,
+                         np.pi/4, -np.pi*40.3/180, np.pi*84.629/180, -np.pi*44.329/180.],
                  init_dq=[0., 0., 0., 0., 0., 0., 0.], singularity_thresh=.00025, **kwargs):
 
-        self.DOF = 8
-        RobotBase.__init__(self, init_q=init_q, init_dq=init_dq, **kwargs)
-        
         # mass matrices
         self.MM = []
         for i in range(9):
@@ -104,24 +91,6 @@ class Robot(RobotBase):
             #self.MM.insert(i,M)
             self.MM.append(M)
 
-        self.state = np.zeros(7)
-        update state from simulator using dt
-        reset state
-        self.reset()
-        self.update_state()
-
-    def apply_torque(self, u, dt=None):
-        # Takes in torque and timestep and updates robot accordingly
-
-        if dt is None:
-            dt = self.dt
-
-        u = -1*np.array(u, dtype='float')
-
-        for ii in range(int(np.ceil(dt/1e-5))):
-            self.sim.step(self.state, u)
-        self.update_state()
-        
     def gen_jacCOM1(self, q=None):
         """Generates the Jacobian from the COM of the first
         link to the origin frame"""
@@ -255,7 +224,7 @@ class Robot(RobotBase):
 
         return JEE
     
-    def gen_Mq(self, q=None):
+    def gen_Mx(self, JEE = None, q=None, **kwargs):
         # Mass matrix
         M1 = self.MM[1]
         M2 = self.MM[2]
@@ -271,31 +240,25 @@ class Robot(RobotBase):
               np.dot(JCOM3.T, np.dot(M3, JCOM3)) +
               np.dot(JCOM4.T, np.dot(M4, JCOM4)))
 
-        return Mq
+        if JEE is None:
+            JEE = self.gen_jacEE(q=q)
+        Mx_inv = np.dot(JEE, np.dot(np.linalg.inv(Mq), JEE.T))
+        u, s, v = np.linalg.svd(Mx_inv)
+        # cut off any singular values that could cause control problems
+        for i in range(len(s)):
+            s[i] = 0 if s[i] < singularity_thresh else 1./float(s[i])
+        # numpy returns U,S,V.T, so have to transpose both here
+        Mx = np.dot(v.T, np.dot(np.diag(s), u.T))
 
-    def reset(self, q=[], dq=[]):
-        if isinstance(q, np.ndarray):
-            q = q.tolist()
-        if isinstance(dq, np.ndarray):
-            dq = dq.tolist()
+        return Mx
 
-        if q:
-            assert len(q) == self.DOF
-        if dq:
-            assert len(dq) == self.DOF
+        # calculate force
+        Fx = np.dot(Mx, x_des)
+        self.u = (np.dot(JEE.T, Fx).reshape(-1,) -
+                  np.dot(Mq, self.kv * arm.dq))
 
-        state = np.zeros(self.DOF*2)
-        state[1::2] =  self.init_dq if not dq else np.copy(dq)
-
-        self.sim.reset(self.state, state)
-        self.update_state()
-
-    def update_state(self):
-        #Update the local variables
-        self.t = self.state[0]
-        self.q = self.state[1:4]
-        self.dq = self.state[4:]
-           
+        return self.u
+    
 robert = Robot()
 #print(robert.MM[7])
 print(robert.gen_Mx())

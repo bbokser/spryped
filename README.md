@@ -1,7 +1,31 @@
-# spryped
+***INSERT GRAPHIC HERE***
 
-I am developing a bipedal robot featuring my custom made QDD actuator, SpryDrive. Compare the "chickenwalker" design to Agility Robotics' Cassie, as well as the Blackbird bipedal robot. The focus of my design is to move the CoM as far upward as possible (to better match the SLIP model) while also reducing limb inertia and optimizing for low weight, profile, and simplicity. To achieve this, I have located the ankle and toe actuators in the tibiotarsus member and set the ratio of the lengths of the tibiotarsus member to the tarsometatarsus member as 2:5 (whereas traditionally a roughly 1:1 ratio is used). "Toe" (or foot) actuation is attained with the use of a four-bar linkage mechanism, although I am also considering a belt drive. It is unlikely that I will include yaw actuation in the first iteration, as it is almost exclusively used for turning rather than the acts of balancing and walking.
+# Spryped
 
-This repo is being built for use with PyBullet. 
+> An Impedance Controlled Bipedal Robot
 
-I am currently learning to use methods such as whole body operational space control for the balancing controller. 
+**Badges will go here**
+
+## Table of Contents (Optional)
+
+- [Setup](#setup)
+- [Info](#info)
+
+---
+
+## Setup
+
+You will need to install PyBullet to run the simulation. 
+
+```shell
+pip3 install pybullet
+
+```
+
+Here is the [PyBullet tutorial](https://docs.google.com/document/d/10sXEhzFRSnvFcl3XxNGhnD4N2SedqwdAvK3dsihxVUA/edit#heading=h.2ye70wns7io3).
+
+---
+
+## Info
+
+This is the Github repo for a bipedal robot that I am developing featuring my custom made QDD actuator, SpryDrive. Compare the "chickenwalker" design to Agility Robotics' Cassie, as well as the Blackbird bipedal robot. The focus of my design is to move the CoM as far upward as possible (to better match the SLIP model) while also reducing limb inertia and optimizing for low weight, profile, and simplicity. I am currently learning to use methods such as whole body operational space control for the balancing controller. 
