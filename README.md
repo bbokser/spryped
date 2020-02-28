@@ -1,10 +1,6 @@
-***INSERT GRAPHIC HERE***
-
 # Spryped
 
 > An Impedance Controlled Bipedal Robot
-
-**Badges will go here**
 
 ## Table of Contents (Optional)
 
