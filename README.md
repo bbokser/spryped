@@ -2,7 +2,7 @@
 
 > An Impedance Controlled Bipedal Robot
 
-## Table of Contents (Optional)
+## Table of Contents
 
 - [Setup](#setup)
 - [Info](#info)
