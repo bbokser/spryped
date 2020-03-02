@@ -1,7 +1,5 @@
-# Copyright 2020 Benjamin Bokser
-
 '''
-Copyright (C) 2013 Travis DeWolf
+Copyright (C) 2020 Benjamin Bokser
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
