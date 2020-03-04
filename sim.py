@@ -23,6 +23,7 @@ import pybullet as p
 import pybullet_data
 
 from osc import Control
+from robot import Robot
 
 GRAVITY = -9.81
 dt = 1e-3
@@ -51,7 +52,10 @@ for i in range(p.getNumJoints(robot)):
   p.setJointMotorControl2(robot, i, p.VELOCITY_CONTROL, force=1)
   # force=1 allows us to easily mimic joint friction rather than disabling
   p.enableJointForceTorqueSensor(robot,i,1) # enable joint torque sensing
-print(Control.control.u)
+
+robot = Robot()
+c = Control()
+print(c.control())
 '''
 while(1):
     time.sleep(dt)

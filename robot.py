@@ -1,7 +1,6 @@
-# Copyright 2020 Benjamin Bokser
-
 '''
 Copyright (C) 2013 Travis DeWolf
+Copyright (C) 2020 Benjamin Bokser
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -17,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from ..RobotBase import RobotBase
+from RobotBase import RobotBase
 
 import numpy as np
 import math
@@ -82,11 +81,20 @@ class Robot(RobotBase):
 
     def __init__(self, init_q=[0, np.pi/4, -np.pi*40.3/180, np.pi*84.629/180,-np.pi*44.329/180,
                  np.pi/4, -np.pi*40.3/180, np.pi*84.629/180, -np.pi*44.329/180.],
-                 init_dq=[0., 0., 0., 0., 0., 0., 0.], singularity_thresh=.00025, **kwargs):
+                 init_dq=[0., 0., 0., 0., 0., 0., 0., 0.], singularity_thresh=.00025, **kwargs):
 
         self.DOF = 8
         RobotBase.__init__(self, init_q=init_q, init_dq=init_dq, **kwargs)
-        
+        # build the robot you would like to use by editing
+        # the setup file to import the desired model and running
+        # python setup.py build_ext -i
+        # name the resulting .so file to match and go
+        arm_import_name = 'arms.three_link.py3LinkArm'
+        arm_import_name = (arm_import_name if self.options is None
+                           else '_' + self.options)
+        print(arm_import_name)
+        pyRobot = importlib.import_module(name=arm_import_name)
+
         # mass matrices
         self.MM = []
         for i in range(9):
@@ -105,8 +113,10 @@ class Robot(RobotBase):
             self.MM.append(M)
 
         self.state = np.zeros(7)
-        update state from simulator using dt
-        reset state
+        # update state from simulator using dt
+        self.sim = pyArm.pySim(dt=1e-5)
+        self.sim.reset(self.state)
+        # reset state
         self.reset()
         self.update_state()
 
@@ -285,6 +295,7 @@ class Robot(RobotBase):
             assert len(dq) == self.DOF
 
         state = np.zeros(self.DOF*2)
+        # slice starting from 1 w/ step size of 2
         state[1::2] =  self.init_dq if not dq else np.copy(dq)
 
         self.sim.reset(self.state, state)
@@ -296,6 +307,6 @@ class Robot(RobotBase):
         self.q = self.state[1:4]
         self.dq = self.state[4:]
            
-robert = Robot()
+#robert = Robot()
 #print(robert.MM[7])
-print(robert.gen_Mx())
+#print(robert.gen_Mx())
