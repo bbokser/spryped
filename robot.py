@@ -15,12 +15,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
-
-from RobotBase import RobotBase
-
 import numpy as np
 import math
 import csv
+
+import sim
+
+from RobotBase import RobotBase
 
 values = []
 with open('spryped_urdf_rev05/urdf/spryped_urdf_rev05.csv', 'r') as csvfile:
@@ -78,22 +79,13 @@ L4 = 0.061 # toe left
 L = np.array([L0, L1, L2, L3, L4, L1, L2, L3, L4])
 
 class Robot(RobotBase):
-
+    # first value in q and dq refer to BODY position
     def __init__(self, init_q=[0, np.pi/4, -np.pi*40.3/180, np.pi*84.629/180,-np.pi*44.329/180,
                  np.pi/4, -np.pi*40.3/180, np.pi*84.629/180, -np.pi*44.329/180.],
-                 init_dq=[0., 0., 0., 0., 0., 0., 0., 0.], singularity_thresh=.00025, **kwargs):
+                 init_dq=[0., 0., 0., 0., 0., 0., 0., 0., 0.], singularity_thresh=.00025, **kwargs):
 
-        self.DOF = 8
+        self.DOF = 9
         RobotBase.__init__(self, init_q=init_q, init_dq=init_dq, **kwargs)
-        # build the robot you would like to use by editing
-        # the setup file to import the desired model and running
-        # python setup.py build_ext -i
-        # name the resulting .so file to match and go
-        arm_import_name = 'arms.three_link.py3LinkArm'
-        arm_import_name = (arm_import_name if self.options is None
-                           else '_' + self.options)
-        print(arm_import_name)
-        pyRobot = importlib.import_module(name=arm_import_name)
 
         # mass matrices
         self.MM = []
@@ -112,10 +104,11 @@ class Robot(RobotBase):
             #self.MM.insert(i,M)
             self.MM.append(M)
 
-        self.state = np.zeros(7)
-        # update state from simulator using dt
-        self.sim = pyArm.pySim(dt=1e-5)
-        self.sim.reset(self.state)
+        #self.state = np.zeros(7)
+        # initialize sim
+        # self.sim = pyRobot.pySim(dt=1e-5)
+        # send reset command to sim
+        # self.sim.reset(self.state)
         # reset state
         self.reset()
         self.update_state()
@@ -295,18 +288,19 @@ class Robot(RobotBase):
             assert len(dq) == self.DOF
 
         state = np.zeros(self.DOF*2)
-        # slice starting from 1 w/ step size of 2
+        # slice w/ step size of 2 to interweave q and dq into state
+        state[::2] = self.init_q if not q else np.copy(q)
         state[1::2] =  self.init_dq if not dq else np.copy(dq)
-
-        self.sim.reset(self.state, state)
-        self.update_state()
+        
+        self.update_state() # is this necessary? Seems redundant
 
     def update_state(self):
-        #Update the local variables
+        # Update the local variables
+        state = sim.get_state()
         self.t = self.state[0]
         self.q = self.state[1:4]
         self.dq = self.state[4:]
-           
+        
 #robert = Robot()
 #print(robert.MM[7])
 #print(robert.gen_Mx())

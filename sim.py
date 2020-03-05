@@ -56,21 +56,29 @@ for i in range(p.getNumJoints(robot)):
 robot = Robot()
 c = Control()
 print(c.control())
-'''
+
+def reaction(self):
+    reaction_force=[j[2] for j in p.getJointStates(robot,range(7))] # j[2] selects jointReactionForces
+    #  [Fx, Fy, Fz, Mx, My, Mz]
+    return reaction_force[:][4] # selected joint 1 and 5 Mz, all other joints My
+  
+def get_state(self):
+    state_q = [j[0] for j in p.getJointStates(robot,range(7))]
+    state_dq = [j[1] for j in p.getJointStates(robot,range(7))]
+    state = append(state_q, state_dq)
+    return state
+  
 while(1):
     time.sleep(dt)
     p.setJointMotorControlArray(robot, jointArray, p.TORQUE_CONTROL, forces=u)
     
-    states=[j[2] for j in p.getJointStates(robot,range(7))] # j[2] selects jointReactionForces
-    #  [Fx, Fy, Fz, Mx, My, Mz]
-    print(states[1][4]) #'%s' % float('%.1g' % pront[1])) # selected joint 2, My
+    #states=[j[2] for j in p.getJointStates(robot,range(7))] # j[2] selects jointReactionForces
+    #print(states[1][4]) #'%s' % float('%.1g' % pront[1])) # selected joint 2, My
     
     if (useRealTime == 0):
         p.stepSimulation()
         
 time.sleep(10000)
-
-'''
 
 
 
