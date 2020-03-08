@@ -77,24 +77,24 @@ class Control(control.Control):
         # if null_control is selected and the task space has
         # fewer DOFs than the robot, add a control signal in the
         # null space to try to move the robot to its resting state
-        if self.null_control and self.DOF < len(robot.L):
+       # if self.null_control and self.DOF < len(robot.L):
 
             # calculate our secondary control signal
             # calculated desired joint angle acceleration
-            prop_val = ((robot.rest_angles - robot.q) + np.pi) % (np.pi*2) - np.pi
-            q_des = (self.kp * prop_val + \
-                     self.kv * -robot.dq).reshape(-1,)
+           # prop_val = ((robot.rest_angles - robot.q) + np.pi) % (np.pi*2) - np.pi
+           # q_des = (self.kp * prop_val + \
+           #          self.kv * -robot.dq).reshape(-1,)
 
-            Mq = robot.gen_Mq()
-            u_null = np.dot(Mq, q_des)
+           # Mq = robot.gen_Mq()
+           # u_null = np.dot(Mq, q_des)
 
             # calculate the null space filter
-            Jdyn_inv = np.dot(Mx, np.dot(JEE, np.linalg.inv(Mq)))
-            null_filter = np.eye(len(robot.L)) - np.dot(JEE.T, Jdyn_inv)
+           # Jdyn_inv = np.dot(Mx, np.dot(JEE, np.linalg.inv(Mq)))
+           # null_filter = np.eye(len(robot.L)) - np.dot(JEE.T, Jdyn_inv)
 
-            null_signal = np.dot(null_filter, u_null).reshape(-1,)
+           # null_signal = np.dot(null_filter, u_null).reshape(-1,)
 
-            self.u += null_signal
+           # self.u += null_signal
 
         if self.write_to_file is True:
             # feed recorders their signals

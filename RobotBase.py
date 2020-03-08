@@ -64,10 +64,10 @@ class RobotBase:
 
         return Mx
 
-    def position(self, q=None):
+    #def position(self, q=None):
         #Compute x,y position of the end effector
 
-        raise NotImplementedError
+     #   raise NotImplementedError
 
     def reset(self, q=[], dq=[]):
         #Resets the state of the arm

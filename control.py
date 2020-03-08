@@ -42,11 +42,11 @@ class Control(object):
         self.write_to_file = write_to_file
         self.recorders = []
 
-    def check_distance(self, arm):
+    def check_distance(self, robot):
         """Checks the distance to target"""
-        return np.sum(abs(arm.x - self.target)) + np.sum(abs(arm.dq))
+        return np.sum(abs(robot.x - self.target)) + np.sum(abs(robot.dq))
 
     def control(self):
-        """Generates a control signal to apply to the arm"""
+        """Generates a control signal to apply to the robot"""
         raise NotImplementedError
 

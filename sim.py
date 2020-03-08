@@ -27,15 +27,26 @@ from robot import Robot
 
 GRAVITY = -9.81
 dt = 1e-3
-
+  
 physicsClient = p.connect(p.GUI)
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.resetSimulation()
 planeID = p.loadURDF("plane.urdf")
 robotStartOrientation = p.getQuaternionFromEuler([0,0,0])
-robot = p.loadURDF("spryped_urdf_rev05/urdf/spryped_urdf_rev05.urdf", [0,0,0.8],
+bot = p.loadURDF("spryped_urdf_rev05/urdf/spryped_urdf_rev05.urdf", [0,0,0.8],
                    robotStartOrientation, useFixedBase=1)
 
+def reaction(self):
+    reaction_force=[j[2] for j in p.getJointStates(bot,range(7))] # j[2]=jointReactionForces
+    #  [Fx, Fy, Fz, Mx, My, Mz]
+    return reaction_force[:][4] # selected joint 1 and 5 Mz, all other joints My
+
+def get_states(self):
+    self.q = [j[0] for j in p.getJointStates(bot,range(7))]
+    self.dq = [j[1] for j in p.getJointStates(bot,range(7))]
+    state = append(state_q, state_dq)
+    return state
+        
 p.setGravity(0,0, GRAVITY)
 p.setTimeStep(dt)
 
@@ -45,36 +56,23 @@ useRealTime = 0
 torque = 4;
 u = [torque, torque, torque, torque, torque, torque, torque, torque]
 
-jointArray = range(p.getNumJoints(robot))
+jointArray = range(p.getNumJoints(bot))
 
 # Disable the default velocity/position motor:
-for i in range(p.getNumJoints(robot)):
-  p.setJointMotorControl2(robot, i, p.VELOCITY_CONTROL, force=1)
+for i in range(p.getNumJoints(bot)):
+  p.setJointMotorControl2(bot, i, p.VELOCITY_CONTROL, force=1)
   # force=1 allows us to easily mimic joint friction rather than disabling
-  p.enableJointForceTorqueSensor(robot,i,1) # enable joint torque sensing
+  p.enableJointForceTorqueSensor(bot,i,1) # enable joint torque sensing
 
 robot = Robot()
 c = Control()
-print(c.control())
+print(c.control(robot=robot))
 
-def reaction(self):
-    reaction_force=[j[2] for j in p.getJointStates(robot,range(7))] # j[2] selects jointReactionForces
-    #  [Fx, Fy, Fz, Mx, My, Mz]
-    return reaction_force[:][4] # selected joint 1 and 5 Mz, all other joints My
-  
-def get_state(self):
-    state_q = [j[0] for j in p.getJointStates(robot,range(7))]
-    state_dq = [j[1] for j in p.getJointStates(robot,range(7))]
-    state = append(state_q, state_dq)
-    return state
-  
 while(1):
     time.sleep(dt)
-    p.setJointMotorControlArray(robot, jointArray, p.TORQUE_CONTROL, forces=u)
-    
-    #states=[j[2] for j in p.getJointStates(robot,range(7))] # j[2] selects jointReactionForces
+    p.setJointMotorControlArray(bot, jointArray, p.TORQUE_CONTROL, forces=u)
+    #states=[j[2] for j in p.getJointStates(bot,range(7))] # j[2] selects jointReactionForces
     #print(states[1][4]) #'%s' % float('%.1g' % pront[1])) # selected joint 2, My
-    
     if (useRealTime == 0):
         p.stepSimulation()
         

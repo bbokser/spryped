@@ -19,7 +19,7 @@ import numpy as np
 import math
 import csv
 
-import sim
+import pybullet as p
 
 from RobotBase import RobotBase
 
@@ -276,6 +276,38 @@ class Robot(RobotBase):
 
         return Mq
 
+    def position(self, q=None):
+        """forward kinematics
+        Compute x,y,z position of end effector relative to base
+
+        q np.array: a set of angles to return positions for
+        """
+        if q is None:
+            q0 = self.q[0]
+            q1 = self.q[1]
+            q2 = self.q[2]
+            q3 = self.q[3]
+            q4 = self.q[4]
+        else:
+            q0 = q[0]
+            q1 = q[1]
+            q2 = q[2]
+            q3 = q[3]
+            q4 = q[4]
+            
+        x = np.cumsum([0, # cumulative sum
+                       self.L[0] * np.cos(q0),
+                       self.L[1] * np.cos(q0+q1),
+                       self.L[2] * np.cos(q0+q1+q2)])
+                       self.L[3] * np.cos(q0+q1+q2+q3)])
+                       self.L[4] * np.cos(q0+q1+q2+q3+q4)])
+        y = np.cumsum([0,
+                       self.L[0] * np.sin(q0),
+                       self.L[1] * np.sin(q0+q1),
+                       self.L[2] * np.sin(q0+q1+q2)])
+                       self.L[3] * np.sin(q0+q1+q2+q3])
+        return np.array([x, y])
+    
     def reset(self, q=[], dq=[]):
         if isinstance(q, np.ndarray):
             q = q.tolist()
@@ -296,10 +328,12 @@ class Robot(RobotBase):
 
     def update_state(self):
         # Update the local variables
-        state = sim.get_state()
-        self.t = self.state[0]
-        self.q = self.state[1:4]
-        self.dq = self.state[4:]
+        self.q = [j[0] for j in p.getJointStates(1,range(7))]
+        self.dq = [j[1] for j in p.getJointStates(1,range(7))]
+        #state = np.append(state_q, state_dq)
+        #self.t = self.state[0]
+        #self.q = self.state[1:4]
+        #self.dq = self.state[4:]
         
 #robert = Robot()
 #print(robert.MM[7])
