@@ -108,11 +108,11 @@ class Control(control.Control):
 
         return self.u
 
-    """def gen_target(self, robot):
+    def gen_target(self, robot):
         #Generate a random target
         gain = np.sum(robot.L) * .75
         bias = -np.sum(robot.L) * 0
 
         self.target = np.random.random(size=(2,)) * gain + bias
 
-        return self.target.tolist()"""
+        return self.target.tolist()

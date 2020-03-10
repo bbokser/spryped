@@ -23,61 +23,6 @@ import pybullet as p
 
 from RobotBase import RobotBase
 
-values = []
-with open('spryped_urdf_rev05/urdf/spryped_urdf_rev05.csv', 'r') as csvfile:
-    data = csv.reader(csvfile, delimiter=',') 
-    next(data) # skip headers
-    values = list(zip(*(row for row in data))) # transpose rows to columns
-    values = np.array(values) # convert list of nested lists to array
-
-comx = values[1].astype(np.float)
-comy = values[2].astype(np.float)
-comz = values[3].astype(np.float)
-
-mass = values[7].astype(np.float)
-ixx = values[8].astype(np.float)
-ixy = values[9].astype(np.float)
-ixz = values[10].astype(np.float)
-iyy = values[11].astype(np.float)
-iyz = values[12].astype(np.float)
-izz = values[13].astype(np.float)
-
-ox = values[38].astype(np.float)
-oy = values[39].astype(np.float)
-oz = values[40].astype(np.float)
-
-coml = []
-for j in range(9):
-    comlen = math.sqrt((comx[j]**2)+(comz[j]**2)) # joint origin to COM ignoring y axis
-    #comlen = math.sqrt((comx[j]**2)+(comy[j]**2)+(comz[j]**2)) # joint origin to COM length
-    coml.append(comlen)
-#print(coml[1])
-
-# estimating init link angles
-#p = 4
-#dist = math.sqrt((ox[p]**2)+(oz[p]**2))
-#angle = np.degrees(math.atan(oz[p]/dist))
-#print("dist = ", dist)
-#print("angle p = ", angle)
-               
-# link masses
-if mass[1]!=mass[5]:
-    print("WARNING: femur L/R masses unequal, check CAD")
-if mass[2]!=mass[6]:
-    print("WARNING: tibiotarsus L/R masses unequal, check CAD")
-if mass[3]!=mass[7]:
-    print("WARNING: tarsometatarsus L/R masses unequal, check CAD")
-if mass[4]!=mass[8]:
-    print("WARNING: toe L/R masses unequal, check CAD")
-
-# link lengths must be manually updated
-L0 = 0.1 # body
-L1 = 0.1 # femur left
-L2 = 0.199 # tibiotarsus left
-L3 = 0.5 # tarsometatarsus left
-L4 = 0.061 # toe left
-L = np.array([L0, L1, L2, L3, L4, L1, L2, L3, L4])
-
 class Robot(RobotBase):
     # first value in q and dq refer to BODY position
     def __init__(self, init_q=[0, np.pi/4, -np.pi*40.3/180, np.pi*84.629/180,-np.pi*44.329/180,
@@ -86,6 +31,61 @@ class Robot(RobotBase):
 
         self.DOF = 9
         RobotBase.__init__(self, init_q=init_q, init_dq=init_dq, **kwargs)
+
+        values = []
+        with open('spryped_urdf_rev05/urdf/spryped_urdf_rev05.csv', 'r') as csvfile:
+            data = csv.reader(csvfile, delimiter=',') 
+            next(data) # skip headers
+            values = list(zip(*(row for row in data))) # transpose rows to columns
+            values = np.array(values) # convert list of nested lists to array
+
+        comx = values[1].astype(np.float)
+        comy = values[2].astype(np.float)
+        comz = values[3].astype(np.float)
+
+        mass = values[7].astype(np.float)
+        ixx = values[8].astype(np.float)
+        ixy = values[9].astype(np.float)
+        ixz = values[10].astype(np.float)
+        iyy = values[11].astype(np.float)
+        iyz = values[12].astype(np.float)
+        izz = values[13].astype(np.float)
+
+        ox = values[38].astype(np.float)
+        oy = values[39].astype(np.float)
+        oz = values[40].astype(np.float)
+
+        self.coml = []
+        for j in range(9):
+            comlen = math.sqrt((comx[j]**2)+(comz[j]**2)) # joint origin to COM ignoring y axis
+            #comlen = math.sqrt((comx[j]**2)+(comy[j]**2)+(comz[j]**2)) # joint origin to COM length
+            self.coml.append(comlen)
+        #print(self.coml[1])
+
+        # estimating init link angles
+        #p = 4
+        #dist = math.sqrt((ox[p]**2)+(oz[p]**2))
+        #angle = np.degrees(math.atan(oz[p]/dist))
+        #print("dist = ", dist)
+        #print("angle p = ", angle)
+               
+        # link masses
+        if mass[1]!=mass[5]:
+            print("WARNING: femur L/R masses unequal, check CAD")
+        if mass[2]!=mass[6]:
+            print("WARNING: tibiotarsus L/R masses unequal, check CAD")
+        if mass[3]!=mass[7]:
+            print("WARNING: tarsometatarsus L/R masses unequal, check CAD")
+        if mass[4]!=mass[8]:
+            print("WARNING: toe L/R masses unequal, check CAD")
+
+        # link lengths must be manually updated
+        L0 = 0.1 # body
+        L1 = 0.1 # femur left
+        L2 = 0.199 # tibiotarsus left
+        L3 = 0.5 # tarsometatarsus left
+        L4 = 0.061 # toe left
+        self.L = np.array([L0, L1, L2, L3, L4, L1, L2, L3, L4])
 
         # mass matrices
         self.MM = []
@@ -130,10 +130,13 @@ class Robot(RobotBase):
         link to the origin frame"""
         q = self.q if q is None else q
         q1 = q[1]
-    
+
+        L1 = self.L[1]
+        coml1 = self.coml[1]
+        
         JCOM1 = np.zeros((6, 4))
-        JCOM1[1, 0] = -L[1]*np.sin(q1) - 2*coml[1]*np.sin(2*q1)
-        JCOM1[2, 0] = L[1]*np.cos(q1) + 2*coml[1]*np.cos(2*q1)
+        JCOM1[1, 0] = -L1*np.sin(q1) - 2*coml1*np.sin(2*q1)
+        JCOM1[2, 0] = L1*np.cos(q1) + 2*coml1*np.cos(2*q1)
         JCOM1[3, :] = 1
 
         return JCOM1
@@ -144,13 +147,17 @@ class Robot(RobotBase):
         q = self.q if q is None else q
         q1 = q[1]
         q2 = q[2]
+
+        L1 = self.L[1]
+        L2 = self.L[2]
+        coml2 = self.coml[2]
         
         JCOM2 = np.zeros((6, 4))
-        JCOM2[0, 1] = L[2]*np.cos(q2)
-        JCOM2[1, 0] = -(L[1]+L[2]*np.cos(q2)+coml[2])*np.sin(q1)
-        JCOM2[1, 1] = -L[2]*np.sin(q2)*np.cos(q1)
-        JCOM2[2, 0] = (L[1]+L[2]*np.cos(q2)+coml[2])*np.cos(q1)
-        JCOM2[2, 1] = -L[2]*np.sin(q1)*np.sin(q2)
+        JCOM2[0, 1] = L2*np.cos(q2)
+        JCOM2[1, 0] = -(L1+L2*np.cos(q2)+coml2)*np.sin(q1)
+        JCOM2[1, 1] = -L2*np.sin(q2)*np.cos(q1)
+        JCOM2[2, 0] = (L1+L2*np.cos(q2)+coml2)*np.cos(q1)
+        JCOM2[2, 1] = -L2*np.sin(q1)*np.sin(q2)
         JCOM2[5, :] = 1
 
         return JCOM2
@@ -158,32 +165,37 @@ class Robot(RobotBase):
     def gen_jacCOM3(self, q=None):
         """Generates the Jacobian from the COM of the third
         link to the origin frame"""
-        q = self.q if q is None else q
+        q = self.q if q is None else q    
         q1 = q[1]
         q2 = q[2]
         q3 = q[3]
+
+        L1 = self.L[1]
+        L2 = self.L[2]
+        L3 = self.L[3]
+        coml3 = self.coml[3]
         
         JCOM3 = np.zeros((6, 4))
-        JCOM3[0, 0] = (L[1]+coml[3]*np.cos(q3))*np.sin(q1)*np.sin(q2+q3)
-        JCOM3[0, 1] = -L[1]*np.cos(q1)*np.cos(q2+q3)\
-            + L[2]*np.cos(q2-q3) - coml[3]*np.sin(q3)*np.sin(q2+q3)\
-            - coml[3]*np.cos(q1)*np.cos(q3)*np.cos(q2+q3)
-        JCOM3[0, 2] = -L[1]*np.cos(q1)*np.cos(q2 + q3) - L[2]*np.cos(q2 - q3)\
-            + L[3]*np.cos(q3) + coml[3]*np.sin(q3)*np.sin(q2 + q3)*np.cos(q1)\
-            - coml[3]*np.sin(q3)*np.sin(q2 + q3)\
-            - coml[3]*np.cos(q1)*np.cos(q3)*np.cos(q2 + q3)\
-            + coml[3]*np.cos(q3)*np.cos(q2 + q3)
-        JCOM3[1, 0] = -(L[1]+coml[3]*np.cos(q3))*np.sin(q1)*np.cos(q2+q3)
-        JCOM3[1, 1] = -L[1]*np.sin(q2+q3)*np.cos(q1) - L[2]*np.sin(q2-q3)\
-            + coml[3]*np.sin(q3)*np.cos(q2+q3)\
-            - coml[3]*np.sin(q2+q3)*np.cos(q1)*np.cos(q3)
-        JCOM3[1, 2] = -L[1]*np.sin(q2 + q3)*np.cos(q1) + L[2]*np.sin(q2 - q3)\
-            - L[3]*np.sin(q3) - coml[3]*np.sin(q3)*np.cos(q1)*np.cos(q2 + q3)\
-            + coml[3]*np.sin(q3)*np.cos(q2 + q3)\
-            - coml[3]*np.sin(q2 + q3)*np.cos(q1)*np.cos(q3)\
-            + coml[3]*np.sin(q2 + q3)*np.cos(q3)
-        JCOM3[2, 0] = (L[1]+coml[3]*np.cos(q3))*np.cos(q1)
-        JCOM3[2, 2] = -coml[3]*np.sin(q1)*np.sin(q3)
+        JCOM3[0, 0] = (L1+coml3*np.cos(q3))*np.sin(q1)*np.sin(q2+q3)
+        JCOM3[0, 1] = -L1*np.cos(q1)*np.cos(q2+q3)\
+            + L2*np.cos(q2-q3) - coml3*np.sin(q3)*np.sin(q2+q3)\
+            - coml3*np.cos(q1)*np.cos(q3)*np.cos(q2+q3)
+        JCOM3[0, 2] = -L1*np.cos(q1)*np.cos(q2 + q3) - L2*np.cos(q2 - q3)\
+            + L3*np.cos(q3) + coml3*np.sin(q3)*np.sin(q2 + q3)*np.cos(q1)\
+            - coml3*np.sin(q3)*np.sin(q2 + q3)\
+            - coml3*np.cos(q1)*np.cos(q3)*np.cos(q2 + q3)\
+            + coml3*np.cos(q3)*np.cos(q2 + q3)
+        JCOM3[1, 0] = -(L1+coml3*np.cos(q3))*np.sin(q1)*np.cos(q2+q3)
+        JCOM3[1, 1] = -L1*np.sin(q2+q3)*np.cos(q1) - L2*np.sin(q2-q3)\
+            + coml3*np.sin(q3)*np.cos(q2+q3)\
+            - coml3*np.sin(q2+q3)*np.cos(q1)*np.cos(q3)
+        JCOM3[1, 2] = -L1*np.sin(q2 + q3)*np.cos(q1) + L2*np.sin(q2 - q3)\
+            - L3*np.sin(q3) - coml3*np.sin(q3)*np.cos(q1)*np.cos(q2 + q3)\
+            + coml3*np.sin(q3)*np.cos(q2 + q3)\
+            - coml3*np.sin(q2 + q3)*np.cos(q1)*np.cos(q3)\
+            + coml3*np.sin(q2 + q3)*np.cos(q3)
+        JCOM3[2, 0] = (L1+coml3*np.cos(q3))*np.cos(q1)
+        JCOM3[2, 2] = -coml3*np.sin(q1)*np.sin(q3)
         JCOM3[5, :] = 1
 
         return JCOM3
@@ -196,38 +208,44 @@ class Robot(RobotBase):
         q2 = q[2]
         q3 = q[3]
         q4 = q[4]
+
+        L1 = self.L[1]
+        L2 = self.L[2]
+        L3 = self.L[3]
+        L4 = self.L[4]
+        coml4 = self.coml[4]
         
         JCOM4 = np.zeros((6, 4))
-        JCOM4[0, 0] = (L[1] + coml[4]*np.cos(q4))*np.sin(q1)*np.sin(q2 + q3 + q4)
-        JCOM4[0, 1] = -L[1]*np.cos(q1)*np.cos(q2 + q3 + q4)\
-            + L[2]*np.cos(-q2 + q3 + q4) - coml[4]*np.sin(q4)*np.sin(q2 + q3 + q4)\
-            - coml[4]*np.cos(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)
-        JCOM4[0, 2] = -L[1]*np.cos(q1)*np.cos(q2 + q3 + q4)\
-            - L[2]*np.cos(-q2 + q3 + q4) + L[3]*np.cos(q3 - q4)\
-            - coml[4]*np.sin(q4)*np.sin(q2 + q3 + q4)\
-            - coml[4]*np.cos(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)
-        JCOM4[0, 3] = -L[1]*np.cos(q1)*np.cos(q2 + q3 + q4)\
-            - L[2]*np.cos(-q2 + q3 + q4) - L[3]*np.cos(q3 - q4) + L[4]*np.cos(q4)\
-            + coml[4]*np.sin(q4)*np.sin(q2 + q3 + q4)*np.cos(q1)\
-            - coml[4]*np.sin(q4)*np.sin(q2 + q3 + q4)\
-            - coml[4]*np.cos(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)\
-            + coml[4]*np.cos(q4)*np.cos(q2 + q3 + q4)
-        JCOM4[1, 0] = -(L[1] + coml[4]*np.cos(q4))*np.sin(q1)*np.cos(q2 + q3 + q4)
-        JCOM4[1, 1] = -L[1]*np.sin(q2 + q3 + q4)*np.cos(q1)\
-            + L[2]*np.sin(-q2 + q3 + q4) + coml[4]*np.sin(q4)*np.cos(q2 + q3 + q4)\
-            - coml[4]*np.sin(q2 + q3 + q4)*np.cos(q1)*np.cos(q4)
-        JCOM4[1, 2] = -L[1]*np.sin(q2 + q3 + q4)*np.cos(q1)\
-            - L[2]*np.sin(-q2 + q3 + q4) - L[3]*np.sin(q3 - q4)\
-            + coml[4]*np.sin(q4)*np.cos(q2 + q3 + q4)\
-            - coml[4]*np.sin(q2 + q3 + q4)*np.cos(q1)*np.cos(q4)
-        JCOM4[1, 3] = -L[1]*np.sin(q2 + q3 + q4)*np.cos(q1)\
-            - L[2]*np.sin(-q2 + q3 + q4) + L[3]*np.sin(q3 - q4) - L[4]*np.sin(q4)\
-            - coml[4]*np.sin(q4)*np.cos(q1)*np.cos(q2 + q3 + q4)\
-            + coml[4]*np.sin(q4)*np.cos(q2 + q3 + q4)\
-            - coml[4]*np.sin(q2 + q3 + q4)*np.cos(q1)*np.cos(q4)\
-            + coml[4]*np.sin(q2 + q3 + q4)*np.cos(q4)
-        JCOM4[2, 0] = (L[1] + coml[4]*np.cos(q4))*np.cos(q1)
-        JCOM4[2, 3] = -coml[4]*np.sin(q1)*np.sin(q4)
+        JCOM4[0, 0] = (L1 + coml4*np.cos(q4))*np.sin(q1)*np.sin(q2 + q3 + q4)
+        JCOM4[0, 1] = -L1*np.cos(q1)*np.cos(q2 + q3 + q4)\
+            + L2*np.cos(-q2 + q3 + q4) - coml4*np.sin(q4)*np.sin(q2 + q3 + q4)\
+            - coml4*np.cos(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)
+        JCOM4[0, 2] = -L1*np.cos(q1)*np.cos(q2 + q3 + q4)\
+            - L2*np.cos(-q2 + q3 + q4) + L3*np.cos(q3 - q4)\
+            - coml4*np.sin(q4)*np.sin(q2 + q3 + q4)\
+            - coml4*np.cos(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)
+        JCOM4[0, 3] = -L1*np.cos(q1)*np.cos(q2 + q3 + q4)\
+            - L2*np.cos(-q2 + q3 + q4) - L3*np.cos(q3 - q4) + L4*np.cos(q4)\
+            + coml4*np.sin(q4)*np.sin(q2 + q3 + q4)*np.cos(q1)\
+            - coml4*np.sin(q4)*np.sin(q2 + q3 + q4)\
+            - coml4*np.cos(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)\
+            + coml4*np.cos(q4)*np.cos(q2 + q3 + q4)
+        JCOM4[1, 0] = -(L1 + coml4*np.cos(q4))*np.sin(q1)*np.cos(q2 + q3 + q4)
+        JCOM4[1, 1] = -L1*np.sin(q2 + q3 + q4)*np.cos(q1)\
+            + L2*np.sin(-q2 + q3 + q4) + coml4*np.sin(q4)*np.cos(q2 + q3 + q4)\
+            - coml4*np.sin(q2 + q3 + q4)*np.cos(q1)*np.cos(q4)
+        JCOM4[1, 2] = -L1*np.sin(q2 + q3 + q4)*np.cos(q1)\
+            - L2*np.sin(-q2 + q3 + q4) - L3*np.sin(q3 - q4)\
+            + coml4*np.sin(q4)*np.cos(q2 + q3 + q4)\
+            - coml4*np.sin(q2 + q3 + q4)*np.cos(q1)*np.cos(q4)
+        JCOM4[1, 3] = -L1*np.sin(q2 + q3 + q4)*np.cos(q1)\
+            - L2*np.sin(-q2 + q3 + q4) + L3*np.sin(q3 - q4) - L4*np.sin(q4)\
+            - coml4*np.sin(q4)*np.cos(q1)*np.cos(q2 + q3 + q4)\
+            + coml4*np.sin(q4)*np.cos(q2 + q3 + q4)\
+            - coml4*np.sin(q2 + q3 + q4)*np.cos(q1)*np.cos(q4)\
+            + coml4*np.sin(q2 + q3 + q4)*np.cos(q4)
+        JCOM4[2, 0] = (L1 + coml4*np.cos(q4))*np.cos(q1)
+        JCOM4[2, 3] = -coml4*np.sin(q1)*np.sin(q4)
         JCOM4[5, :] = 1
         
         return JCOM4
@@ -239,22 +257,24 @@ class Robot(RobotBase):
         q2 = q[2]
         q3 = q[3]
         q4 = q[4]
+
+        L4 = self.L[4]
         
         JEE = np.zeros((3, 4)) # Only x, y, z forces controlled, others dropped
-        JEE[0, 0] = L[4]*np.sin(q1)*np.sin(q2 + q3 + q4)*np.cos(q4)
-        JEE[0, 1] = -L[4]*(np.sin(q4)*np.sin(q2 + q3 + q4)\
+        JEE[0, 0] = L4*np.sin(q1)*np.sin(q2 + q3 + q4)*np.cos(q4)
+        JEE[0, 1] = -L4*(np.sin(q4)*np.sin(q2 + q3 + q4)\
             + np.cos(q1)*np.cos(q4)*np.cos(q2 + q3 + q4))
         JEE[0, 2] = JEE[0, 1]
-        JEE[0, 3] = L[4]*(np.cos(q2 + q3 + 2*q4)\
+        JEE[0, 3] = L4*(np.cos(q2 + q3 + 2*q4)\
             - np.cos(-q1 + q2 + q3 + 2*q4)/2 - np.cos(q1 + q2 + q3 + 2*q4)/2)
-        JEE[1, 0] = -L[4]*np.sin(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)
-        JEE[1, 1] = L[4]*(np.sin(q4)*np.cos(q2 + q3 + q4)\
+        JEE[1, 0] = -L4*np.sin(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)
+        JEE[1, 1] = L4*(np.sin(q4)*np.cos(q2 + q3 + q4)\
             - np.sin(q2 + q3 + q4)*np.cos(q1)*np.cos(q4))
         JEE[1, 2] = JEE[1, 1]
-        JEE[1, 3] = L[4]*(np.sin(q2 + q3 + 2*q4)\
+        JEE[1, 3] = L4*(np.sin(q2 + q3 + 2*q4)\
             - np.sin(-q1 + q2 + q3 + 2*q4)/2 - np.sin(q1 + q2 + q3 + 2*q4)/2)
-        JEE[2, 0] = L[4]*np.cos(q1)*np.cos(q4)
-        JEE[2, 3] = -L[4]*np.sin(q1)*np.sin(q4)
+        JEE[2, 0] = L4*np.cos(q1)*np.cos(q4)
+        JEE[2, 3] = -L4*np.sin(q1)*np.sin(q4)
 
         return JEE
     
@@ -294,19 +314,32 @@ class Robot(RobotBase):
             q2 = q[2]
             q3 = q[3]
             q4 = q[4]
-            
-        x = np.cumsum([0, # cumulative sum
-                       self.L[0] * np.cos(q0),
-                       self.L[1] * np.cos(q0+q1),
-                       self.L[2] * np.cos(q0+q1+q2)])
-                       self.L[3] * np.cos(q0+q1+q2+q3)])
-                       self.L[4] * np.cos(q0+q1+q2+q3+q4)])
-        y = np.cumsum([0,
-                       self.L[0] * np.sin(q0),
-                       self.L[1] * np.sin(q0+q1),
-                       self.L[2] * np.sin(q0+q1+q2)])
-                       self.L[3] * np.sin(q0+q1+q2+q3])
-        return np.array([x, y])
+
+        L0 = self.L[0]
+        L1 = self.L[1]
+        L2 = self.L[2]
+        L3 = self.L[3]
+        L4 = self.L[4]
+        
+        x = np.cumsum([0, # body link
+                       0, # femur
+                       L2 * np.sin(q2),
+                       L3 * np.sin(q2+q3),
+                       L4 * np.sin(q2+q3+q4)])
+
+        y = np.cumsum([L0 * np.cos(q0),
+                       L1 * np.cos(q1),
+                       L2 * np.cos(q2)*np.cos(q1),
+                       L3 * np.cos(q3)*np.cos(q1),
+                       L4 * np.cos(q4)*np.cos(q1)])
+
+        z = np.cumsum([L0 * np.sin(q0),
+                       L1 * np.sin(q1),
+                       L2 * np.cos(q2)*np.sin(q1),
+                       L3 * np.cos(q3)*np.sin(q1),
+                       L4 * np.cos(q4)*np.sin(q1)])
+        
+        return np.array([x, y, z])
     
     def reset(self, q=[], dq=[]):
         if isinstance(q, np.ndarray):
