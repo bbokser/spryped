@@ -35,16 +35,6 @@ class Control(control.Control):
         self.DOF = 3 # task space dimensionality
         self.null_control = null_control
 
-        if self.write_to_file is True:
-            from recorder import Recorder
-            # set up recorders
-            self.u_recorder = Recorder('control signal', self.task, 'osc')
-            self.xy_recorder = Recorder('end-effector position', self.task, 'osc')
-            self.dist_recorder = Recorder('distance from target', self.task, 'osc')
-            self.recorders = [self.u_recorder,
-                            self.xy_recorder,
-                            self.dist_recorder]
-
     def control(self, robot, x_des=None):
         """Generates a control signal to move the
         joints to the specified target.
