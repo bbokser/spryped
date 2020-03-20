@@ -54,7 +54,7 @@ class Runner:
 
         useRealTime = 0
 
-        torque = 4;
+        torque = 4
         u = [torque, torque, torque, torque, torque, torque, torque, torque]
 
         jointArray = range(p.getNumJoints(bot))
@@ -64,12 +64,21 @@ class Runner:
             p.setJointMotorControl2(bot, i, p.VELOCITY_CONTROL, force=1)
             # force=1 allows us to easily mimic joint friction rather than disabling
             p.enableJointForceTorqueSensor(bot,i,1) # enable joint torque sensing
-            
-        while(1):
+
+        steps = 0
+
+        while 1:
             time.sleep(self.dt)
-            self.target = self.shell.controller.target
+            # update target after specified period of time passes
+            steps = steps + 1
+
+            if steps == 1:
+                self.target = self.shell.controller.gen_target(self.robot)
+            else:
+                self.target = self.shell.controller.target
+
             self.tau = self.shell.control(self.robot)
-            self.arm.apply_torque(u=self.tau, dt=self.dt)
+            self.robot.apply_torque(u=self.tau, dt=self.dt)
             
             p.setJointMotorControlArray(bot, jointArray, p.TORQUE_CONTROL, forces=u)
             #states=[j[2] for j in p.getJointStates(bot,range(7))] # j[2] selects jointReactionForces

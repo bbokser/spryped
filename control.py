@@ -46,7 +46,7 @@ class Control(object):
         """Checks the distance to target"""
         return np.sum(abs(robot.x - self.target)) + np.sum(abs(robot.dq))
 
-    def control(self):
+    def control(self, robot, x_des):
         """Generates a control signal to apply to the robot"""
         raise NotImplementedError
 

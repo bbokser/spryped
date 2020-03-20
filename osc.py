@@ -1,4 +1,4 @@
-'''
+"""
 Copyright (C) 2013 Travis DeWolf
 Copyright (C) 2020 Benjamin Bokser
 
@@ -14,17 +14,19 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-'''
+"""
 
 import control
 
 import numpy as np
+
 
 class Control(control.Control):
     """
     A controller that implements operational space control.
     Controls the (x,y) position of the end-effector.
     """
+
     def __init__(self, null_control=True, **kwargs):
         """
         null_control boolean: apply second controller in null space or not
@@ -32,7 +34,7 @@ class Control(control.Control):
 
         super(Control, self).__init__(**kwargs)
 
-        self.DOF = 3 # task space dimensionality
+        self.DOF = 3  # task space dimensionality
         self.null_control = null_control
 
     def control(self, robot, x_des=None):
@@ -61,36 +63,36 @@ class Control(control.Control):
         JEE = robot.gen_jacEE()
         # tau = J^T * Fx + tau_grav, but gravity = 0
         # add in velocity compensation in GC space for stability
-        self.u = (np.dot(JEE.T, Fx).reshape(-1,) -
+        self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
                   np.dot(Mq, self.kv * robot.dq))
 
         # if null_control is selected and the task space has
         # fewer DOFs than the robot, add a control signal in the
         # null space to try to move the robot to its resting state
-       # if self.null_control and self.DOF < len(robot.L):
+        # if self.null_control and self.DOF < len(robot.L):
 
-            # calculate our secondary control signal
-            # calculated desired joint angle acceleration
-           # prop_val = ((robot.rest_angles - robot.q) + np.pi) % (np.pi*2) - np.pi
-           # q_des = (self.kp * prop_val + \
-           #          self.kv * -robot.dq).reshape(-1,)
+        # calculate our secondary control signal
+        # calculated desired joint angle acceleration
+        # prop_val = ((robot.rest_angles - robot.q) + np.pi) % (np.pi*2) - np.pi
+        # q_des = (self.kp * prop_val + \
+        #          self.kv * -robot.dq).reshape(-1,)
 
-           # Mq = robot.gen_Mq()
-           # u_null = np.dot(Mq, q_des)
+        # Mq = robot.gen_Mq()
+        # u_null = np.dot(Mq, q_des)
 
-            # calculate the null space filter
-           # Jdyn_inv = np.dot(Mx, np.dot(JEE, np.linalg.inv(Mq)))
-           # null_filter = np.eye(len(robot.L)) - np.dot(JEE.T, Jdyn_inv)
+        # calculate the null space filter
+        # Jdyn_inv = np.dot(Mx, np.dot(JEE, np.linalg.inv(Mq)))
+        # null_filter = np.eye(len(robot.L)) - np.dot(JEE.T, Jdyn_inv)
 
-           # null_signal = np.dot(null_filter, u_null).reshape(-1,)
+        # null_signal = np.dot(null_filter, u_null).reshape(-1,)
 
-           # self.u += null_signal
+        # self.u += null_signal
 
-        if self.write_to_file is True:
-            # feed recorders their signals
-            self.u_recorder.record(0.0, self.u)
-            self.xy_recorder.record(0.0, self.x)
-            self.dist_recorder.record(0.0, self.target - self.x)
+        # if self.write_to_file is True:
+        # feed recorders their signals
+        #     self.u_recorder.record(0.0, self.u)
+        #     self.xy_recorder.record(0.0, self.x)
+        #     self.dist_recorder.record(0.0, self.target - self.x)
 
         # add in any additional signals
         for addition in self.additions:
@@ -99,10 +101,10 @@ class Control(control.Control):
         return self.u
 
     def gen_target(self, robot):
-        #Generate a random target
+        # Generate a random target
         gain = np.sum(robot.L) * .75
         bias = -np.sum(robot.L) * 0
 
-        self.target = np.random.random(size=(2,)) * gain + bias
+        self.target = np.random.random(size=(3,)) * gain + bias
 
         return self.target.tolist()

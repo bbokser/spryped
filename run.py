@@ -1,4 +1,4 @@
-'''
+"""
 Copyright (C) 2015 Travis DeWolf
 Copyright (C) 2020 Benjamin Bokser
 
@@ -14,13 +14,13 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-'''
+"""
 
 from sim import Runner
 
-import robot # from robot import Robot
+import robot  # from robot import Robot
 
-import osc # from osc import Control
+import osc  # from osc import Control
 
 import movement
 
