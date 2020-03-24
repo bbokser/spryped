@@ -37,34 +37,48 @@ class Control(control.Control):
         self.DOF = 3  # task space dimensionality
         self.null_control = null_control
 
-    def control(self, robot, x_des=None):
-        """Generates a control signal to move the
+    def control(self, robot, x_dd_des=None):
+        """
+        Generates a control signal to move the
         joints to the specified target.
 
         robot Robot: the robot model being controlled
         des list: the desired system position
-        x_des np.array: desired task-space force,
+        x_dd_des np.array: desired task-space acceleration,
                         system goes to self.target if None
         """
 
         # calculate desired end-effector acceleration
-        if x_des is None:
+        if x_dd_des is None:
             self.x = robot.x
-            x_des = self.kp * (self.target - self.x)
+            x_dd_des = self.kp * (self.target - self.x)
 
+        # print("x=")
+        # print(self.x)
+        # print("target=")
+        # print(self.target)
         # generate the mass matrix in end-effector space
         Mq = robot.gen_Mq()
         Mx = robot.gen_Mx()
-
+        # print("Mx = ")
+        # print(Mx)
+        # print("x_dd_des = ")
+        # print(x_dd_des)
         # calculate force
-        Fx = np.dot(Mx, x_des)
-
+        Fx = np.dot(Mx, x_dd_des)
         # calculate the Jacobian
+        # print("Fx = ", Fx)
         JEE = robot.gen_jacEE()
         # tau = J^T * Fx + tau_grav, but gravity = 0
         # add in velocity compensation in GC space for stability
         self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
-                  np.dot(Mq, self.kv * robot.dq))
+                  np.dot(Mq, self.kv * robot.dq).flatten())
+        print("u = ")
+        print(self.u)
+        # print("first term = ")
+        # print(np.dot(JEE.T, Fx).reshape(-1, ))
+        # print("second term = ")
+        # print(np.dot(Mq, self.kv * robot.dq).flatten())
 
         # if null_control is selected and the task space has
         # fewer DOFs than the robot, add a control signal in the
@@ -102,9 +116,11 @@ class Control(control.Control):
 
     def gen_target(self, robot):
         # Generate a random target
-        gain = np.sum(robot.L) * .75
-        bias = -np.sum(robot.L) * 0
+        # gain = np.sum(robot.L) * .75
+        # bias = -np.sum(robot.L) * 0
 
-        self.target = np.random.random(size=(3,)) * gain + bias
+        # self.target = np.random.random(size=(3,)) * gain + bias
+
+        self.target = np.array([0.5, 0.86, 0])
 
         return self.target.tolist()
