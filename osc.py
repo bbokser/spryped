@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import control
+import sys
 
 import numpy as np
 
@@ -47,38 +48,30 @@ class Control(control.Control):
         x_dd_des np.array: desired task-space acceleration,
                         system goes to self.target if None
         """
+        # calculate the Jacobian
+        JEE = robot.gen_jacEE()
 
         # calculate desired end-effector acceleration
         if x_dd_des is None:
             self.x = robot.x
-            x_dd_des = self.kp * (self.target - self.x)
+            #print("self.x = ", self.x)
+            self.velocity = np.transpose(np.dot(JEE, robot.dq)).flatten()
+            #print("self.velocity = ", self.velocity)
+            # x_dd_des = self.kp * (self.target - self.x)
+            x_dd_des = np.add(self.kp * (self.target - self.x), self.kv * (2 - self.velocity))
 
-        # print("x=")
-        # print(self.x)
-        # print("target=")
-        # print(self.target)
         # generate the mass matrix in end-effector space
         Mq = robot.gen_Mq()
         Mx = robot.gen_Mx()
-        # print("Mx = ")
-        # print(Mx)
-        # print("x_dd_des = ")
-        # print(x_dd_des)
+
         # calculate force
         Fx = np.dot(Mx, x_dd_des)
-        # calculate the Jacobian
-        # print("Fx = ", Fx)
-        JEE = robot.gen_jacEE()
+
         # tau = J^T * Fx + tau_grav, but gravity = 0
         # add in velocity compensation in GC space for stability
-        self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
-                  np.dot(Mq, self.kv * robot.dq).flatten())
-        print("u = ")
-        print(self.u)
-        # print("first term = ")
-        # print(np.dot(JEE.T, Fx).reshape(-1, ))
-        # print("second term = ")
-        # print(np.dot(Mq, self.kv * robot.dq).flatten())
+        self.u = (np.dot(JEE.T, Fx).reshape(-1, ))
+        # self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
+        #          np.dot(Mq, self.kv * robot.dq).flatten())
 
         # if null_control is selected and the task space has
         # fewer DOFs than the robot, add a control signal in the
@@ -121,6 +114,6 @@ class Control(control.Control):
 
         # self.target = np.random.random(size=(3,)) * gain + bias
 
-        self.target = np.array([0.5, 0.86, 0])
+        self.target = np.array([0.1, 0, -0.7])
 
         return self.target.tolist()

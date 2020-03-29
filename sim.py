@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
 import time
+import sys
 
 import numpy as np
 
@@ -34,7 +35,7 @@ planeID = p.loadURDF("plane.urdf")
 robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])
 bot = p.loadURDF("spryped_urdf_rev05/urdf/spryped_urdf_rev05.urdf", [0, 0, 0.8],
                  robotStartOrientation, useFixedBase=1)
-#p.setGravity(0, 0, GRAVITY)
+# p.setGravity(0, 0, GRAVITY)
 
 
 class Runner:
@@ -51,9 +52,8 @@ class Runner:
 
         p.setTimeStep(self.dt)
 
-        # p.setRealTimeSimulation(useRealTime)
-
         useRealTime = 0
+        p.setRealTimeSimulation(useRealTime)
 
         jointArray = range(p.getNumJoints(bot))
 
@@ -77,18 +77,29 @@ class Runner:
 
             self.tau = self.shell.control(self.robot)
             torque = np.zeros(8)
-            print(torque)
+
             u = self.robot.apply_torque(u=self.tau, dt=self.dt)
-            torque[1:5] = u
+            torque[0:4] = u
+            torque[1] *= -1  # readjust to match motor polarity
+            torque[2] *= -1
+            torque[3] *= -1
+            # print(torque)
+            print(robot.x)  # forward kinematics
+            # print(robot.q)  # encoder
+
+            sys.stdout.write("\033[F")  # back to previous line
+            sys.stdout.write("\033[K")  # clear line
+            # print(robot.velocity())
+
             p.setJointMotorControlArray(bot, jointArray, p.TORQUE_CONTROL, forces=torque)
-            # states=[j[2] for j in p.getJointStates(bot,range(7))] # j[2] selects jointReactionForces
-            # print(states[1][4]) #'%s' % float('%.1g' % pront[1])) # selected joint 2, My
+
             if (useRealTime == 0):
                 p.stepSimulation()
         '''
         def reaction(self):
             reaction_force = [j[2] for j in p.getJointStates(bot, range(7))]  # j[2]=jointReactionForces
             #  [Fx, Fy, Fz, Mx, My, Mz]
+            # print(states[1][4]) #'%s' % float('%.1g' % pront[1])) # selected joint 2, My
             return reaction_force[:][4]  # selected joint 1 and 5 Mz, all other joints My
         '''
         def get_states(self):
