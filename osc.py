@@ -53,12 +53,10 @@ class Control(control.Control):
 
         # calculate desired end-effector acceleration
         if x_dd_des is None:
-            self.x = robot.x
-            #print("self.x = ", self.x)
+            self.x = robot.position()[:, -1]
             self.velocity = np.transpose(np.dot(JEE, robot.dq)).flatten()
-            #print("self.velocity = ", self.velocity)
-            # x_dd_des = self.kp * (self.target - self.x)
-            x_dd_des = np.add(self.kp * (self.target - self.x), self.kv * (2 - self.velocity))
+            x_dd_des = self.kp * (self.target - self.x)
+            # x_dd_des = np.add(self.kp * (self.target - self.x), self.kv * (2 - self.velocity))
 
         # generate the mass matrix in end-effector space
         Mq = robot.gen_Mq()
@@ -69,9 +67,12 @@ class Control(control.Control):
 
         # tau = J^T * Fx + tau_grav, but gravity = 0
         # add in velocity compensation in GC space for stability
-        self.u = (np.dot(JEE.T, Fx).reshape(-1, ))
+        # self.u = (np.dot(JEE.T, Fx).reshape(-1, ))
         # self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
         #          np.dot(Mq, self.kv * robot.dq).flatten())
+
+        # simple inverse kinematics PID control
+        self.u = self.kp*(robot.inv_kinematics(self.target)-robot.q)
 
         # if null_control is selected and the task space has
         # fewer DOFs than the robot, add a control signal in the
@@ -114,6 +115,6 @@ class Control(control.Control):
 
         # self.target = np.random.random(size=(3,)) * gain + bias
 
-        self.target = np.array([0.1, 0, -0.7])
+        self.target = np.array([100, 0, -700])
 
         return self.target.tolist()

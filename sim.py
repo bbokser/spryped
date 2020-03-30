@@ -35,8 +35,9 @@ planeID = p.loadURDF("plane.urdf")
 robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])
 bot = p.loadURDF("spryped_urdf_rev05/urdf/spryped_urdf_rev05.urdf", [0, 0, 0.8],
                  robotStartOrientation, useFixedBase=1)
-# p.setGravity(0, 0, GRAVITY)
 
+
+# p.setGravity(0, 0, GRAVITY)
 
 class Runner:
 
@@ -86,10 +87,9 @@ class Runner:
             # print(torque)
             print(robot.x)  # forward kinematics
             # print(robot.q)  # encoder
-
+            # print(robot.velocity())
             sys.stdout.write("\033[F")  # back to previous line
             sys.stdout.write("\033[K")  # clear line
-            # print(robot.velocity())
 
             p.setJointMotorControlArray(bot, jointArray, p.TORQUE_CONTROL, forces=torque)
 
@@ -102,6 +102,7 @@ class Runner:
             # print(states[1][4]) #'%s' % float('%.1g' % pront[1])) # selected joint 2, My
             return reaction_force[:][4]  # selected joint 1 and 5 Mz, all other joints My
         '''
+
         def get_states(self):
             self.q = [j[0] for j in p.getJointStates(bot, range(7))]
             self.dq = [j[1] for j in p.getJointStates(bot, range(7))]

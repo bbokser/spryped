@@ -327,6 +327,25 @@ class Robot(RobotBase):
 
         return Mq
 
+    def inv_kinematics(self, xyz):
+        L1 = self.L[1]
+        L2 = self.L[2]
+        L3 = self.L[3]
+        L4 = self.L[4]
+
+        x = xyz[0]
+        y = xyz[1]
+        z = xyz[2]
+
+        d = np.sqrt(x**2 + (z - L1 - L4)**2)
+        q3 = np.pi/180 - np.arctan2((L2**2 + L3**2 - d**2), (-2*L2*L3))
+        print(q3)
+        q2 = np.arcsin((x - L3*np.sin(q3))/L2)
+        q1 = np.arccos(y/(L1 + L2*np.cos(q2) + L3*np.cos(q2 + q3)))
+        q4 = np.pi/180 - q2 - q3  # keep foot flat for now, simplifies kinematics
+
+        return np.array([q1, q2, q3, q4], dtype=float)
+
     def position(self, q=None):
         """forward kinematics
         Compute x,y,z position of end effector relative to base
