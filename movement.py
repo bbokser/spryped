@@ -25,7 +25,7 @@ def Task(arm, controller_class, **kwargs):
 
     # set robot specific parameters ------------
 
-    kp = 1
+    kp = 20
     kv = np.sqrt(kp)
 
     # generate control shell -----------------
