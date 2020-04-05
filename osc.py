@@ -15,12 +15,12 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
-import control
 import sys
 
 import numpy as np
+from simple_pid import PID
 
+import control
 
 class Control(control.Control):
     """
@@ -28,15 +28,18 @@ class Control(control.Control):
     Controls the (x,y) position of the end-effector.
     """
 
-    def __init__(self, null_control=True, **kwargs):
+    def __init__(self, dt=1e-3, null_control=True, **kwargs):
         """
         null_control boolean: apply second controller in null space or not
         """
 
         super(Control, self).__init__(**kwargs)
-
+        self.dt = dt
         self.DOF = 3  # task space dimensionality
         self.null_control = null_control
+        self.pid = PID(10, 3, 0.5)
+        self.pid.sample_time = self.dt # 1e-3
+
 
     def control(self, robot, x_dd_des=None):
         """
@@ -53,10 +56,13 @@ class Control(control.Control):
 
         # calculate desired end-effector acceleration
         if x_dd_des is None:
+            # self.pid.setpoint = self.target
             self.x = robot.position()[:, -1]
             self.velocity = np.transpose(np.dot(JEE, robot.dq)).flatten()
+            # compute new output from the PID according to the system's current value
+            # x_dd_des = self.pid(self.x)
             x_dd_des = self.kp * (self.target - self.x)
-            # x_dd_des = np.add(self.kp * (self.target - self.x), self.kv * (2 - self.velocity))
+            # x_dd_des = np.add(self.kp * (self.target - self.x), -self.kd * self.velocity)
 
         # generate the mass matrix in end-effector space
         Mq = robot.gen_Mq()
@@ -65,14 +71,18 @@ class Control(control.Control):
         # calculate force
         Fx = np.dot(Mx, x_dd_des)
 
-        # tau = J^T * Fx + tau_grav, but gravity = 0
+        # generate gravity term in task space
+        tau_grav = robot.gen_grav()
+
         # add in velocity compensation in GC space for stability
-        # self.u = (np.dot(JEE.T, Fx).reshape(-1, ))
-        # self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
-        #          np.dot(Mq, self.kv * robot.dq).flatten())
+        # self.u = (np.dot(JEE.T, Fx).reshape(-1, )) # + tau_grav
+        self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
+                  np.dot(Mq, self.kd * robot.dq).flatten()) + tau_grav
 
         # simple inverse kinematics PID control
-        self.u = self.kp*(robot.inv_kinematics(self.target)-robot.q)
+        # self.u = self.kp*(robot.inv_kinematics(self.target)-robot.q)
+        # self.pid.setpoint = robot.inv_kinematics(self.target)
+        # self.u = self.pid(robot.q)
 
         # if null_control is selected and the task space has
         # fewer DOFs than the robot, add a control signal in the
@@ -83,7 +93,7 @@ class Control(control.Control):
         # calculated desired joint angle acceleration
         # prop_val = ((robot.rest_angles - robot.q) + np.pi) % (np.pi*2) - np.pi
         # q_des = (self.kp * prop_val + \
-        #          self.kv * -robot.dq).reshape(-1,)
+        #          self.kd * -robot.dq).reshape(-1,)
 
         # Mq = robot.gen_Mq()
         # u_null = np.dot(Mq, q_des)
@@ -115,6 +125,6 @@ class Control(control.Control):
 
         # self.target = np.random.random(size=(3,)) * gain + bias
 
-        self.target = np.array([100, 0, -700])
+        self.target = np.array([0.077, 0.131, -0.708])
 
         return self.target.tolist()

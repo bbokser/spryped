@@ -17,20 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
 import shell
-# import controllers.forcefield as forcefield
 
 import numpy as np
 
-def Task(arm, controller_class, **kwargs):
+def Task(arm, controller_class, dt, **kwargs):
 
     # set robot specific parameters ------------
-
-    kp = 20
-    kv = np.sqrt(kp)
+    ku = 30
+    kp = ku*0.6 # 10 for plain inv kinematics
+    kd = ku*0
 
     # generate control shell -----------------
 
-    controller = controller_class.Control(kp=kp, kv=kv)
+    controller = controller_class.Control(kp=kp, kd=kd, dt=dt)
     control_shell = shell.Shell(controller=controller)
 
     return (control_shell)

@@ -22,20 +22,20 @@ class Control(object):
     """
     The base class for controllers.
     """
-    def __init__(self, kp=10, kv=np.sqrt(10),
+    def __init__(self, kp=10, kd=np.sqrt(10),
                     additions=[], task='', write_to_file=False):
         """
         additions list: list of Addition classes to append to
                         the outgoing control signal
         kp float: the position error term gain value
-        kv float: the velocity error term gain value
+        kd float: the velocity error term gain value
         """
 
         self.u = np.zeros((2,1)) # control signal
 
         self.additions = additions
         self.kp = kp
-        self.kv = kv
+        self.kd = kd
         self.task = task
         self.target = None
 

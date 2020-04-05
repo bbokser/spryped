@@ -30,11 +30,8 @@ class Robot(RobotBase):
     def __init__(self, init_q=None, init_dq=None, **kwargs):
 
         if init_dq is None:
-            # init_dq = [0., 0., 0., 0., 0., 0., 0., 0., 0.]
             init_dq = [0., 0., 0., 0.]  # just left leg
         if init_q is None:
-            # init_q = [0, -np.pi / 4, np.pi * 40.3 / 180, -np.pi * 84.629 / 180, np.pi * 44.329 / 180,
-            #           -np.pi / 4, -np.pi * 40.3 / 180, np.pi * 84.629 / 180, -np.pi * 44.329 / 180.]
             init_q = [-2 * np.pi / 4, np.pi * 32 / 180, -np.pi * 44.17556088 / 180, np.pi * 12.17556088 / 180.]
         self.DOF = 4
         RobotBase.__init__(self, init_q=init_q, init_dq=init_dq, **kwargs)
@@ -87,17 +84,19 @@ class Robot(RobotBase):
             print("WARNING: toe L/R masses unequal, check CAD")
 
         # link lengths (mm) must be manually updated
-        L0 = 288  # body
-        L1 = 114  # femur left
-        L2 = 199  # tibiotarsus left
-        L3 = 500  # tarsometatarsus left
-        L4 = 61  # toe left
+        L0 = .288  # body
+        L1 = .114  # femur left
+        L2 = .199  # tibiotarsus left
+        L3 = .500  # tarsometatarsus left
+        L4 = .061  # toe left
         self.L = np.array([L0, L1, L2, L3, L4, L1, L2, L3, L4])
 
-        # mass matrices
+        # mass matrices and gravity
         self.MM = []
-        for i in range(9):
+        self.Fg = []
+        for i in range(1,5):
             M = np.zeros((6, 6))
+            fgi = np.zeros((6,1))
             M[0:3, 0:3] = np.eye(3) * float(mass[i])
             M[3, 3] = ixx[i]
             M[3, 4] = ixy[i]
@@ -110,13 +109,9 @@ class Robot(RobotBase):
             M[5, 5] = izz[i]
             # self.MM.insert(i,M)
             self.MM.append(M)
+            fgi[2,0] = float(mass[i])*(-9.807) # apply mass*gravity term to 3rd column (z axis)
+            self.Fg.append(fgi)
 
-        # self.state = np.zeros(7)
-        # initialize sim
-        # self.sim = pyRobot.pySim(dt=1e-5)
-        # send reset command to sim
-        # self.sim.reset(self.state)
-        # reset state
         self.reset()
         self.update_state()
 
@@ -137,7 +132,6 @@ class Robot(RobotBase):
         """Generates the Jacobian from the COM of the first
         link to the origin frame"""
         q = self.q if q is None else q
-        # q1 = q[1]
         q1 = q[0]
 
         L1 = self.L[1]
@@ -154,10 +148,7 @@ class Robot(RobotBase):
         """Generates the Jacobian from the COM of the second
         link to the origin frame"""
         q = self.q if q is None else q
-        '''
-        q1 = q[1]
-        q2 = q[2]
-        '''
+
         q1 = q[0]
         q2 = q[1]
 
@@ -179,11 +170,7 @@ class Robot(RobotBase):
         """Generates the Jacobian from the COM of the third
         link to the origin frame"""
         q = self.q if q is None else q
-        '''
-        q1 = q[1]
-        q2 = q[2]
-        q3 = q[3]
-        '''
+
         q1 = q[0]
         q2 = q[1]
         q3 = q[2]
@@ -222,12 +209,7 @@ class Robot(RobotBase):
         """Generates the Jacobian from the COM of the fourth
         link to the origin frame"""
         q = self.q if q is None else q
-        '''
-        q1 = q[1]
-        q2 = q[2]
-        q3 = q[3]
-        q4 = q[4]
-        '''
+
         q1 = q[0]
         q2 = q[1]
         q3 = q[2]
@@ -277,12 +259,7 @@ class Robot(RobotBase):
     def gen_jacEE(self, q=None):
         """Generates the Jacobian from the end effector to the origin frame"""
         q = self.q if q is None else q
-        '''
-        q1 = q[1]
-        q2 = q[2]
-        q3 = q[3]
-        q4 = q[4]
-        '''
+
         q1 = q[0]
         q2 = q[1]
         q3 = q[2]
@@ -310,10 +287,10 @@ class Robot(RobotBase):
 
     def gen_Mq(self, q=None):
         # Mass matrix
-        M1 = self.MM[1]
-        M2 = self.MM[2]
-        M3 = self.MM[3]
-        M4 = self.MM[4]
+        M1 = self.MM[0]
+        M2 = self.MM[1]
+        M3 = self.MM[2]
+        M4 = self.MM[3]
 
         JCOM1 = self.gen_jacCOM1(q=q)
         JCOM2 = self.gen_jacCOM2(q=q)
@@ -326,6 +303,17 @@ class Robot(RobotBase):
               np.dot(JCOM4.T, np.dot(M4, JCOM4)))
 
         return Mq
+
+    def gen_grav(self, q=None):
+        # Generate gravity term g(q)
+        J1T = np.transpose(self.gen_jacCOM1(q=q))
+        J2T = np.transpose(self.gen_jacCOM2(q=q))
+        J3T = np.transpose(self.gen_jacCOM3(q=q))
+        J4T = np.transpose(self.gen_jacCOM4(q=q))
+
+        gq = J1T.dot(self.Fg[0]) + J2T.dot(self.Fg[1]) + J3T.dot(self.Fg[2]) + J4T.dot(self.Fg[3])
+
+        return gq.reshape(-1, )
 
     def inv_kinematics(self, xyz):
         L1 = self.L[1]
@@ -341,7 +329,7 @@ class Robot(RobotBase):
         q3 = np.pi/180 - np.arccos((-L2**2 - L3**2 + d**2)/(-2*L2*L3))
         alpha = np.arccos((d**2 + L2**2 - L3**2)/(2*d*L2))
         q2 = alpha - np.arcsin((x/d))
-        q1 = np.arccos(y/(L1 + L2*np.cos(q2) + L3*np.cos(q2 + q3)))
+        q1 = np.arcsin(z/(L1 + L2*np.cos(q2) + L3*np.cos(q2 + q3) + L4))
         q4 = np.pi/180 - q2 - q3  # keep foot flat for now, simplifies kinematics
 
         return np.array([q1, q2, q3, q4], dtype=float)
@@ -393,8 +381,8 @@ class Robot(RobotBase):
         # Calculate operational space linear velocity vector
         if dq is None:
             dq = self.dq
-        JEE = self.gen_jacEE()
-        return np.dot(JEE, self.dq)
+        JEE = self.gen_jacEE(q=q)
+        return np.dot(JEE, self.dq).flatten()
 
     def reset(self, q=None, dq=None):
         if q is None:
@@ -410,11 +398,6 @@ class Robot(RobotBase):
             assert len(q) == self.DOF
         if dq:
             assert len(dq) == self.DOF
-
-        # state = np.zeros(self.DOF * 2)
-        # slice w/ step size of 2 to interweave q and dq into state
-        # state[::2] = self.init_q if not q else np.copy(q)
-        # state[1::2] = self.init_dq if not dq else np.copy(dq)
 
         self.update_state()  # is this necessary? Seems redundant
 

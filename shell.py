@@ -18,14 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 class Shell(object):
 
-    def __init__(self, controller, pen_down=False, **kwargs):
+    def __init__(self, controller, **kwargs):
         """
         control Control instance: the controller to use
         pen_down boolean: True if the end-effector is drawing
         """
 
         self.controller = controller
-        self.pen_down = pen_down
         self.kwargs = kwargs
 
     def control(self, arm):

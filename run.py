@@ -27,7 +27,6 @@ import movement
 dt = 1e-3
 robot = robot.Robot(dt=dt)
 controller_class = osc
-task = movement.Task
-control_shell = task(robot, controller_class)
+control_shell = movement.Task(robot, controller_class, dt=dt)
 runner = Runner(dt=dt)
 runner.run(robot=robot, control_shell=control_shell)

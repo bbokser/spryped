@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import time
 import sys
+import curses
 
 import numpy as np
 
@@ -26,7 +27,7 @@ import pybullet_data
 # from osc import Control
 # from robot import Robot
 
-GRAVITY = -9.81
+GRAVITY = -9.807
 
 physicsClient = p.connect(p.GUI)
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
@@ -38,8 +39,7 @@ robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])
 bot = p.loadURDF("spryped_urdf_rev05/urdf/spryped_urdf_rev05.urdf", [0, 0, 2],
                  robotStartOrientation, useFixedBase=1)
 
-
-# p.setGravity(0, 0, GRAVITY)
+p.setGravity(0, 0, GRAVITY)
 
 class Runner:
 
@@ -83,13 +83,12 @@ class Runner:
 
             u = self.robot.apply_torque(u=self.tau, dt=self.dt)
             torque[0:4] = u
-            torque[1] *= -1  # readjust to match motor polarity
-            torque[2] *= -1
-            torque[3] *= -1
+            torque[0] *= -1  # readjust to match motor polarity
             # print(torque)
             print(robot.x)  # forward kinematics
+            # print("vel = ", robot.velocity())
             # print(robot.q)  # encoder
-            # print(robot.velocity())
+            # print(robot.gen_grav()) # gravity term
             sys.stdout.write("\033[F")  # back to previous line
             sys.stdout.write("\033[K")  # clear line
 

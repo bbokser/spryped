@@ -22,7 +22,7 @@ import numpy as np
 class RobotBase:
 
     def __init__(self, init_q=None, init_dq=None,
-                 dt=1e-5, singularity_thresh=0.00025, options=None):
+                 dt=1e-3, singularity_thresh=0.00025, options=None):
 
         self.dt = dt
         self.options = options
