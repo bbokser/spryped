@@ -23,7 +23,7 @@ import numpy as np
 def Task(arm, controller_class, dt, **kwargs):
 
     # set robot specific parameters ------------
-    ku = 30
+    ku = 10
     kp = ku*0.6 # 10 for plain inv kinematics
     kd = ku*0
 

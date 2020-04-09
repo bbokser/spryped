@@ -2,6 +2,7 @@ clear all
 clc
 
 pkg load symbolic
+% warning: delete old csvs before running this or it will just append to them
 
 syms q1 q2 q3 q4 L1 L2 L3 L4 l1 l2 l3 l4
 
@@ -57,7 +58,7 @@ Tcom1 = [[0]; # simplified manually
          [1]];
 
 J1 = jacobian(Tcom1, [q1, q2, q3, q4]);
-J1(4,:) = 1;
+J1(4,1) = 1;
 J1(5,:) = 0;
 J1(6,:) = 0;
 
@@ -66,34 +67,39 @@ T2_0 = simplify(T1_0*T2_1);
 Tcom2 = simplify(T2_0*com2);
 
 J2 = simplify(jacobian(Tcom2, [q1, q2, q3, q4]));
-J2(4,:) = 0;
+J2(4,1) = 1;
 J2(5,:) = 0;
-J2(6,:) = 1;
+J2(6,2) = 1;
 
 T3_0 = simplify(T3_2*T2_1*T1_0);
         
 Tcom3 = simplify(T3_0*com3);
 
 J3 = simplify(jacobian(Tcom3, [q1, q2, q3, q4]));
-J3(4,:) = 0;
+J3(4,1) = 1;
 J3(5,:) = 0;
-J3(6,:) = 1;
+J3(6,2) = 1;
+J3(6,3) = 1;
 
 T4_0 = simplify(T4_3*T3_2*T2_1*T1_0);
 
 Tcom4 = simplify(T4_0*com4);
 
 J4 = simplify(jacobian(Tcom4, [q1, q2, q3, q4]));
-J4(4,:) = 0;
+J4(4,1) = 1;
 J4(5,:) = 0;
-J4(6,:) = 1;
+J4(6,2) = 1;
+J4(6,3) = 1;
+J4(6,4) = 1;
 
 Txee = simplify(T4_0*xee);
 
 JEE = simplify(jacobian(Txee, [q1, q2, q3, q4]));
-JEE(4,:) = 0;
+JEE(4,1) = 1;
 JEE(5,:) = 0;
-JEE(6,:) = 1;
+JEE(6,2) = 1;
+JEE(6,3) = 1;
+JEE(6,4) = 1;
 
 for c=1:6
 dlmwrite('j1.csv', char(J1(c,:)),'','-append')

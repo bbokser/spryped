@@ -48,6 +48,7 @@ class Robot(RobotBase):
         comz = values[3].astype(np.float)
 
         mass = values[7].astype(np.float)
+
         ixx = values[8].astype(np.float)
         ixy = values[9].astype(np.float)
         ixz = values[10].astype(np.float)
@@ -107,7 +108,6 @@ class Robot(RobotBase):
             M[5, 3] = -ixz[i]
             M[5, 4] = -iyz[i]
             M[5, 5] = izz[i]
-            # self.MM.insert(i,M)
             self.MM.append(M)
             fgi[2,0] = float(mass[i])*(-9.807) # apply mass*gravity term to 3rd column (z axis)
             self.Fg.append(fgi)
@@ -140,7 +140,7 @@ class Robot(RobotBase):
         JCOM1 = np.zeros((6, 4))
         JCOM1[1, 0] = -L1 * np.sin(q1) - 2 * coml1 * np.sin(2 * q1)
         JCOM1[2, 0] = L1 * np.cos(q1) + 2 * coml1 * np.cos(2 * q1)
-        JCOM1[3, :] = 1
+        JCOM1[3, 0] = 1
 
         return JCOM1
 
@@ -162,7 +162,8 @@ class Robot(RobotBase):
         JCOM2[1, 1] = -L2 * np.sin(q2) * np.cos(q1)
         JCOM2[2, 0] = (L1 + L2 * np.cos(q2) + coml2) * np.cos(q1)
         JCOM2[2, 1] = -L2 * np.sin(q1) * np.sin(q2)
-        JCOM2[5, :] = 1
+        JCOM2[3, 0] = 1
+        JCOM2[5, 1] = 1
 
         return JCOM2
 
@@ -201,7 +202,9 @@ class Robot(RobotBase):
             + coml3 * np.sin(q2 + q3) * np.cos(q3)
         JCOM3[2, 0] = (L1 + coml3 * np.cos(q3)) * np.cos(q1)
         JCOM3[2, 2] = -coml3 * np.sin(q1) * np.sin(q3)
-        JCOM3[5, :] = 1
+        JCOM3[3, 0] = 1
+        JCOM3[5, 1] = 1
+        JCOM3[5, 2] = 1
 
         return JCOM3
 
@@ -252,7 +255,10 @@ class Robot(RobotBase):
             + coml4 * np.sin(q2 + q3 + q4) * np.cos(q4)
         JCOM4[2, 0] = (L1 + coml4 * np.cos(q4)) * np.cos(q1)
         JCOM4[2, 3] = -coml4 * np.sin(q1) * np.sin(q4)
-        JCOM4[5, :] = 1
+        JCOM4[3, 0] = 1
+        JCOM4[5, 1] = 1
+        JCOM4[5, 2] = 1
+        JCOM4[5, 3] = 1
 
         return JCOM4
 
@@ -282,6 +288,10 @@ class Robot(RobotBase):
                           - np.sin(-q1 + q2 + q3 + 2 * q4) / 2 - np.sin(q1 + q2 + q3 + 2 * q4) / 2)
         JEE[2, 0] = L4 * np.cos(q1) * np.cos(q4)
         JEE[2, 3] = -L4 * np.sin(q1) * np.sin(q4)
+        # JEE[3, 0] = 1
+        # JEE[5, 1] = 1
+        # JEE[5, 2] = 1
+        # JEE[5, 3] = 1
 
         return JEE
 
@@ -295,7 +305,7 @@ class Robot(RobotBase):
         JCOM1 = self.gen_jacCOM1(q=q)
         JCOM2 = self.gen_jacCOM2(q=q)
         JCOM3 = self.gen_jacCOM3(q=q)
-        JCOM4 = self.gen_jacCOM3(q=q)
+        JCOM4 = self.gen_jacCOM4(q=q)
 
         Mq = (np.dot(JCOM1.T, np.dot(M1, JCOM1)) +
               np.dot(JCOM2.T, np.dot(M2, JCOM2)) +

@@ -54,6 +54,7 @@ class Control(control.Control):
         # calculate the Jacobian
         JEE = robot.gen_jacEE()
 
+
         # calculate desired end-effector acceleration
         if x_dd_des is None:
             # self.pid.setpoint = self.target
@@ -75,9 +76,9 @@ class Control(control.Control):
         tau_grav = robot.gen_grav()
 
         # add in velocity compensation in GC space for stability
-        # self.u = (np.dot(JEE.T, Fx).reshape(-1, )) # + tau_grav
-        self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
-                  np.dot(Mq, self.kd * robot.dq).flatten()) + tau_grav
+        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - tau_grav
+        # self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
+        #          np.dot(Mq, self.kd * robot.dq).flatten()) + tau_grav
 
         # simple inverse kinematics PID control
         # self.u = self.kp*(robot.inv_kinematics(self.target)-robot.q)
@@ -126,5 +127,6 @@ class Control(control.Control):
         # self.target = np.random.random(size=(3,)) * gain + bias
 
         self.target = np.array([0.077, 0.131, -0.708])
+        # self.target = np.array([0, 0, -0.8325])
 
         return self.target.tolist()
