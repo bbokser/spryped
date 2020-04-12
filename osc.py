@@ -137,6 +137,6 @@ class Control(control.Control):
         target_alpha = 0
         target_beta = np.pi # keep foot flat for now
         target_gamma = 0
-        self.target = np.array([-0.077, -0.131, -0.608, target_alpha, target_beta, target_gamma])
+        self.target = np.array([0.077, 0.131, -0.608, target_alpha, target_beta, target_gamma])
 
         return self.target.tolist()

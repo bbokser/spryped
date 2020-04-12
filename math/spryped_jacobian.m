@@ -100,7 +100,7 @@ JEE(5,:) = 0;
 JEE(6,2) = 1;
 JEE(6,3) = 1;
 JEE(6,4) = 1;
-
+%{
 for c=1:6
 dlmwrite('j1.csv', char(J1(c,:)),'','-append')
 end
@@ -120,28 +120,58 @@ end
 for c=1:6
 dlmwrite('jee.csv', char(JEE(c,:)),'','-append')
 end
+%}
+
+fprintf('T1_0:\n %s', latex(T1_0))
+fprintf('\n')
+fprintf('T2_1:\n %s', latex(T2_1))
+fprintf('\n')
+fprintf('T3_2:\n %s', latex(T3_2))
+fprintf('\n')
+fprintf('T4_1:\n %s', latex(T4_3))
+fprintf('\n')
+
+fprintf('com1:\n %s', latex(com1))
+fprintf('\n')
+fprintf('com2:\n %s', latex(com2))
+fprintf('\n')
+fprintf('com3:\n %s', latex(com3))
+fprintf('\n')
+fprintf('com4:\n %s', latex(com4))
+fprintf('\n')
+
+%{
+fprintf('J1:\n %s', latex(J1))
+fprintf('\n')
+fprintf('J2:\n %s', latex(J2))
+fprintf('\n')
+fprintf('J3:\n %s', latex(J3))
+fprintf('\n')
+fprintf('J4:\n %s', latex(J4))
+fprintf('\n')
+fprintf('JEE:\n %s', latex(JEE))
+fprintf('\n')
+}%
 
 %writematrix(J1, 'j.csv') % not supported in Octave yet
-%fprintf('J1:\n %s', latex(J1))
+
+%{
 fprintf('J1:\n')
 J1
-
 fprintf('\n')
-%fprintf('J2:\n %s', latex(J2))
+
 fprintf('J2:\n')
 J2
-
 fprintf('\n')
-%fprintf('J3:\n %s', latex(J3))
+
 fprintf('J3:\n')
 J3
-
 fprintf('\n')
-%fprintf('J4:\n %s', latex(J4))
+
 fprintf('J4:\n')
 J4
-
 fprintf('\n')
-%fprintf('JEE:\n %s', latex(JEE))
+
 fprintf('JEE:\n')
 JEE
+}%
