@@ -22,7 +22,7 @@ class Control(object):
     """
     The base class for controllers.
     """
-    def __init__(self, kp=10, kd=np.sqrt(10),
+    def __init__(self, kp=10, kd=np.sqrt(10), ko=np.sqrt(10),
                     additions=[], task='', write_to_file=False):
         """
         additions list: list of Addition classes to append to
@@ -31,22 +31,19 @@ class Control(object):
         kd float: the velocity error term gain value
         """
 
-        self.u = np.zeros((2,1)) # control signal
+        self.u = np.zeros((4,1)) # control signal
 
         self.additions = additions
         self.kp = kp
         self.kd = kd
+        self.ko = ko
         self.task = task
         self.target = None
 
         self.write_to_file = write_to_file
         self.recorders = []
 
-    def check_distance(self, robot):
-        """Checks the distance to target"""
-        return np.sum(abs(robot.x - self.target)) + np.sum(abs(robot.dq))
-
-    def control(self, robot, x_des):
+    def control(self, robot, x_dd_des):
         """Generates a control signal to apply to the robot"""
         raise NotImplementedError
 

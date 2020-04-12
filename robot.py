@@ -21,6 +21,7 @@ import math
 import csv
 
 import pybullet as p
+import transformations
 
 from RobotBase import RobotBase
 
@@ -273,7 +274,7 @@ class Robot(RobotBase):
 
         L4 = self.L[4]
 
-        JEE = np.zeros((3, 4))  # Only x, y, z forces controlled, others dropped
+        JEE = np.zeros((6, 4))  # (3, 4) if only x, y, z forces controlled, others dropped
         JEE[0, 0] = L4 * np.sin(q1) * np.sin(q2 + q3 + q4) * np.cos(q4)
         JEE[0, 1] = -L4 * (np.sin(q4) * np.sin(q2 + q3 + q4)
                            + np.cos(q1) * np.cos(q4) * np.cos(q2 + q3 + q4))
@@ -288,10 +289,10 @@ class Robot(RobotBase):
                           - np.sin(-q1 + q2 + q3 + 2 * q4) / 2 - np.sin(q1 + q2 + q3 + 2 * q4) / 2)
         JEE[2, 0] = L4 * np.cos(q1) * np.cos(q4)
         JEE[2, 3] = -L4 * np.sin(q1) * np.sin(q4)
-        # JEE[3, 0] = 1
-        # JEE[5, 1] = 1
-        # JEE[5, 2] = 1
-        # JEE[5, 3] = 1
+        JEE[3, 0] = 1
+        JEE[5, 1] = 1
+        JEE[5, 2] = 1
+        JEE[5, 3] = 1
 
         return JEE
 
@@ -394,6 +395,28 @@ class Robot(RobotBase):
         JEE = self.gen_jacEE(q=q)
         return np.dot(JEE, self.dq).flatten()
 
+    def orientation(self, q=None):
+        # Calculate orientation of end effector in quaternions
+        if q is None:
+            q1 = self.q[0]
+            q2 = self.q[1]
+            q3 = self.q[2]
+            q4 = self.q[3]
+        else:
+            q1 = q[0]
+            q2 = q[1]
+            q3 = q[2]
+            q4 = q[3]
+
+        alpha = q1 # x-axis rotation
+        beta = q2+q3+q4 # y-axis rotation
+        gamma = 0 # z-axis rotation
+        q_e = transformations.unit_vector(
+            transformations.quaternion_from_euler(
+                alpha, beta, gamma, axes='rxyz'))  # 'rotating xyz'
+
+        return q_e
+
     def reset(self, q=None, dq=None):
         if q is None:
             q = []
@@ -423,7 +446,3 @@ class Robot(RobotBase):
         self.q = np.add(self.q.flatten(), np.array([-2 * np.pi / 4, np.pi * 32 / 180,
                                                    -np.pi * 44.17556088 / 180, np.pi * 12.17556088 / 180.]))
         self.dq = np.reshape([j[1] for j in p.getJointStates(1, range(0, 4))], (-1, 1))
-
-# robert = Robot()
-# print(robert.MM[7])
-# print(robert.gen_Mx())

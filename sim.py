@@ -39,7 +39,7 @@ robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])
 bot = p.loadURDF("spryped_urdf_rev05/urdf/spryped_urdf_rev05.urdf", [0, 0, 2],
                  robotStartOrientation, useFixedBase=1)
 
-p.setGravity(0, 0, GRAVITY)
+# p.setGravity(0, 0, GRAVITY)
 
 class Runner:
 
@@ -85,7 +85,7 @@ class Runner:
             torque[0:4] = u
             torque[0] *= -1  # readjust to match motor polarity
             # print(torque)
-            print(robot.x)  # forward kinematics
+            print(robot.position()[:, -1])  # forward kinematics
             # print("vel = ", robot.velocity())
             # print(robot.q)  # encoder
             # print(robot.gen_grav()) # gravity term

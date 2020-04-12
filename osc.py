@@ -19,7 +19,7 @@ import sys
 
 import numpy as np
 from simple_pid import PID
-
+import transformations
 import control
 
 class Control(control.Control):
@@ -40,7 +40,6 @@ class Control(control.Control):
         self.pid = PID(10, 3, 0.5)
         self.pid.sample_time = self.dt # 1e-3
 
-
     def control(self, robot, x_dd_des=None):
         """
         Generates a control signal to move the
@@ -48,26 +47,47 @@ class Control(control.Control):
 
         robot Robot: the robot model being controlled
         des list: the desired system position
-        x_dd_des np.array: desired task-space acceleration,
-                        system goes to self.target if None
+        x_dd_des np.array: desired acceleration
         """
+        # which dim to control of [x, y, z, alpha, beta, gamma]
+        ctrlr_dof = np.array([True, True, True, False, True, False])
+
         # calculate the Jacobian
-        JEE = robot.gen_jacEE()
-
-
-        # calculate desired end-effector acceleration
-        if x_dd_des is None:
-            # self.pid.setpoint = self.target
-            self.x = robot.position()[:, -1]
-            self.velocity = np.transpose(np.dot(JEE, robot.dq)).flatten()
-            # compute new output from the PID according to the system's current value
-            # x_dd_des = self.pid(self.x)
-            x_dd_des = self.kp * (self.target - self.x)
-            # x_dd_des = np.add(self.kp * (self.target - self.x), -self.kd * self.velocity)
+        JEE = robot.gen_jacEE()[ctrlr_dof]
 
         # generate the mass matrix in end-effector space
         Mq = robot.gen_Mq()
-        Mx = robot.gen_Mx()
+        Mx = robot.gen_Mx(Mq=Mq, JEE=JEE)
+
+        x_dd_des = np.zeros(6)  # [x, y, z, alpha, beta, gamma]
+
+        # self.pid.setpoint = self.target
+        self.x = robot.position()[:, -1]
+
+        # Calculate operational space linear velocity vector
+        # self.velocity = np.transpose(np.dot(JEE, robot.dq)).flatten()
+
+        # x_dd_des = self.pid(self.x)
+        x_dd_des[:3] = self.kp * (self.target[0:3] - self.x)
+
+        # calculate end effector orientation unit quaternion
+        q_e = robot.orientation()
+
+        # calculate the target orientation unit quaternion
+        q_d = transformations.unit_vector(
+            transformations.quaternion_from_euler(
+                self.target[3], self.target[4], self.target[5],
+                axes='rxyz'))  # converting angles from 'rotating xyz'
+
+        # calculate the rotation between current and target orientations
+        q_r = transformations.quaternion_multiply(
+            q_d, transformations.quaternion_conjugate(q_e))
+
+        # convert rotation quaternion to Euler angle forces
+        x_dd_des[3:] = self.ko * q_r[1:] * np.sign(q_r[0])
+
+        x_dd_des = x_dd_des[ctrlr_dof] # get rid of dim not being controlled
+        x_dd_des = np.reshape(x_dd_des, (-1, 1))
 
         # calculate force
         Fx = np.dot(Mx, x_dd_des)
@@ -76,9 +96,9 @@ class Control(control.Control):
         tau_grav = robot.gen_grav()
 
         # add in velocity compensation in GC space for stability
-        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - tau_grav
+        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) # - tau_grav
         # self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
-        #          np.dot(Mq, self.kd * robot.dq).flatten()) + tau_grav
+        #          np.dot(Mq, self.kd * robot.dq).flatten()) # + tau_grav
 
         # simple inverse kinematics PID control
         # self.u = self.kp*(robot.inv_kinematics(self.target)-robot.q)
@@ -107,12 +127,6 @@ class Control(control.Control):
 
         # self.u += null_signal
 
-        # if self.write_to_file is True:
-        # feed recorders their signals
-        #     self.u_recorder.record(0.0, self.u)
-        #     self.xy_recorder.record(0.0, self.x)
-        #     self.dist_recorder.record(0.0, self.target - self.x)
-
         # add in any additional signals
         for addition in self.additions:
             self.u += addition.generate(self.u, robot)
@@ -120,13 +134,9 @@ class Control(control.Control):
         return self.u
 
     def gen_target(self, robot):
-        # Generate a random target
-        # gain = np.sum(robot.L) * .75
-        # bias = -np.sum(robot.L) * 0
-
-        # self.target = np.random.random(size=(3,)) * gain + bias
-
-        self.target = np.array([0.077, 0.131, -0.708])
-        # self.target = np.array([0, 0, -0.8325])
+        target_alpha = 0
+        target_beta = np.pi # keep foot flat for now
+        target_gamma = 0
+        self.target = np.array([-0.077, -0.131, -0.608, target_alpha, target_beta, target_gamma])
 
         return self.target.tolist()

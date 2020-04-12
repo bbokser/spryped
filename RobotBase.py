@@ -46,12 +46,13 @@ class RobotBase:
 
         raise NotImplementedError
 
-    def gen_Mx(self, JEE=None, q=None, **kwargs):
+    def gen_Mx(self, JEE=None, q=None, Mq = None, **kwargs):
         # Generate the mass matrix in operational space
         if q is None:
             q = self.q
 
-        Mq = self.gen_Mq(q=q, **kwargs)
+        if Mq is None:
+            Mq = self.gen_Mq(q=q, **kwargs)
 
         if JEE is None:
             JEE = self.gen_jacEE(q=q)
@@ -91,6 +92,6 @@ class RobotBase:
         # Update the state
         pass
 
-    @property
-    def x(self):
-        return self.position()[:, -1]
+    # @property
+    # def x(self):
+    #     return self.position()[:, -1]
