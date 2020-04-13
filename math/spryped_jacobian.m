@@ -49,7 +49,7 @@ com4 = [[l4*sin(q4)];
 xee = [[L4*sin(q4)]; # position of the end effector
        [L4*cos(q4)];
        [0];
-       [0]];
+       [1]];
 
 #Tcom1 = simplify(T1_0*com1) # insufficient simplification
 Tcom1 = [[0]; # simplified manually
@@ -100,7 +100,7 @@ JEE(5,:) = 0;
 JEE(6,2) = 1;
 JEE(6,3) = 1;
 JEE(6,4) = 1;
-%{
+
 for c=1:6
 dlmwrite('j1.csv', char(J1(c,:)),'','-append')
 end
@@ -120,7 +120,7 @@ end
 for c=1:6
 dlmwrite('jee.csv', char(JEE(c,:)),'','-append')
 end
-%}
+
 
 fprintf('T1_0:\n %s', latex(T1_0))
 fprintf('\n')
@@ -138,6 +138,8 @@ fprintf('\n')
 fprintf('com3:\n %s', latex(com3))
 fprintf('\n')
 fprintf('com4:\n %s', latex(com4))
+fprintf('\n')
+fprintf('com4:\n %s', latex(xee))
 fprintf('\n')
 
 %{

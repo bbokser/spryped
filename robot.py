@@ -272,23 +272,34 @@ class Robot(RobotBase):
         q3 = q[2]
         q4 = q[3]
 
+        L1 = self.L[1]
+        L2 = self.L[2]
+        L3 = self.L[3]
         L4 = self.L[4]
 
         JEE = np.zeros((6, 4))  # (3, 4) if only x, y, z forces controlled, others dropped
-        JEE[0, 0] = L4 * np.sin(q1) * np.sin(q2 + q3 + q4) * np.cos(q4)
-        JEE[0, 1] = -L4 * (np.sin(q4) * np.sin(q2 + q3 + q4)
-                           + np.cos(q1) * np.cos(q4) * np.cos(q2 + q3 + q4))
-        JEE[0, 2] = JEE[0, 1]
-        JEE[0, 3] = L4 * (np.cos(q2 + q3 + 2 * q4)
-                          - np.cos(-q1 + q2 + q3 + 2 * q4) / 2 - np.cos(q1 + q2 + q3 + 2 * q4) / 2)
-        JEE[1, 0] = -L4 * np.sin(q1) * np.cos(q4) * np.cos(q2 + q3 + q4)
-        JEE[1, 1] = L4 * (np.sin(q4) * np.cos(q2 + q3 + q4)
-                          - np.sin(q2 + q3 + q4) * np.cos(q1) * np.cos(q4))
-        JEE[1, 2] = JEE[1, 1]
-        JEE[1, 3] = L4 * (np.sin(q2 + q3 + 2 * q4)
-                          - np.sin(-q1 + q2 + q3 + 2 * q4) / 2 - np.sin(q1 + q2 + q3 + 2 * q4) / 2)
-        JEE[2, 0] = L4 * np.cos(q1) * np.cos(q4)
-        JEE[2, 3] = -L4 * np.sin(q1) * np.sin(q4)
+        JEE[0, 0] = (L1 + L4*np.cos(q4))*np.sin(q1)*np.sin(q2 + q3 + q4)
+        JEE[0, 1] = -L1*np.cos(q1)*np.cos(q2 + q3 + q4) + L2*np.cos(-q2 + q3 + q4)\
+                    - L4*np.sin(q4)*np.sin(q2 + q3 + q4)\
+                    - L4*np.cos(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)
+        JEE[0, 2] = -L1*np.cos(q1)*np.cos(q2 + q3 + q4) - L2*np.cos(-q2 + q3 + q4) + L3*np.cos(q3 - q4)\
+                    - L4*np.sin(q4)*np.sin(q2 + q3 + q4) - L4*np.cos(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)
+        JEE[0, 3] = -L1*np.cos(q1)*np.cos(q2 + q3 + q4) - L2*np.cos(-q2 + q3 + q4) - L3*np.cos(q3 - q4)\
+                    + L4*np.sin(q4)*np.sin(q2 + q3 + q4)*np.cos(q1) - L4*np.sin(q4)*np.sin(q2 + q3 + q4)\
+                    - L4*np.cos(q1)*np.cos(q4)*np.cos(q2 + q3 + q4)\
+                    + L4*np.cos(q4)*np.cos(q2 + q3 + q4) + L4*np.cos(q4)
+        JEE[1, 0] = -(L1 + L4*np.cos(q4))*np.sin(q1)*np.cos(q2 + q3 + q4)
+        JEE[1, 1] = -L1*np.sin(q2 + q3 + q4)*np.cos(q1) + L2*np.sin(-q2 + q3 + q4)\
+                    + L4*np.sin(q4)*np.cos(q2 + q3 + q4)\
+                    - L4*np.sin(q2 + q3 + q4)*np.cos(q1)*np.cos(q4)
+        JEE[1, 2] = -L1*np.sin(q2 + q3 + q4)*np.cos(q1) - L2*np.sin(-q2 + q3 + q4) - L3*np.sin(q3 - q4)\
+                    + L4*np.sin(q4)*np.cos(q2 + q3 + q4) - L4*np.sin(q2 + q3 + q4)*np.cos(q1)*np.cos(q4)
+        JEE[1, 3] = -L1*np.sin(q2 + q3 + q4)*np.cos(q1) - L2*np.sin(-q2 + q3 + q4) + L3*np.sin(q3 - q4)\
+                    - L4*np.sin(q4)*np.cos(q1)*np.cos(q2 + q3 + q4) + L4*np.sin(q4)*np.cos(q2 + q3 + q4)\
+                    - L4*np.sin(q4) - L4*np.sin(q2 + q3 + q4)*np.cos(q1)*np.cos(q4)\
+                    + L4*np.sin(q2 + q3 + q4)*np.cos(q4)
+        JEE[2, 0] = (L1 + L4*np.cos(q4))*np.cos(q1)
+        JEE[2, 3] = -L4*np.sin(q1)*np.sin(q4)
         JEE[3, 0] = 1
         JEE[5, 1] = 1
         JEE[5, 2] = 1

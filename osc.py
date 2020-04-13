@@ -50,7 +50,7 @@ class Control(control.Control):
         x_dd_des np.array: desired acceleration
         """
         # which dim to control of [x, y, z, alpha, beta, gamma]
-        ctrlr_dof = np.array([True, True, True, False, True, False])
+        ctrlr_dof = np.array([True, True, True, False, False, False])
 
         # calculate the Jacobian
         JEE = robot.gen_jacEE()[ctrlr_dof]
@@ -137,6 +137,6 @@ class Control(control.Control):
         target_alpha = 0
         target_beta = np.pi # keep foot flat for now
         target_gamma = 0
-        self.target = np.array([0.077, 0.131, -0.608, target_alpha, target_beta, target_gamma])
+        self.target = np.array([0.077, 0.131, -0.708, target_alpha, target_beta, target_gamma])
 
         return self.target.tolist()

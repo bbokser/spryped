@@ -8,11 +8,75 @@
 \begin{document}
 
 \begin{equation}
+	{}_0^1 T = \begin{bmatrix}
+	1 & 0 & 0 & 0\\0 & \cos{\left(q_{1} \right)} & - \sin{\left(q_{1} \right)} & L_{1} \cos{\left(q_{1} 	\right)}\\
+	0 & \sin{\left(q_{1} \right)} & \cos{\left(q_{1} \right)} & L_{1} \sin{\left(q_{1} \right)}\\
+	0 & 0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	{}_1^2 T = \begin{bmatrix}
+ 	\cos{\left(q_{2} \right)} & - \sin{\left(q_{2} \right)} & 0 & L_{2} \sin{\left(q_{2} \right)}\\
+ 	\sin{\left(q_{2} \right)} & \cos{\left(q_{2} \right)} & 0 & L_{2} \cos{\left(q_{2} \right)}\\
+ 	0 & 0 & 1 & 0\\
+ 	0 & 0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	{}_2^3 T = \begin{bmatrix}
+ 	\cos{\left(q_{3} \right)} & - \sin{\left(q_{3} \right)} & 0 & L_{3} \sin{\left(q_{3} \right)}\\\sin{\left(q_{3} \right)} & \cos{\left(q_{3} \right)} & 0 & L_{3} \cos{\left(q_{3} \right)}\\0 & 0 & 1 & 0\\0 & 0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	{}_3^4 T = \begin{bmatrix}
+ 	\cos{\left(q_{4} \right)} & - \sin{\left(q_{4} \right)} & 0 & L_{4} \sin{\left(q_{4} \right)}\\
+ 	\sin{\left(q_{4} \right)} & \cos{\left(q_{4} \right)} & 0 & L_{4} \cos{\left(q_{4} \right)}\\
+ 	0 & 0 & 1 & 0\\
+ 	0 & 0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	com_1 = \begin{bmatrix}
+ 	0\\l_{1} \cos{\left(q_{1} \right)}\\l_{1} \sin{\left(q_{1} \right)}\\1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	com_2 = \begin{bmatrix}
+ 	l_{2} \sin{\left(q_{2} \right)}\\l_{2} \cos{\left(q_{2} \right)}\\0\\1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	com_3 = \begin{bmatrix}
+ 	l_{3} \sin{\left(q_{3} \right)}\\l_{3} \cos{\left(q_{3} \right)}\\0\\1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	com_4 = \begin{bmatrix}
+ 	l_{4} \sin{\left(q_{4} \right)}\\l_{4} \cos{\left(q_{4} \right)}\\0\\1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	com_{ee} = \begin{bmatrix}
+ 	L_{4} \sin{\left(q_{4} \right)}\\L_{4} \cos{\left(q_{4} \right)}\\0\\1
+\end{bmatrix}
+\end{equation}
+
+
+
+\begin{equation}
 	J_1 = \begin{bsmallmatrix}
 	0 & 0 & 0 & 0\\
 	- L_{1} \sin{(q_{1} )} - 2 l_{1} \sin{(2 q_{1} )} & 0 & 0 & 0\\
 	L_{1} \cos{(q_{1} )} + 2 l_{1} \cos{(2 q_{1} )} & 0 & 0 & 0\\
-	1 & 1 & 1 & 1\\
+	1 & 0 & 0 & 0\\
 	0 & 0 & 0 & 0\\
 	0 & 0 & 0 & 0
 \end{bsmallmatrix}
@@ -22,9 +86,9 @@
 	J_2 = \begin{bsmallmatrix}0 & L_{2} \cos{(q_{2} )} & 0 & 0\\
 	- (L_{1} + L_{2} \cos{(q_{2} )} + l_{2}) \sin{(q_{1} )} & - L_{2} \sin{(q_{2} )} \cos{(q_{1} )} & 0 & 0\\
 	(L_{1} + L_{2} \cos{(q_{2} )} + l_{2}) \cos{(q_{1} )} & - L_{2} \sin{(q_{1} )} \sin{(q_{2} )} & 0 & 0\\
+	1 & 0 & 0 & 0\\
 	0 & 0 & 0 & 0\\
-	0 & 0 & 0 & 0\\
-	1 & 1 & 1 & 1
+	0 & 1 & 0 & 0
 \end{bsmallmatrix}
 \end{equation}
 
@@ -32,9 +96,9 @@
 	J_3 = \begin{bsmallmatrix}(L_{1} + l_{3} \cos{(q_{3} )}) \sin{(q_{1} )} \sin{(q_{2} + q_{3} )} & - L_{1} 		\cos{(q_{1} )} \cos{(q_{2} + q_{3} )} + L_{2} \cos{(q_{2} - q_{3} )} - l_{3} \sin{(q_{3} )} \sin{(q_{2} + q_{3} )} - l_{3} \cos{(q_{1} )} \cos{(q_{3} )} \cos{(q_{2} + q_{3} )} & - L_{1} \cos{(q_{1} )} \cos{(q_{2} + 	q_{3})} - L_{2} \cos{(q_{2} - q_{3} )} + L_{3} \cos{(q_{3} )} + l_{3} \sin{(q_{3} )} \sin{(q_{2} + q_{3} )} 	\cos{(q_{1} )} - l_{3} \sin{(q_{3} )} \sin{(q_{2} + q_{3} )} - l_{3} \cos{(q_{1} )} \cos{(q_{3} )} \cos{(q_{2} + 	q_{3} )} + l_{3} \cos{(q_{3} )} \cos{(q_{2} + q_{3} )} & 0\\
 	 - (L_{1} + l_{3} \cos{(q_{3} )}) \sin{(q_{1} )} \cos{(q_{2} + q_{3} )} & - L_{1} \sin{(q_{2} + q_{3} )} \cos{(q_{1} )} - L_{2} \sin{(q_{2} - q_{3} )} + l_{3} \sin{(q_{3} )} \cos{(q_{2} + q_{3} )} - l_{3} \sin{(q_{2} + q_{3} )} \cos{(q_{1} )} \cos{(q_{3} )} & - L_{1} \sin{(q_{2} + q_{3} )} \cos{(q_{1} )} + L_{2} \sin{(q_{2} - q_{3} )} - L_{3} \sin{(q_{3} )} - l_{3} \sin{(q_{3} )} \cos{(q_{1} )} \cos{(q_{2} + q_{3} )} + l_{3} \sin{(q_{3} )} \cos{(q_{2} + q_{3} )} - l_{3} \sin{(q_{2} + q_{3} )} \cos{(q_{1} )} \cos{(q_{3} )} + l_{3} \sin{(q_{2} + q_{3} )}\cos{(q_{3} )} & 0\\
 	(L_{1} + l_{3} \cos{(q_{3} )}) \cos{(q_{1} )} & 0 & - l_{3} \sin{(q_{1} )} \sin{(q_{3} )} & 0\\
+	1 & 0 & 0 & 0\\
 	0 & 0 & 0 & 0\\
-	0 & 0 & 0 & 0\\
-	1 & 1 & 1 & 1
+	0 & 1 & 1 & 0
 \end{bsmallmatrix}
 \end{equation}
 
@@ -42,9 +106,9 @@
 	J_4 = \begin{bsmallmatrix}(L_{1} + l_{4} \cos{(q_{4} )}) \sin{(q_{1} )} \sin{(q_{2} + q_{3} + q_{4} )} & - L_{1} \cos{(q_{1} )} \cos{(q_{2} + q_{3} + q_{4} )} + L_{2} \cos{(- q_{2} + q_{3} + q_{4} )} - l_{4} \sin{(q_{4} )} \sin{(q_{2} + q_{3} + q_{4} )} - l_{4} \cos{(q_{1} )} \cos{(q_{4} )} \cos{(q_{2} + q_{3} + q_{4} )} & - L_{1} \cos{(q_{1} )} \cos{(q_{2} + q_{3} + q_{4} )} - L_{2} \cos{(- q_{2} + q_{3} + q_{4} )} + L_{3} \cos{(q_{3} - q_{4} )} -l_{4} \sin{(q_{4} )} \sin{(q_{2} + q_{3} + q_{4} )} - l_{4} \cos{(q_{1} )} \cos{(q_{4} )} \cos{(q_{2} + q_{3} + q_{4} )} & - L_{1} \cos{(q_{1} )} \cos{(q_{2} + q_{3} + q_{4} )} - L_{2} \cos{(- q_{2} + q_{3} + q_{4} )} - L_{3} \cos{(q_{3} - q_{4} )} + L_{4} \cos{(q_{4} )} + l_{4} \sin{(q_{4} )} \sin{(q_{2} + q_{3} + q_{4} )} \cos{(q_{1} )} - l_{4} \sin{(q_{4} )} \sin{(q_{2} + q_{3} + q_{4} )} - l_{4} \cos{(q_{1} )} \cos{(q_{4} )} \cos{(q_{2} + q_{3} + q_{4} )} + l_{4} \cos{(q_{4} )} \cos{(q_{2} + q_{3} + q_{4} )}\\
 	- (L_{1} + l_{4} \cos{(q_{4} )}) \sin{(q_{1} )} \cos{(q_{2} + q_{3} + q_{4} )} & - L_{1} \sin{(q_{2} + q_{3} + q_{4} )} \cos{(q_{1} )} + L_{2} \sin{(- q_{2} + q_{3} + q_{4} )} + l_{4} \sin{(q_{4} )} \cos{(q_{2} + q_{3} + q_{4} )} - l_{4} \sin{(q_{2} + q_{3} + q_{4} )} \cos{(q_{1} )} \cos{(q_{4} )} & - L_{1} \sin{(q_{2} + q_{3} + q_{4} )} \cos{(q_{1} )}- L_{2} \sin{(- q_{2} + q_{3} + q_{4} )} - L_{3} \sin{(q_{3} - q_{4} )} + l_{4} \sin{(q_{4} )} \cos{(q_{2} + q_{3} + q_{4} )} - l_{4} \sin{(q_{2} + q_{3} + q_{4} )} \cos{(q_{1} )} \cos{(q_{4} )} & - L_{1} \sin{(q_{2} + q_{3} + q_{4} )} \cos{(q_{1} )} - L_{2} \sin{(- q_{2} + q_{3} + q_{4} )} + L_{3} \sin{(q_{3} - q_{4} )} - L_{4} \sin{(q_{4} )} - l_{4} \sin{(q_{4} )} \cos{(q_{1} )} \cos{(q_{2} + q_{3} + q_{4} )} + l_{4} \sin{(q_{4} )} \cos{(q_{2} + q_{3} + q_{4} )} - l_{4} \sin{(q_{2} + q_{3} + q_{4} )} \cos{(q_{1} )} \cos{(q_{4} )} + l_{4} \sin{(q_{2} + q_{3} + q_{4} )} \cos{(q_{4} )}\\
 	(L_{1} + l_{4} \cos{(q_{4} )}) \cos{(q_{1} )} & 0 & 0 & - l_{4} \sin{(q_{1} )} \sin{(q_{4} )}\\
+	1 & 0 & 0 & 0\\
 	0 & 0 & 0 & 0\\
-	0 & 0 & 0 & 0\\
-	1 & 1 & 1 & 1
+	0 & 1 & 1 & 1
 \end{bsmallmatrix}
 \end{equation}
 
