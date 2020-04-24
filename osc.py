@@ -50,7 +50,7 @@ class Control(control.Control):
         x_dd_des np.array: desired acceleration
         """
         # which dim to control of [x, y, z, alpha, beta, gamma]
-        ctrlr_dof = np.array([True, True, True, False, False, False])
+        ctrlr_dof = np.array([True, True, True, False, True, False])
 
         # calculate the Jacobian
         JEE = robot.gen_jacEE()[ctrlr_dof]
@@ -96,7 +96,7 @@ class Control(control.Control):
         tau_grav = robot.gen_grav()
 
         # add in velocity compensation in GC space for stability
-        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) # - tau_grav
+        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) # + tau_grav
         # self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
         #          np.dot(Mq, self.kd * robot.dq).flatten()) # + tau_grav
 
@@ -137,6 +137,6 @@ class Control(control.Control):
         target_alpha = 0
         target_beta = np.pi # keep foot flat for now
         target_gamma = 0
-        self.target = np.array([0.077, 0.131, -0.708, target_alpha, target_beta, target_gamma])
+        self.target = np.array([0.077, -0.131, -0.608, target_alpha, target_beta, target_gamma])
 
         return self.target.tolist()

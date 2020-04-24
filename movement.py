@@ -24,7 +24,7 @@ def Task(arm, controller_class, dt, **kwargs):
 
     # set robot specific parameters ------------
 
-    kp = 2 # 10 for plain inv kinematics
+    kp = 30 # 10 for plain inv kinematics
     kd = np.sqrt(kp)
     ko = 100
 

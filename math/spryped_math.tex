@@ -1,0 +1,148 @@
+%\documentclass[fleqn]{article}
+\documentclass{article}
+
+\usepackage[margin=0.5in]{geometry}
+\usepackage{amsmath}
+\usepackage{mathtools}
+
+\begin{document}
+
+\begin{equation}
+	{}_o^0 T = \begin{bmatrix}
+	1 & 0 & 0 & 0\\
+	0 & \cos{(q_{0} )} & - \sin{(q_{0} )} & L_{0} \cos{(q_{0} )}\\
+	0 & \sin{(q_{0} )} & \cos{(q_{0} )} & L_{0} \sin{(q_{0} )}\\
+	0 & 0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	{}_0^1 T = \begin{bmatrix}
+	\cos{(q_{1} )} & - \sin{(q_{1} )} & 0 & L_{1} \sin{(q_{1} )}\\
+	\sin{(q_{1} )} & \cos{(q_{1} )} & 0 & L_{1} \cos{(q_{1} )}\\
+	0 & 0 & 1 & 0\\
+	0 & 0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	{}_1^2 T = \begin{bmatrix}
+ 	\cos{(q_{2} )} & - \sin{(q_{2} )} & 0 & L_{2} \sin{(q_{2} )}\\
+ 	\sin{(q_{2} )} & \cos{(q_{2} )} & 0 & L_{2} \cos{(q_{2} )}\\
+ 	0 & 0 & 1 & 0\\
+ 	0 & 0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	{}_2^3 T = \begin{bmatrix}
+ 	\cos{(q_{3} )} & - \sin{(q_{3} )} & 0 & L_{3} \sin{(q_{3} )}\\
+ 	\sin{(q_{3} )} & \cos{(q_{3} )} & 0 & L_{3} \cos{(q_{3} )}\\
+ 	0 & 0 & 1 & 0\\
+ 	0 & 0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+
+
+\begin{equation}
+	com_0 = \begin{bmatrix}
+ 	0\\
+ 	l_{0}\\
+ 	0\\
+ 	1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	com_1 = \begin{bmatrix}
+ 	0\\
+ 	l_{1}\\
+ 	0\\
+ 	1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	com_2 = \begin{bmatrix}
+ 	0\\
+ 	l_{2}\\
+ 	0\\
+ 	1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	com_3 = \begin{bmatrix}
+  	0\\
+ 	l_{3}\\
+ 	0\\
+ 	1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	com_{ee} = \begin{bmatrix}
+ 	0\\
+ 	L_{3}\\
+ 	0\\
+ 	1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	J_0 = \begin{bsmallmatrix}
+	0 & 0 & 0 & 0\\
+	- (L_{0} + l_{0}) \sin{(q_{0} )} & 0 & 0 & 0\\
+	(L_{0} + l_{0}) \cos{(q_{0} )} & 0 & 0 & 0\\
+	1 & 0 & 0 & 0\\
+	0 & 0 & 0 & 0\\
+	0 & 0 & 0 & 0
+\end{bsmallmatrix}
+\end{equation}
+
+\begin{equation}
+	J_1 = \begin{bsmallmatrix}
+	0 & (L_{1} - l_{1}) \cos{(q_{1} )} & 0 & 0\\
+	- (L_{0} + L_{1} \cos{(q_{1} )} + l_{1} \cos{(q_{1} )}) \sin{(q_{0} )} & - (L_{1} + l_{1}) \sin{(q_{1} )} \cos{(q_{0} )} & 0 & 0\\
+	(L_{0} + L_{1} \cos{(q_{1} )} + l_{1} \cos{(q_{1} )}) \cos{(q_{0} )} & - (L_{1} + l_{1}) \sin{(q_{0} )} \sin{(q_{1} )} & 0 & 0\\
+	1 & 0 & 0 & 0\\
+	0 & 0 & 0 & 0\\
+	0 & 1 & 0 & 0
+\end{bsmallmatrix}
+\end{equation}
+
+\begin{equation}
+	J_2 = \begin{bsmallmatrix}
+	0 & L_{1} \cos{(q_{1} )} - L_{2} \cos{(q_{1} - q_{2} )} - l_{2} \cos{(q_{1} + q_{2} )} & L_{2} \cos{(q_{1} - q_{2} )} - l_{2} \cos{(q_{1} + q_{2} )} & 0\\
+	- (L_{0} + L_{1} \cos{(q_{1} )} + L_{2} \cos{(q_{1} - q_{2} )} + l_{2} \cos{(q_{1} + q_{2} )}) \sin{(q_{0} )} & - (L_{1} \sin{(q_{1} )} + L_{2} \sin{(q_{1} - q_{2} )} + l_{2} \sin{(q_{1} + q_{2} )}) \cos{(q_{0} )} & (L_{2} \sin{(q_{1} - q_{2} )} - l_{2} \sin{(q_{1} + q_{2} )}) \cos{(q_{0} )} & 0\\
+	(L_{0} + L_{1} \cos{(q_{1} )} + L_{2} \cos{(q_{1} - q_{2} )} + l_{2} \cos{(q_{1} + q_{2} )}) \cos{(q_{0} )} & - (L_{1} \sin{(q_{1} )} + L_{2} \sin{(q_{1} - q_{2} )} + l_{2} \sin{(q_{1} + q_{2} )}) \sin{(q_{0} )} & (L_{2} \sin{(q_{1} - q_{2} )} - l_{2} \sin{(q_{1} + q_{2} )}) \sin{(q_{0} )} & 0\\
+	1 & 0 & 0 & 0\\
+	0 & 0 & 0 & 0\\
+	0 & 1 & 1 & 0
+\end{bsmallmatrix}
+\end{equation}
+
+\begin{equation}
+	J_3 = \begin{bsmallmatrix}
+	0 & L_{1} \cos{(- q_{1} + q_{2} + q_{3} )} - l_{3} \cos{(q_{1} + q_{2} + q_{3} )} & - L_{1} \cos{(- q_{1} +q_{2} + q_{3} )} + L_{2} \cos{(q_{2} - q_{3} )} - l_{3} \cos{(q_{1} + q_{2} + q_{3} )} & - L_{1} \cos{(- q_{1} + q_{2} + q_{3} )} - L_{2} \cos{(q_{2} - q_{3} )} + L_{3} \cos{(q_{3} )} - l_{3} \cos{(q_{1} + q_{2} + q_{3} )}\\
+	- (L_{0} +L_{1} \cos{(- q_{1} + q_{2} + q_{3} )} + L_{2} \cos{(q_{2} - q_{3} )} + L_{3} \cos{(q_{3} )} + l_{3} \cos{(q_{1} + q_{2} + q_{3} )}) \sin{(q_{0} )} & (L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} - l_{3} \sin{(q_{1} + q_{2} + q_{3} )}) \cos{(q_{0} )} & - (L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} + L_{2} \sin{(q_{2} - q_{3} )} + l_{3} \sin{(q_{1} + q_{2} + q_{3} )}) \cos{(q_{0} )} & (- L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} + L_{2} \sin{(q_{2} - q_{3} )} - L_{3} \sin{(q_{3} )} - l_{3} \sin{(q_{1} + q_{2} + q_{3} )}) \cos{(q_{0} )}\\
+	(L_{0} + L_{1} \cos{(- q_{1} + q_{2} + q_{3} )} + L_{2} \cos{(q_{2} - q_{3} )} + L_{3} \cos{(q_{3} )} + l_{3} \cos{(q_{1} + q_{2} + q_{3})}) \cos{(q_{0} )} & (L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} - l_{3} \sin{(q_{1} + q_{2} + q_{3} )})
+ \sin{(q_{0} )} & - (L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} + L_{2} \sin{(q_{2} - q_{3} )} + l_{3} \sin{(q_{1} +q_{2} + q_{3} )}) \sin{(q_{0} )} & (- L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} + L_{2} \sin{(q_{2} - q_{3} )} - L_{3} \sin{(q_{3} )} - l_{3} \sin{(q_{1} + q_{2} + q_{3} )}) \sin{(q_{0} )}\\
+ 	1 & 0 & 0 & 0\\
+ 	0 & 0 & 0 & 0\\
+ 	0 & 1& 1 & 1
+\end{bsmallmatrix}
+\end{equation}
+
+\begin{equation}
+	J_{EE} = \begin{bsmallmatrix}
+	0 & L_{1} \cos{(- q_{1} + q_{2} + q_{3} )} - L_{3} \cos{(q_{1} + q_{2} + q_{3} )} & - L_{1} \cos{(- q_{1} +q_{2} + q_{3} )} + L_{2} \cos{(q_{2} - q_{3} )} - L_{3} \cos{(q_{1} + q_{2} + q_{3} )} & - L_{1} \cos{(- q_{1} + q_{2} + q_{3} )} - L_{2} \cos{(q_{2} - q_{3} )} + L_{3} \cos{(q_{3} )} - L_{3} \cos{(q_{1} + q_{2} + q_{3} )}\\
+	- (L_{0} +L_{1} \cos{(- q_{1} + q_{2} + q_{3} )} + L_{2} \cos{(q_{2} - q_{3} )} + L_{3} \cos{(q_{3} )} + L_{3} \cos{(q_{1} + q_{2} + q_{3} )}) \sin{(q_{0} )} & (L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} - L_{3} \sin{(q_{1} + q_{2} + q_{3} )}) \cos{(q_{0} )} & - (L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} + L_{2} \sin{(q_{2} - q_{3} )} + L_{3} \sin{(q_{1} + q_{2} + q_{3} )}) \cos{(q_{0} )} & (- L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} + L_{2} \sin{(q_{2} - q_{3} )} - L_{3} \sin{(q_{3} )} - L_{3} \sin{(q_{1} + q_{2} + q_{3} )}) \cos{(q_{0} )}\\
+	(L_{0} + L_{1} \cos{(- q_{1} + q_{2} + q_{3} )} + L_{2} \cos{(q_{2} - q_{3} )} + L_{3} \cos{(q_{3} )} + L_{3} \cos{(q_{1} + q_{2} + q_{3})}) \cos{(q_{0} )} & (L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} - L_{3} \sin{(q_{1} + q_{2} + q_{3} )}) \sin{(q_{0} )} & - (L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} + L_{2} \sin{(q_{2} - q_{3} )} + L_{3} \sin{(q_{1} +q_{2} + q_{3} )}) \sin{(q_{0} )} & (- L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} + L_{2} \sin{(q_{2} - q_{3} )} - L_{3} \sin{(q_{3} )} - L_{3} \sin{(q_{1} + q_{2} + q_{3} )}) \sin{(q_{0} )}\\
+	1 & 0 & 0 & 0\\
+	0 & 0 & 0 & 0\\
+	0 & 1& 1 & 1
+\end{bsmallmatrix}
+\end{equation}
+
+\end{document}

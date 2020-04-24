@@ -36,7 +36,7 @@ planeID = p.loadURDF("plane.urdf")
 robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])
 # bot = p.loadURDF("spryped_urdf_rev05/urdf/spryped_urdf_rev05.urdf", [0, 0, 0.8],
 #                 robotStartOrientation, useFixedBase=1)
-bot = p.loadURDF("spryped_urdf_rev05/urdf/spryped_urdf_rev05.urdf", [0, 0, 2],
+bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 2],
                  robotStartOrientation, useFixedBase=1)
 
 # p.setGravity(0, 0, GRAVITY)
