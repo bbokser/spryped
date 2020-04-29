@@ -38,7 +38,7 @@ class Robot(RobotBase):
         RobotBase.__init__(self, init_q=init_q, init_dq=init_dq, **kwargs)
 
         values = []
-        with open('spryped_urdf_rev06/spryped_data.csv', 'r') as csvfile:
+        with open('spryped_urdf_rev06/spryped_data_alt.csv', 'r') as csvfile:
             data = csv.reader(csvfile, delimiter=',')
             next(data)  # skip headers
             values = list(zip(*(row for row in data)))  # transpose rows to columns
@@ -59,9 +59,9 @@ class Robot(RobotBase):
             values_direct = list(zip(*(row for row in data_direct)))  # transpose rows to columns
             values_direct = np.array(values_direct)  # convert list of nested lists to array
 
-        mass = values_direct[7].astype(np.float)
-        mass = np.delete(mass, 0) # remove body value
-        print(mass)
+        self.mass = values_direct[7].astype(np.float)
+        self.mass = np.delete(self.mass, 0) # remove body value
+
         # estimating init link angles
         # p = 4
         # dist = math.sqrt((ox[p]**2)+(oz[p]**2))
@@ -70,13 +70,13 @@ class Robot(RobotBase):
         # print("angle p = ", angle)
 
         # link masses
-        if mass[0] != mass[4]:
+        if self.mass[0] != self.mass[4]:
             print("WARNING: femur L/R masses unequal, check CAD")
-        if mass[1] != mass[5]:
+        if self.mass[1] != self.mass[5]:
             print("WARNING: tibiotarsus L/R masses unequal, check CAD")
-        if mass[2] != mass[6]:
+        if self.mass[2] != self.mass[6]:
             print("WARNING: tarsometatarsus L/R masses unequal, check CAD")
-        if mass[3] != mass[7]:
+        if self.mass[3] != self.mass[7]:
             print("WARNING: toe L/R masses unequal, check CAD")
 
         # link lengths (mm) must be manually updated
@@ -90,10 +90,11 @@ class Robot(RobotBase):
         # mass matrices and gravity
         self.MM = []
         self.Fg = []
+        self.gravity = np.matrix([[0, 0, -9.81, 0, 0, 0]]).T
         for i in range(0,4):
             M = np.zeros((6, 6))
             fgi = np.zeros((6,1))
-            M[0:3, 0:3] = np.eye(3) * float(mass[i])
+            M[0:3, 0:3] = np.eye(3) * float(self.mass[i])
             M[3, 3] = ixx[i]
             M[3, 4] = ixy[i]
             M[3, 5] = ixz[i]
@@ -104,19 +105,23 @@ class Robot(RobotBase):
             M[5, 4] = iyz[i]
             M[5, 5] = izz[i]
             self.MM.append(M)
-            fgi[2,0] = float(mass[i])*(-9.807) # apply mass*gravity term to 3rd column (z axis)
+            fgi = float(self.mass[i])*self.gravity # apply mass*gravity term to 3rd column (z axis)
             self.Fg.append(fgi)
+
+        self.k = 1
 
         self.reset()
         self.update_state()
 
-    def apply_torque(self, u, dt=None):
+    def apply_torque(self, u, dt=None, k=None):
         # Takes in torque and timestep and updates robot accordingly
 
         if dt is None:
             dt = self.dt
+        if k is None:
+            k = self.k
 
-        u = -1 * np.array(u, dtype='float')
+        u = -1 * k * np.array(u, dtype='float')
 
         # for ii in range(int(np.ceil(dt / 1e-5))):
         #    self.sim.step(self.state, u)
@@ -133,8 +138,8 @@ class Robot(RobotBase):
         l0 = self.coml[0]
 
         JCOM0 = np.zeros((6, 4))
-        JCOM0[1, 0] = -(L0 + l0)*np.sin(q0)
-        JCOM0[2, 0] = (L0 + l0)*np.cos(q0)
+        JCOM0[1, 0] = -l0*np.sin(q0)
+        JCOM0[2, 0] = l0*np.cos(q0)
         JCOM0[3, 0] = 1
 
         return JCOM0
@@ -152,11 +157,11 @@ class Robot(RobotBase):
         l1 = self.coml[1]
 
         JCOM1 = np.zeros((6, 4))
-        JCOM1[0, 1] = (L1 - l1)*np.cos(q1)
-        JCOM1[1, 0] = -(L0 + L1*np.cos(q1) + l1*np.cos(q1))*np.sin(q0)
-        JCOM1[1, 1] = -(L1 + l1)*np.sin(q1)*np.cos(q0)
-        JCOM1[2, 0] = (L0 + L1*np.cos(q1) + l1*np.cos(q1))*np.cos(q0)
-        JCOM1[2, 1] = -(L1 + l1)*np.sin(q0)*np.sin(q1)
+        JCOM1[0, 1] = l1*np.cos(q1)
+        JCOM1[1, 0] = -(L0 + l1*np.cos(q1))*np.sin(q0)
+        JCOM1[1, 1] = -l1*np.sin(q1)*np.cos(q0)
+        JCOM1[2, 0] = (L0 + l1*np.cos(q1))*np.cos(q0)
+        JCOM1[2, 1] = -l1*np.sin(q0)*np.sin(q1)
         JCOM1[3, 0] = 1
         JCOM1[5, 1] = 1
 
@@ -178,14 +183,14 @@ class Robot(RobotBase):
         l2 = self.coml[2]
 
         JCOM2 = np.zeros((6, 4))
-        JCOM2[0, 1] = L1*np.cos(q1) - L2*np.cos(q1 - q2) - l2*np.cos(q1 + q2)
-        JCOM2[0, 2] = L2*np.cos(q1 - q2) - l2*np.cos(q1 + q2)
-        JCOM2[1, 0] = -(L0 + L1*np.cos(q1) + L2*np.cos(q1 - q2) + l2*np.cos(q1 + q2))*np.sin(q0)
-        JCOM2[1, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 - q2) + l2*np.sin(q1 + q2))*np.cos(q0)
-        JCOM2[1, 2] = (L2*np.sin(q1 - q2) - l2*np.sin(q1 + q2))*np.cos(q0)
-        JCOM2[2, 0] = (L0 + L1*np.cos(q1) + L2*np.cos(q1 - q2) + l2*np.cos(q1 + q2))*np.cos(q0)
-        JCOM2[2, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 - q2) + l2*np.sin(q1 + q2))*np.sin(q0)
-        JCOM2[2, 2] = (L2*np.sin(q1 - q2) - l2*np.sin(q1 + q2))*np.sin(q0)
+        JCOM2[0, 1] = L1*np.cos(q1) - l2*np.cos(q1 - q2)
+        JCOM2[0, 2] = l2*np.cos(q1 - q2)
+        JCOM2[1, 0] = -(L0 + L1*np.cos(q1) + l2*np.cos(q1 - q2))*np.sin(q0)
+        JCOM2[1, 1] = -(L1*np.sin(q1) + l2*np.sin(q1 - q2))*np.cos(q0)
+        JCOM2[1, 2] = l2*np.sin(q1 - q2)*np.cos(q0)
+        JCOM2[2, 0] = (L0 + L1*np.cos(q1) + l2*np.cos(q1 - q2))*np.cos(q0)
+        JCOM2[2, 1] = -(L1*np.sin(q1) + l2*np.sin(q1 - q2))*np.sin(q0)
+        JCOM2[2, 2] = l2*np.sin(q0)*np.sin(q1 - q2)
         JCOM2[3, 0] = 1
         JCOM2[5, 1] = 1
         JCOM2[5, 2] = 1
@@ -210,17 +215,17 @@ class Robot(RobotBase):
         l3 = self.coml[3]
 
         JCOM3 = np.zeros((6, 4))
-        JCOM3[0, 1] = L1*np.cos(-q1 + q2 + q3) - l3*np.cos(q1 + q2 + q3)
-        JCOM3[0, 2] = -L1*np.cos(-q1 + q2 + q3) + L2*np.cos(q2 - q3) - l3*np.cos(q1 + q2 + q3)
-        JCOM3[0, 3] = -L1*np.cos(-q1 + q2 + q3) - L2*np.cos(q2 - q3) + L3*np.cos(q3) - l3*np.cos(q1 + q2 + q3)
-        JCOM3[1, 0] = -(L0 + L1*np.cos(-q1 + q2 + q3) + L2*np.cos(q2 - q3) + L3*np.cos(q3) + l3*np.cos(q1 + q2 + q3))*np.sin(q0)
-        JCOM3[1, 1] = (L1*np.sin(-q1 + q2 + q3) - l3*np.sin(q1 + q2 + q3))*np.cos(q0)
-        JCOM3[1, 2] = -(L1*np.sin(-q1 + q2 + q3) + L2*np.sin(q2 - q3) + l3*np.sin(q1 + q2 + q3))*np.cos(q0)
-        JCOM3[1, 3] = (-L1*np.sin(-q1 + q2 + q3) + L2*np.sin(q2 - q3) - L3*np.sin(q3) - l3*np.sin(q1 + q2 + q3))*np.cos(q0)
-        JCOM3[2, 0] = (L0 + L1*np.cos(-q1 + q2 + q3) + L2*np.cos(q2 - q3) + L3*np.cos(q3) + l3*np.cos(q1 + q2 + q3))*np.cos(q0)
-        JCOM3[2, 1] = (L1*np.sin(-q1 + q2 + q3) - l3*np.sin(q1 + q2 + q3))*np.sin(q0)
-        JCOM3[2, 2] = -(L1*np.sin(-q1 + q2 + q3) + L2*np.sin(q2 - q3) + l3*np.sin(q1 + q2 + q3))*np.sin(q0)
-        JCOM3[2, 3] = (-L1*np.sin(-q1 + q2 + q3) + L2*np.sin(q2 - q3) - L3*np.sin(q3) - l3*np.sin(q1 + q2 + q3))*np.sin(q0)
+        JCOM3[0, 1] = L1*np.cos(q1) - L2*np.cos(q1 - q2) - l3*np.cos(q1 + q2 - q3)
+        JCOM3[0, 2] = L2*np.cos(q1 - q2) - l3*np.cos(q1 + q2 - q3)
+        JCOM3[0, 3] = l3*np.cos(q1 + q2 - q3)
+        JCOM3[1, 0] = -(L0 + L1*np.cos(q1) + L2*np.cos(q1 - q2) + l3*np.cos(q1 + q2 - q3))*np.sin(q0)
+        JCOM3[1, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 - q2) + l3*np.sin(q1 + q2 - q3))*np.cos(q0)
+        JCOM3[1, 2] = (L2*np.sin(q1 - q2) - l3*np.sin(q1 + q2 - q3))*np.cos(q0)
+        JCOM3[1, 3] = l3*np.sin(q1 + q2 - q3)*np.cos(q0)
+        JCOM3[2, 0] = (L0 + L1*np.cos(q1) + L2*np.cos(q1 - q2) + l3*np.cos(q1 + q2 - q3))*np.cos(q0)
+        JCOM3[2, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 - q2) + l3*np.sin(q1 + q2 - q3))*np.sin(q0)
+        JCOM3[2, 2] = (L2*np.sin(q1 - q2) - l3*np.sin(q1 + q2 - q3))*np.sin(q0)
+        JCOM3[2, 3] = l3*np.sin(q0)*np.sin(q1 + q2 - q3)
         JCOM3[3, 0] = 1
         JCOM3[5, 1] = 1
         JCOM3[5, 2] = 1
@@ -243,17 +248,17 @@ class Robot(RobotBase):
         L3 = self.L[3]
 
         JEE = np.zeros((6, 4))  # (3, 4) if only x, y, z forces controlled, others dropped
-        JEE[0, 1] = L1*np.cos(-q1 + q2 + q3) - L3*np.cos(q1 + q2 + q3)
-        JEE[0, 2] = -L1*np.cos(-q1 + q2 + q3) + L2*np.cos(q2 - q3) - L3*np.cos(q1 + q2 + q3)
-        JEE[0, 3] = -L1*np.cos(-q1 + q2 + q3) - L2*np.cos(q2 - q3) + L3*np.cos(q3) - L3*np.cos(q1 + q2 + q3)
-        JEE[1, 0] = -(L0 + L1*np.cos(-q1 + q2 + q3) + L2*np.cos(q2 - q3) + L3*np.cos(q3) + L3*np.cos(q1 + q2 + q3))*np.sin(q0)
-        JEE[1, 1] = (L1*np.sin(-q1 + q2 + q3) - L3*np.sin(q1 + q2 + q3))*np.cos(q0)
-        JEE[1, 2] = -(L1*np.sin(-q1 + q2 + q3) + L2*np.sin(q2 - q3) + L3*np.sin(q1 + q2 + q3))*np.cos(q0)
-        JEE[1, 3] = (-L1*np.sin(-q1 + q2 + q3) + L2*np.sin(q2 - q3) - L3*np.sin(q3) - L3*np.sin(q1 + q2 + q3))*np.cos(q0)
-        JEE[2, 0] = (L0 + L1*np.cos(-q1 + q2 + q3) + L2*np.cos(q2 - q3) + L3*np.cos(q3) + L3*np.cos(q1 + q2 + q3))*np.cos(q0)
-        JEE[2, 1] = (L1*np.sin(-q1 + q2 + q3) - L3*np.sin(q1 + q2 + q3))*np.sin(q0)
-        JEE[2, 2] = -(L1*np.sin(-q1 + q2 + q3) + L2*np.sin(q2 - q3) + L3*np.sin(q1 + q2 + q3))*np.sin(q0)
-        JEE[2, 3] = (-L1*np.sin(-q1 + q2 + q3) + L2*np.sin(q2 - q3) - L3*np.sin(q3) - L3*np.sin(q1 + q2 + q3))*np.sin(q0)
+        JEE[0, 1] = L1*np.cos(q1) - L2*np.cos(q1 - q2) - L3*np.cos(q1 + q2 - q3)
+        JEE[0, 2] = L2*np.cos(q1 - q2) - L3*np.cos(q1 + q2 - q3)
+        JEE[0, 3] = L3*np.cos(q1 + q2 - q3)
+        JEE[1, 0] = -(L0 + L1*np.cos(q1) + L2*np.cos(q1 - q2) + L3*np.cos(q1 + q2 - q3))*np.sin(q0)
+        JEE[1, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 - q2) + L3*np.sin(q1 + q2 - q3))*np.cos(q0)
+        JEE[1, 2] = (L2*np.sin(q1 - q2) - L3*np.sin(q1 + q2 - q3))*np.cos(q0)
+        JEE[1, 3] = L3*np.sin(q1 + q2 - q3)*np.cos(q0)
+        JEE[2, 0] = (L0 + L1*np.cos(q1) + L2*np.cos(q1 - q2) + L3*np.cos(q1 + q2 - q3))*np.cos(q0)
+        JEE[2, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 - q2) + L3*np.sin(q1 + q2 - q3))*np.sin(q0)
+        JEE[2, 2] = (L2*np.sin(q1 - q2) - L3*np.sin(q1 + q2 - q3))*np.sin(q0)
+        JEE[2, 3] = L3*np.sin(q0)*np.sin(q1 + q2 - q3)
         JEE[3, 0] = 1
         JEE[5, 1] = 1
         JEE[5, 2] = 1
@@ -282,6 +287,7 @@ class Robot(RobotBase):
 
     def gen_grav(self, q=None):
         # Generate gravity term g(q)
+
         J0T = np.transpose(self.gen_jacCOM0(q=q))
         J1T = np.transpose(self.gen_jacCOM1(q=q))
         J2T = np.transpose(self.gen_jacCOM2(q=q))

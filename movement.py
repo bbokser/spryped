@@ -24,13 +24,14 @@ def Task(arm, controller_class, dt, **kwargs):
 
     # set robot specific parameters ------------
 
-    kp = 30 # 10 for plain inv kinematics
-    kd = np.sqrt(kp)
+    kp = 75  # 10 for plain inv kinematics
+    ki = 1
+    kd = 10
     ko = 100
 
     # generate control shell -----------------
 
-    controller = controller_class.Control(kp=kp, kd=kd, ko=ko, dt=dt)
+    controller = controller_class.Control(kp=kp, ki=ki, kd=kd, ko=ko, dt=dt)
     control_shell = shell.Shell(controller=controller)
 
     return control_shell

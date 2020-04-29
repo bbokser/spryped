@@ -37,8 +37,8 @@ class Control(control.Control):
         self.dt = dt
         self.DOF = 3  # task space dimensionality
         self.null_control = null_control
-        self.pid = PID(10, 3, 0.5)
-        self.pid.sample_time = self.dt # 1e-3
+        self.pid = PID(self.kp, self.ki, self.kd)
+        self.pid.sample_time = self.dt  # 1e-3
 
     def control(self, robot, x_dd_des=None):
         """
@@ -68,7 +68,11 @@ class Control(control.Control):
         # self.velocity = np.transpose(np.dot(JEE, robot.dq)).flatten()
 
         # x_dd_des = self.pid(self.x)
-        x_dd_des[:3] = self.kp * (self.target[0:3] - self.x)
+        # x_dd_des[:3] = self.kp * (self.target[0:3] - self.x)
+        self.pid.setpoint = self.target[0:3]
+        x_dd_des[:3] = self.pid(self.x)
+        # self.pid.setpoint = robot.inv_kinematics(self.target)
+        # self.u = self.pid(robot.q)
 
         # calculate end effector orientation unit quaternion
         q_e = robot.orientation()
@@ -94,11 +98,10 @@ class Control(control.Control):
 
         # generate gravity term in task space
         tau_grav = robot.gen_grav()
-
         # add in velocity compensation in GC space for stability
-        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) # + tau_grav
+        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) # - tau_grav
         # self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
-        #          np.dot(Mq, self.kd * robot.dq).flatten()) # + tau_grav
+        #          np.dot(Mq, self.kd * robot.dq).flatten()) - tau_grav
 
         # simple inverse kinematics PID control
         # self.u = self.kp*(robot.inv_kinematics(self.target)-robot.q)
@@ -135,8 +138,8 @@ class Control(control.Control):
 
     def gen_target(self, robot):
         target_alpha = 0
-        target_beta = np.pi # keep foot flat for now
+        target_beta = np.pi  # keep foot flat for now
         target_gamma = 0
-        self.target = np.array([0.077, -0.131, -0.608, target_alpha, target_beta, target_gamma])
+        self.target = np.array([0.077, 0.131, -0.708, target_alpha, target_beta, target_gamma])
 
         return self.target.tolist()

@@ -37,9 +37,10 @@ robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])
 # bot = p.loadURDF("spryped_urdf_rev05/urdf/spryped_urdf_rev05.urdf", [0, 0, 0.8],
 #                 robotStartOrientation, useFixedBase=1)
 bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 2],
-                 robotStartOrientation, useFixedBase=1)
+                 robotStartOrientation, useFixedBase=1, flags = p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER)
 
 # p.setGravity(0, 0, GRAVITY)
+# print(p.getJointInfo(bot, 0))
 
 class Runner:
 
@@ -62,7 +63,7 @@ class Runner:
 
         # Disable the default velocity/position motor:
         for i in range(p.getNumJoints(bot)):
-            p.setJointMotorControl2(bot, i, p.VELOCITY_CONTROL, force=1)
+            p.setJointMotorControl2(bot, i, p.VELOCITY_CONTROL, force=0.5)
             # force=1 allows us to easily mimic joint friction rather than disabling
             p.enableJointForceTorqueSensor(bot, i, 1)  # enable joint torque sensing
 
@@ -87,7 +88,7 @@ class Runner:
             # print(torque)
             print(robot.position()[:, -1])  # forward kinematics
             # print("vel = ", robot.velocity())
-            # print(robot.q)  # encoder
+            # print(np.transpose(robot.q))  # encoder
             # print(robot.gen_grav()) # gravity term
             sys.stdout.write("\033[F")  # back to previous line
             sys.stdout.write("\033[K")  # clear line
