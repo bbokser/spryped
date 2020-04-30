@@ -22,6 +22,7 @@ import csv
 
 import pybullet as p
 import transformations
+from pykalman import KalmanFilter
 
 from RobotBase import RobotBase
 
@@ -32,6 +33,7 @@ class Robot(RobotBase):
 
         if init_dq is None:
             init_dq = [0., 0., 0., 0.]  # just left leg
+
         if init_q is None:
             init_q = [-2 * np.pi / 4, np.pi * 32 / 180, -np.pi * 44.17556088 / 180, np.pi * 12.17556088 / 180.]
         self.DOF = 4
@@ -60,7 +62,7 @@ class Robot(RobotBase):
             values_direct = np.array(values_direct)  # convert list of nested lists to array
 
         self.mass = values_direct[7].astype(np.float)
-        self.mass = np.delete(self.mass, 0) # remove body value
+        self.mass = np.delete(self.mass, 0)  # remove body value
 
         # estimating init link angles
         # p = 4
@@ -90,10 +92,10 @@ class Robot(RobotBase):
         # mass matrices and gravity
         self.MM = []
         self.Fg = []
-        self.gravity = np.matrix([[0, 0, -9.81, 0, 0, 0]]).T
-        for i in range(0,4):
+        self.gravity = np.array([[0, 0, -9.81, 0, 0, 0]]).T
+        for i in range(0, 4):
             M = np.zeros((6, 6))
-            fgi = np.zeros((6,1))
+            fgi = np.zeros((6, 1))
             M[0:3, 0:3] = np.eye(3) * float(self.mass[i])
             M[3, 3] = ixx[i]
             M[3, 4] = ixy[i]
@@ -109,6 +111,10 @@ class Robot(RobotBase):
             self.Fg.append(fgi)
 
         self.k = 1
+        self.angles = init_q
+        self.q_previous = init_q
+        self.dq_previous = init_dq
+        self.kv = 0.05
 
         self.reset()
         self.update_state()
@@ -415,4 +421,7 @@ class Robot(RobotBase):
         # Calibrate encoders
         self.q = np.add(self.q.flatten(), np.array([-2 * np.pi / 4, np.pi * 32 / 180,
                                                    -np.pi * 44.17556088 / 180, np.pi * 12.17556088 / 180.]))
-        self.dq = np.reshape([j[1] for j in p.getJointStates(1, range(0, 4))], (-1, 1))
+        # self.dq = np.reshape([j[1] for j in p.getJointStates(1, range(0, 4))], (-1, 1))
+        self.dq = [i * self.kv for i in self.dq_previous] + (self.q - self.q_previous) / self.dt
+        self.dq_previous = self.dq
+        self.q_previous = self.q

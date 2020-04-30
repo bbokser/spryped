@@ -67,12 +67,9 @@ class Control(control.Control):
         # Calculate operational space linear velocity vector
         # self.velocity = np.transpose(np.dot(JEE, robot.dq)).flatten()
 
-        # x_dd_des = self.pid(self.x)
         # x_dd_des[:3] = self.kp * (self.target[0:3] - self.x)
         self.pid.setpoint = self.target[0:3]
         x_dd_des[:3] = self.pid(self.x)
-        # self.pid.setpoint = robot.inv_kinematics(self.target)
-        # self.u = self.pid(robot.q)
 
         # calculate end effector orientation unit quaternion
         q_e = robot.orientation()
@@ -90,7 +87,7 @@ class Control(control.Control):
         # convert rotation quaternion to Euler angle forces
         x_dd_des[3:] = self.ko * q_r[1:] * np.sign(q_r[0])
 
-        x_dd_des = x_dd_des[ctrlr_dof] # get rid of dim not being controlled
+        x_dd_des = x_dd_des[ctrlr_dof]  # get rid of dim not being controlled
         x_dd_des = np.reshape(x_dd_des, (-1, 1))
 
         # calculate force
@@ -99,36 +96,39 @@ class Control(control.Control):
         # generate gravity term in task space
         tau_grav = robot.gen_grav()
         # add in velocity compensation in GC space for stability
-        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) # - tau_grav
+        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - tau_grav
         # self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
         #          np.dot(Mq, self.kd * robot.dq).flatten()) - tau_grav
 
-        # simple inverse kinematics PID control
+        # inverse kinematics PID control
         # self.u = self.kp*(robot.inv_kinematics(self.target)-robot.q)
+
+        # ik simple_pid
         # self.pid.setpoint = robot.inv_kinematics(self.target)
         # self.u = self.pid(robot.q)
 
-        # if null_control is selected and the task space has
-        # fewer DOFs than the robot, add a control signal in the
-        # null space to try to move the robot to its resting state
-        # if self.null_control and self.DOF < len(robot.L):
+        # if null_control is selected, add a control signal in the
+        # null space to try to move the robot to selected position
+        if self.null_control:
 
-        # calculate our secondary control signal
-        # calculated desired joint angle acceleration
-        # prop_val = ((robot.rest_angles - robot.q) + np.pi) % (np.pi*2) - np.pi
-        # q_des = (self.kp * prop_val + \
-        #          self.kd * -robot.dq).reshape(-1,)
+            # calculate our secondary control signal
+            # calculated desired joint angle acceleration
+            prop_val = ((robot.angles - robot.q) + np.pi) % (np.pi*2) - np.pi
+            # print("prop = ", np.shape(prop_val))
+            q_des = (self.kp * prop_val +
+                     self.kd * -robot.dq.reshape(-1, ))
+            # print("q_des = ", np.shape(q_des))
+            # Mq = robot.gen_Mq()
+            u_null = np.dot(Mq, q_des)
 
-        # Mq = robot.gen_Mq()
-        # u_null = np.dot(Mq, q_des)
+            # calculate the null space filter
+            Jdyn_inv = np.dot(Mx, np.dot(JEE, np.linalg.inv(Mq)))
 
-        # calculate the null space filter
-        # Jdyn_inv = np.dot(Mx, np.dot(JEE, np.linalg.inv(Mq)))
-        # null_filter = np.eye(len(robot.L)) - np.dot(JEE.T, Jdyn_inv)
+            null_filter = np.eye(len(robot.L)) - np.dot(JEE.T, Jdyn_inv)
 
-        # null_signal = np.dot(null_filter, u_null).reshape(-1,)
-
-        # self.u += null_signal
+            null_signal = np.dot(null_filter, u_null).reshape(-1,)
+            # print("null = ", np.shape(null_signal))
+            self.u += null_signal
 
         # add in any additional signals
         for addition in self.additions:

@@ -24,10 +24,10 @@ def Task(arm, controller_class, dt, **kwargs):
 
     # set robot specific parameters ------------
 
-    kp = 75  # 10 for plain inv kinematics
-    ki = 1
-    kd = 10
-    ko = 100
+    kp = 40  # 10 for plain inv kinematics
+    ki = 1  # 1
+    kd = 10  # 10
+    ko = 40
 
     # generate control shell -----------------
 

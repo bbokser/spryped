@@ -39,7 +39,7 @@ robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])
 bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 2],
                  robotStartOrientation, useFixedBase=1, flags = p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER)
 
-# p.setGravity(0, 0, GRAVITY)
+p.setGravity(0, 0, GRAVITY)
 # print(p.getJointInfo(bot, 0))
 
 class Runner:
@@ -86,9 +86,10 @@ class Runner:
             torque[0:4] = u
             torque[0] *= -1  # readjust to match motor polarity
             # print(torque)
-            print(robot.position()[:, -1])  # forward kinematics
+            # print(robot.position()[:, -1])  # forward kinematics
             # print("vel = ", robot.velocity())
             # print(np.transpose(robot.q))  # encoder
+            print(np.transpose(robot.dq))  # joint space vel
             # print(robot.gen_grav()) # gravity term
             sys.stdout.write("\033[F")  # back to previous line
             sys.stdout.write("\033[K")  # clear line
