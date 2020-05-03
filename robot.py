@@ -17,12 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import numpy as np
-import math
+# import math
 import csv
 
 import pybullet as p
 import transformations
-from pykalman import KalmanFilter
 
 from RobotBase import RobotBase
 
@@ -163,7 +162,7 @@ class Robot(RobotBase):
         l1 = self.coml[1]
 
         JCOM1 = np.zeros((6, 4))
-        JCOM1[0, 1] = l1*np.cos(q1)
+        JCOM1[0, 1] = -l1*np.cos(q1)
         JCOM1[1, 0] = -(L0 + l1*np.cos(q1))*np.sin(q0)
         JCOM1[1, 1] = -l1*np.sin(q1)*np.cos(q0)
         JCOM1[2, 0] = (L0 + l1*np.cos(q1))*np.cos(q0)
@@ -189,14 +188,14 @@ class Robot(RobotBase):
         l2 = self.coml[2]
 
         JCOM2 = np.zeros((6, 4))
-        JCOM2[0, 1] = L1*np.cos(q1) - l2*np.cos(q1 - q2)
-        JCOM2[0, 2] = l2*np.cos(q1 - q2)
-        JCOM2[1, 0] = -(L0 + L1*np.cos(q1) + l2*np.cos(q1 - q2))*np.sin(q0)
-        JCOM2[1, 1] = -(L1*np.sin(q1) + l2*np.sin(q1 - q2))*np.cos(q0)
-        JCOM2[1, 2] = l2*np.sin(q1 - q2)*np.cos(q0)
-        JCOM2[2, 0] = (L0 + L1*np.cos(q1) + l2*np.cos(q1 - q2))*np.cos(q0)
-        JCOM2[2, 1] = -(L1*np.sin(q1) + l2*np.sin(q1 - q2))*np.sin(q0)
-        JCOM2[2, 2] = l2*np.sin(q0)*np.sin(q1 - q2)
+        JCOM2[0, 1] = -L1*np.cos(q1) - l2*np.cos(q1 + q2)
+        JCOM2[0, 2] = -l2*np.cos(q1 + q2)
+        JCOM2[1, 0] = -(L0 + L1*np.cos(q1) + l2*np.cos(q1 + q2))*np.sin(q0)
+        JCOM2[1, 1] = -(L1*np.sin(q1) + l2*np.sin(q1 + q2))*np.cos(q0)
+        JCOM2[1, 2] = -l2*np.sin(q1 + q2)*np.cos(q0)
+        JCOM2[2, 0] = (L0 + L1*np.cos(q1) + l2*np.cos(q1 + q2))*np.cos(q0)
+        JCOM2[2, 1] = -(L1*np.sin(q1) + l2*np.sin(q1 + q2))*np.sin(q0)
+        JCOM2[2, 2] = -l2*np.sin(q0)*np.sin(q1 + q2)
         JCOM2[3, 0] = 1
         JCOM2[5, 1] = 1
         JCOM2[5, 2] = 1
@@ -221,17 +220,17 @@ class Robot(RobotBase):
         l3 = self.coml[3]
 
         JCOM3 = np.zeros((6, 4))
-        JCOM3[0, 1] = L1*np.cos(q1) - L2*np.cos(q1 - q2) - l3*np.cos(q1 + q2 - q3)
-        JCOM3[0, 2] = L2*np.cos(q1 - q2) - l3*np.cos(q1 + q2 - q3)
-        JCOM3[0, 3] = l3*np.cos(q1 + q2 - q3)
-        JCOM3[1, 0] = -(L0 + L1*np.cos(q1) + L2*np.cos(q1 - q2) + l3*np.cos(q1 + q2 - q3))*np.sin(q0)
-        JCOM3[1, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 - q2) + l3*np.sin(q1 + q2 - q3))*np.cos(q0)
-        JCOM3[1, 2] = (L2*np.sin(q1 - q2) - l3*np.sin(q1 + q2 - q3))*np.cos(q0)
-        JCOM3[1, 3] = l3*np.sin(q1 + q2 - q3)*np.cos(q0)
-        JCOM3[2, 0] = (L0 + L1*np.cos(q1) + L2*np.cos(q1 - q2) + l3*np.cos(q1 + q2 - q3))*np.cos(q0)
-        JCOM3[2, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 - q2) + l3*np.sin(q1 + q2 - q3))*np.sin(q0)
-        JCOM3[2, 2] = (L2*np.sin(q1 - q2) - l3*np.sin(q1 + q2 - q3))*np.sin(q0)
-        JCOM3[2, 3] = l3*np.sin(q0)*np.sin(q1 + q2 - q3)
+        JCOM3[0, 1] = -L1*np.cos(q1) - L2*np.cos(q1 + q2) - l3*np.cos(q1 + q2 + q3)
+        JCOM3[0, 2] = -L2*np.cos(q1 + q2) - l3*np.cos(q1 + q2 + q3)
+        JCOM3[0, 3] = -l3*np.cos(q1 + q2 + q3)
+        JCOM3[1, 0] = -(L0 + L1*np.cos(q1) + L2*np.cos(q1 + q2) + l3*np.cos(q1 + q2 + q3))*np.sin(q0)
+        JCOM3[1, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 + q2) + l3*np.sin(q1 + q2 + q3))*np.cos(q0)
+        JCOM3[1, 2] = -(L2*np.sin(q1 + q2) + l3*np.sin(q1 + q2 + q3))*np.cos(q0)
+        JCOM3[1, 3] = -l3*np.sin(q1 + q2 + q3)*np.cos(q0)
+        JCOM3[2, 0] = (L0 + L1*np.cos(q1) + L2*np.cos(q1 + q2) + l3*np.cos(q1 + q2 + q3))*np.cos(q0)
+        JCOM3[2, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 + q2) + l3*np.sin(q1 + q2 + q3))*np.sin(q0)
+        JCOM3[2, 2] = -(L2*np.sin(q1 + q2) + l3*np.sin(q1 + q2 + q3))*np.sin(q0)
+        JCOM3[2, 3] = -l3*np.sin(q0)*np.sin(q1 + q2 + q3)
         JCOM3[3, 0] = 1
         JCOM3[5, 1] = 1
         JCOM3[5, 2] = 1
@@ -254,17 +253,17 @@ class Robot(RobotBase):
         L3 = self.L[3]
 
         JEE = np.zeros((6, 4))  # (3, 4) if only x, y, z forces controlled, others dropped
-        JEE[0, 1] = L1*np.cos(q1) - L2*np.cos(q1 - q2) - L3*np.cos(q1 + q2 - q3)
-        JEE[0, 2] = L2*np.cos(q1 - q2) - L3*np.cos(q1 + q2 - q3)
-        JEE[0, 3] = L3*np.cos(q1 + q2 - q3)
-        JEE[1, 0] = -(L0 + L1*np.cos(q1) + L2*np.cos(q1 - q2) + L3*np.cos(q1 + q2 - q3))*np.sin(q0)
-        JEE[1, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 - q2) + L3*np.sin(q1 + q2 - q3))*np.cos(q0)
-        JEE[1, 2] = (L2*np.sin(q1 - q2) - L3*np.sin(q1 + q2 - q3))*np.cos(q0)
-        JEE[1, 3] = L3*np.sin(q1 + q2 - q3)*np.cos(q0)
-        JEE[2, 0] = (L0 + L1*np.cos(q1) + L2*np.cos(q1 - q2) + L3*np.cos(q1 + q2 - q3))*np.cos(q0)
-        JEE[2, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 - q2) + L3*np.sin(q1 + q2 - q3))*np.sin(q0)
-        JEE[2, 2] = (L2*np.sin(q1 - q2) - L3*np.sin(q1 + q2 - q3))*np.sin(q0)
-        JEE[2, 3] = L3*np.sin(q0)*np.sin(q1 + q2 - q3)
+        JEE[0, 1] = -L1*np.cos(q1) - L2*np.cos(q1 + q2) - L3*np.cos(q1 + q2 + q3)
+        JEE[0, 2] = -L2*np.cos(q1 + q2) - L3*np.cos(q1 + q2 + q3)
+        JEE[0, 3] = -L3*np.cos(q1 + q2 + q3)
+        JEE[1, 0] = -(L0 + L1*np.cos(q1) + L2*np.cos(q1 + q2) + L3*np.cos(q1 + q2 + q3))*np.sin(q0)
+        JEE[1, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 + q2) + L3*np.sin(q1 + q2 + q3))*np.cos(q0)
+        JEE[1, 2] = -(L2*np.sin(q1 + q2) + L3*np.sin(q1 + q2 + q3))*np.cos(q0)
+        JEE[1, 3] = -L3*np.sin(q1 + q2 + q3)*np.cos(q0)
+        JEE[2, 0] = (L0 + L1*np.cos(q1) + L2*np.cos(q1 + q2) + L3*np.cos(q1 + q2 + q3))*np.cos(q0)
+        JEE[2, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 + q2) + L3*np.sin(q1 + q2 + q3))*np.sin(q0)
+        JEE[2, 2] = -(L2*np.sin(q1 + q2) + L3*np.sin(q1 + q2 + q3))*np.sin(q0)
+        JEE[2, 3] = -L3*np.sin(q0)*np.sin(q1 + q2 + q3)
         JEE[3, 0] = 1
         JEE[5, 1] = 1
         JEE[5, 2] = 1

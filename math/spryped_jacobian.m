@@ -11,17 +11,17 @@ Torg0 = [[1, 0, 0, 0];
 	       [0, sin(q0), cos(q0), L0*sin(q0)];
 	       [0, 0, 0, 1]];
 
-T01 = [[cos(q1), -sin(q1), 0, L1*sin(q1)];
+T01 = [[cos(q1), -sin(q1), 0, -L1*sin(q1)];
         [sin(q1), cos(q1), 0, L1*cos(q1)];
 	      [0, 0, 1, 0];
 	      [0, 0, 0, 1]];
 
-T12 = [[cos(q2), -sin(q2), 0, L2*sin(q2)];
+T12 = [[cos(q2), -sin(q2), 0, -L2*sin(q2)];
        [sin(q2), cos(q2), 0, L2*cos(q2)];
 	     [0, 0, 1, 0];
 	     [0, 0, 0, 1]];
 
-T23 = [[cos(q3), -sin(q3), 0, L3*sin(q3)];
+T23 = [[cos(q3), -sin(q3), 0, -L3*sin(q3)];
        [sin(q3), cos(q3), 0, L3*cos(q3)];
 	     [0, 0, 1, 0];
 	     [0, 0, 0, 1]];
@@ -31,17 +31,17 @@ com0 = [[0];
         [l0*sin(q0)];
 	      [1]];
         
-com1 = [[l1*sin(q1)];
+com1 = [[-l1*sin(q1)];
         [l1*cos(q1)]; # l1*cos(q1)
         [0];
 	      [1]];
 
-com2 = [[l2*sin(q2)]; # l2*sin(q2)
+com2 = [[-l2*sin(q2)]; # l2*sin(q2)
         [l2*cos(q2)]; # l2*cos(q2)
         [0];
 	      [1]];
 
-com3 = [[l3*sin(q3)]; # l3*sin(q3)
+com3 = [[-l3*sin(q3)]; # l3*sin(q3)
         [l3*cos(q3)]; # l3*cos(q3)
         [0];
 	      [1]];

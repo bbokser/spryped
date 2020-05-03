@@ -28,7 +28,7 @@ class Control(control.Control):
     Controls the (x,y) position of the end-effector.
     """
 
-    def __init__(self, dt=1e-3, null_control=True, **kwargs):
+    def __init__(self, dt=1e-3, null_control=False, **kwargs):
         """
         null_control boolean: apply second controller in null space or not
         """
@@ -100,7 +100,7 @@ class Control(control.Control):
         # self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
         #          np.dot(Mq, self.kd * robot.dq).flatten()) - tau_grav
 
-        # inverse kinematics PID control
+        # inverse kinematics basic proportional control
         # self.u = self.kp*(robot.inv_kinematics(self.target)-robot.q)
 
         # ik simple_pid
@@ -118,7 +118,7 @@ class Control(control.Control):
             q_des = (self.kp * prop_val +
                      self.kd * -robot.dq.reshape(-1, ))
             # print("q_des = ", np.shape(q_des))
-            # Mq = robot.gen_Mq()
+
             u_null = np.dot(Mq, q_des)
 
             # calculate the null space filter
@@ -138,7 +138,7 @@ class Control(control.Control):
 
     def gen_target(self, robot):
         target_alpha = 0
-        target_beta = np.pi  # keep foot flat for now
+        target_beta = -2*np.pi  # keep foot flat for now
         target_gamma = 0
         self.target = np.array([0.077, 0.131, -0.708, target_alpha, target_beta, target_gamma])
 
