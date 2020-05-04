@@ -50,7 +50,7 @@ class Control(control.Control):
         x_dd_des np.array: desired acceleration
         """
         # which dim to control of [x, y, z, alpha, beta, gamma]
-        ctrlr_dof = np.array([True, True, True, False, True, False])
+        ctrlr_dof = np.array([True, True, True, False, False, False])
 
         # calculate the Jacobian
         JEE = robot.gen_jacEE()[ctrlr_dof]
@@ -88,6 +88,7 @@ class Control(control.Control):
         x_dd_des[3:] = self.ko * q_r[1:] * np.sign(q_r[0])
 
         x_dd_des = x_dd_des[ctrlr_dof]  # get rid of dim not being controlled
+
         x_dd_des = np.reshape(x_dd_des, (-1, 1))
 
         # calculate force
@@ -97,6 +98,7 @@ class Control(control.Control):
         tau_grav = robot.gen_grav()
         # add in velocity compensation in GC space for stability
         self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - tau_grav
+
         # self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
         #          np.dot(Mq, self.kd * robot.dq).flatten()) - tau_grav
 
@@ -110,24 +112,25 @@ class Control(control.Control):
         # if null_control is selected, add a control signal in the
         # null space to try to move the robot to selected position
         if self.null_control:
-
             # calculate our secondary control signal
             # calculated desired joint angle acceleration
             prop_val = ((robot.angles - robot.q) + np.pi) % (np.pi*2) - np.pi
-            # print("prop = ", np.shape(prop_val))
-            q_des = (self.kp * prop_val +
+            q_des = (self.ko * prop_val +
                      self.kd * -robot.dq.reshape(-1, ))
-            # print("q_des = ", np.shape(q_des))
 
-            u_null = np.dot(Mq, q_des)
+            Fq_null = np.dot(Mq, q_des)
 
             # calculate the null space filter
             Jdyn_inv = np.dot(Mx, np.dot(JEE, np.linalg.inv(Mq)))
 
             null_filter = np.eye(len(robot.L)) - np.dot(JEE.T, Jdyn_inv)
 
-            null_signal = np.dot(null_filter, u_null).reshape(-1,)
-            # print("null = ", np.shape(null_signal))
+            null_signal = np.dot(null_filter, Fq_null).reshape(-1,)
+            null_signal[0] *= 1
+            null_signal[1] *= 1
+            null_signal[2] *= 1
+            null_signal[3] *= 1
+
             self.u += null_signal
 
         # add in any additional signals
@@ -137,8 +140,8 @@ class Control(control.Control):
         return self.u
 
     def gen_target(self, robot):
-        target_alpha = 0
-        target_beta = -2*np.pi  # keep foot flat for now
+        target_alpha = -np.pi/2
+        target_beta = 0  # can't control, ee Jacobian is zeros in that row
         target_gamma = 0
         self.target = np.array([0.077, 0.131, -0.708, target_alpha, target_beta, target_gamma])
 

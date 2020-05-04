@@ -27,7 +27,7 @@ def Task(arm, controller_class, dt, **kwargs):
     kp = 150  # 10 for plain inv kinematics
     ki = 5
     kd = 10
-    ko = 10
+    ko = 100
 
     # generate control shell -----------------
 

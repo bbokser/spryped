@@ -106,7 +106,7 @@ class Robot(RobotBase):
             M[5, 4] = iyz[i]
             M[5, 5] = izz[i]
             self.MM.append(M)
-            fgi = float(self.mass[i])*self.gravity # apply mass*gravity term to 3rd column (z axis)
+            fgi = float(self.mass[i])*self.gravity  # apply mass*gravity term to 3rd column (z axis)
             self.Fg.append(fgi)
 
         self.k = 1
@@ -383,9 +383,9 @@ class Robot(RobotBase):
             q2 = q[2]
             q3 = q[3]
 
-        alpha = q0 # x-axis rotation
-        beta = q1+q2+q3 # y-axis rotation
-        gamma = 0 # z-axis rotation
+        alpha = q0  # x-axis rotation
+        beta = q1+q2+q3  # y-axis rotation
+        gamma = 0  # z-axis rotation
         q_e = transformations.unit_vector(
             transformations.quaternion_from_euler(
                 alpha, beta, gamma, axes='rxyz'))  # 'rotating xyz'

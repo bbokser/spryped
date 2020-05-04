@@ -88,13 +88,13 @@ class Runner:
             torque[0:4] = u
             torque[0] *= -1  # readjust to match motor polarity
             # print(torque)
-            print(robot.position()[:, -1])  # forward kinematics
+            # print(robot.position()[:, -1])  # forward kinematics
             # print("vel = ", robot.velocity())
-            # print(np.transpose(robot.q))  # encoder
+            print(np.transpose(robot.q))  # encoder
             # print(np.transpose(robot.dq))  # joint space vel
             # print(robot.gen_grav()) # gravity term
-            sys.stdout.write("\033[F")  # back to previous line
-            sys.stdout.write("\033[K")  # clear line
+            # sys.stdout.write("\033[F")  # back to previous line
+            # sys.stdout.write("\033[K")  # clear line
 
             p.setJointMotorControlArray(bot, jointArray, p.TORQUE_CONTROL, forces=torque)
 

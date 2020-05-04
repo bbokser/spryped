@@ -50,7 +50,6 @@ class RobotBase:
         # Generate the mass matrix in operational space
         if q is None:
             q = self.q
-
         if Mq is None:
             Mq = self.gen_Mq(q=q, **kwargs)
 
