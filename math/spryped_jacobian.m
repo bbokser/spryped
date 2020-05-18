@@ -92,7 +92,7 @@ JEE(5,:) = 0;
 JEE(6,2) = 1;
 JEE(6,3) = 1;
 JEE(6,4) = 1;
-
+%{
 for c=1:6
 dlmwrite('j0.csv', char(J0(c,:)),'','-append')
 end
@@ -112,7 +112,7 @@ end
 for c=1:6
 dlmwrite('jee.csv', char(JEE(c,:)),'','-append')
 end
-
+%}
 
 
 fprintf('Torg0:\n %s', latex(Torg0))

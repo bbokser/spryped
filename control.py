@@ -18,12 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
 
+
 class Control(object):
     """
     The base class for controllers.
     """
+
     def __init__(self, kp=75, ki=1, kd=5, ko=100,
-                    additions=[], task='', write_to_file=False):
+                 additions=[], task='', write_to_file=False):
         """
         additions list: list of Addition classes to append to
                         the outgoing control signal
@@ -47,4 +49,3 @@ class Control(object):
     def control(self, robot, x_dd_des):
         """Generates a control signal to apply to the robot"""
         raise NotImplementedError
-

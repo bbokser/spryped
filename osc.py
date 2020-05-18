@@ -67,9 +67,9 @@ class Control(control.Control):
         # Calculate operational space linear velocity vector
         # self.velocity = np.transpose(np.dot(JEE, robot.dq)).flatten()
 
-        # x_dd_des[:3] = self.kp * (self.target[0:3] - self.x)
-        self.pid.setpoint = self.target[0:3]
-        x_dd_des[:3] = self.pid(self.x)
+        x_dd_des[:3] = np.dot(self.kp, (self.target[0:3] - self.x))
+        # self.pid.setpoint = self.target[0:3]
+        # x_dd_des[:3] = self.pid(self.x)
 
         # calculate end effector orientation unit quaternion
         q_e = robot.orientation()
@@ -85,7 +85,7 @@ class Control(control.Control):
             q_d, transformations.quaternion_conjugate(q_e))
 
         # convert rotation quaternion to Euler angle forces
-        x_dd_des[3:] = self.ko * q_r[1:] * np.sign(q_r[0])
+        x_dd_des[3:] = np.dot(self.ko, q_r[1:] * np.sign(q_r[0]))
 
         x_dd_des = x_dd_des[ctrlr_dof]  # get rid of dim not being controlled
 
@@ -97,10 +97,10 @@ class Control(control.Control):
         # generate gravity term in task space
         tau_grav = robot.gen_grav()
         # add in velocity compensation in GC space for stability
-        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - tau_grav
+        # self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - tau_grav
 
-        # self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
-        #          np.dot(Mq, self.kd * robot.dq).flatten()) - tau_grav
+        self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
+                  np.dot(Mq, np.dot(self.kd, robot.dq)).flatten()) - tau_grav
 
         # inverse kinematics basic proportional control
         # self.u = self.kp*(robot.inv_kinematics(self.target)-robot.q)

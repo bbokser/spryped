@@ -27,8 +27,8 @@ class Shell(object):
         self.controller = controller
         self.kwargs = kwargs
 
-    def control(self, arm):
+    def control(self, robot):
         """Call the controllers control function.
         """
-        self.u = self.controller.control(arm, **self.kwargs)
+        self.u = self.controller.control(robot, **self.kwargs)
         return self.u

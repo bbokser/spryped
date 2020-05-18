@@ -1,6 +1,0 @@
-Matrix([[0, 0, 0, 0]])
-Matrix([[-l0*sin(q0), 0, 0, 0]])
-Matrix([[l0*cos(q0), 0, 0, 0]])
-Matrix([[1, 0, 0, 0]])
-Matrix([[0, 0, 0, 0]])
-Matrix([[0, 0, 0, 0]])

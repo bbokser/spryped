@@ -20,14 +20,29 @@ import shell
 
 import numpy as np
 
+
 def Task(arm, controller_class, dt, **kwargs):
-
     # set robot specific parameters ------------
+    kp = np.zeros((3, 3))
+    kp[0, 0] = 150
+    kp[1, 1] = 150
+    kp[2, 2] = 150
 
-    kp = 150  # 10 for plain inv kinematics
-    ki = 5
-    kd = 10
-    ko = 100
+    ki = np.zeros((3, 3))
+    ki[0, 0] = 5
+    ki[1, 1] = 5
+    ki[2, 2] = 5
+
+    kd = np.zeros((4, 4))
+    kd[0, 0] = 10
+    kd[1, 1] = 10
+    kd[2, 2] = 10
+    kd[3, 3] = 10
+
+    ko = np.zeros((3, 3))
+    ko[0, 0] = 100
+    ko[1, 1] = 100
+    ko[2, 2] = 100
 
     # generate control shell -----------------
 
@@ -35,6 +50,3 @@ def Task(arm, controller_class, dt, **kwargs):
     control_shell = shell.Shell(controller=controller)
 
     return control_shell
-
-    #u = controller.control(arm, **kwargs)
-    #return u

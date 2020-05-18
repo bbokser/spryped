@@ -8,7 +8,7 @@
 \begin{document}
 
 \begin{equation}
-	{}_o^0 T = \begin{bmatrix}
+	{}_{org}^0 T = \begin{bmatrix}
 	1 & 0 & 0 & 0\\
 	0 & \cos{(q_{0} )} & - \sin{(q_{0} )} & L_{0} \cos{(q_{0} )}\\
 	0 & \sin{(q_{0} )} & \cos{(q_{0} )} & L_{0} \sin{(q_{0} )}\\
@@ -18,7 +18,7 @@
 
 \begin{equation}
 	{}_0^1 T = \begin{bmatrix}
-	\cos{(q_{1} )} & - \sin{(q_{1} )} & 0 & L_{1} \sin{(q_{1} )}\\
+	\cos{(q_{1} )} & - \sin{(q_{1} )} & 0 & -L_{1} \sin{(q_{1} )}\\
 	\sin{(q_{1} )} & \cos{(q_{1} )} & 0 & L_{1} \cos{(q_{1} )}\\
 	0 & 0 & 1 & 0\\
 	0 & 0 & 0 & 1
@@ -27,7 +27,7 @@
 
 \begin{equation}
 	{}_1^2 T = \begin{bmatrix}
- 	\cos{(q_{2} )} & - \sin{(q_{2} )} & 0 & L_{2} \sin{(q_{2} )}\\
+ 	\cos{(q_{2} )} & - \sin{(q_{2} )} & 0 & -L_{2} \sin{(q_{2} )}\\
  	\sin{(q_{2} )} & \cos{(q_{2} )} & 0 & L_{2} \cos{(q_{2} )}\\
  	0 & 0 & 1 & 0\\
  	0 & 0 & 0 & 1
@@ -36,7 +36,7 @@
 
 \begin{equation}
 	{}_2^3 T = \begin{bmatrix}
- 	\cos{(q_{3} )} & - \sin{(q_{3} )} & 0 & L_{3} \sin{(q_{3} )}\\
+ 	\cos{(q_{3} )} & - \sin{(q_{3} )} & 0 & -L_{3} \sin{(q_{3} )}\\
  	\sin{(q_{3} )} & \cos{(q_{3} )} & 0 & L_{3} \cos{(q_{3} )}\\
  	0 & 0 & 1 & 0\\
  	0 & 0 & 0 & 1
@@ -46,16 +46,16 @@
 
 \begin{equation}
 	com_0 = \begin{bmatrix}
- 	l_{0} \sin{(q_{0} )}\\
- 	l_{0} \cos{(q_{0} )}\\
  	0\\
+ 	l_{0} \cos{(q_{0} )}\\
+ 	l_{0} \sin{(q_{0} )}\\
  	1
 \end{bmatrix}
 \end{equation}
 
 \begin{equation}
 	com_1 = \begin{bmatrix}
- 	l_{1} \sin{(q_{1} )}\\
+ 	{-l_{1} \sin{(q_{1} )}}\\
  	l_{1} \cos{(q_{1} )}\\
  	0\\
  	1
@@ -64,7 +64,7 @@
 
 \begin{equation}
 	com_2 = \begin{bmatrix}
- 	l_{2} \sin{(q_{2} )}\\
+ 	-l_{2} \sin{(q_{2} )}\\
  	l_{2} \cos{(q_{2} )}\\
  	0\\
  	1
@@ -73,7 +73,7 @@
 
 \begin{equation}
 	com_3 = \begin{bmatrix}
-  	l_{3} \sin{(q_{3} )}\\
+  	-l_{3} \sin{(q_{3} )}\\
   	l_{3} \cos{(q_{3} )}\\
   	0\\
   	1
@@ -90,20 +90,45 @@
 \end{equation}
 
 \begin{equation}
-	J_0 = \begin{bsmallmatrix}
-	l_{0} \cos{(q_{0} )} & 0 & 0 & 0\\
-	- l_{0} \sin{(q_{0} )} & 0 & 0 & 0\\
-	0 & 0 & 0 & 0\\
-	1 & 0 & 0 & 0\\
-	0 & 0 & 0 & 0\\
-	0 & 0 & 0 & 0
-\end{bsmallmatrix}
+	{}_{org}^1 T = {}_{org}^0 T \, {}_0^1 T
 \end{equation}
 
 \begin{equation}
-	J_1 = \begin{bsmallmatrix}
-	0 & l_{1} \cos{(q_{1} )} & 0 & 0\\
-	- (L_{0} + l_{1} \cos{(q_{1} )}) \sin{(q_{0} )} & - l_{1} \sin{(q_{1} )} \cos{(q_{0} )} & 0 & 0\\
+	{}_{org}^2 T = {}_{org}^0 T \, {}_0^1 T \, {}_1^2 T
+\end{equation}
+
+\begin{equation}
+	{}_{org}^3 T = {}_{org}^0 T \, {}_0^1 T \, {}_1^2 T \, {}_2^3 T
+\end{equation}
+
+\begin{equation}
+	Jacobian = 
+	\begin{bsmallmatrix}
+	\frac{\partial x}{\partial q_0} & \frac{\partial x}{\partial q_1} & \frac{\partial x}{\partial q_2} & \frac{\partial x}{\partial q_3}\\
+	\frac{\partial y}{\partial q_0} & \frac{\partial y}{\partial q_1} & \frac{\partial y}{\partial q_2} & \frac{\partial y}{\partial q_3}\\
+	\frac{\partial z}{\partial q_0} & \frac{\partial z}{\partial q_1} & \frac{\partial z}{\partial q_2} & \frac{\partial z}{\partial q_3}\\
+	\frac{\partial \omega_x}{\partial q_0} & \frac{\partial \omega_x}{\partial q_1} & \frac{\partial \omega_x}{\partial q_2} & \frac{\partial \omega_x}{\partial q_3}\\
+	\frac{\partial \omega_y}{\partial q_0} & \frac{\partial \omega_y}{\partial q_1} & \frac{\partial \omega_y}{\partial q_2} & \frac{\partial \omega_y}{\partial q_3}\\
+	\frac{\partial \omega_z}{\partial q_0} & \frac{\partial \omega_z}{\partial q_1} & \frac{\partial \omega_z}{\partial q_2} & \frac{\partial \omega_z}{\partial q_3}\\
+	\end{bsmallmatrix}
+\end{equation}
+
+\begin{equation}
+	J_0 =  Jacobian(com_0) =
+	\begin{bsmallmatrix}
+	0 & 0 & 0 & 0\\
+	- l_{0} \sin{(q_{0} )} & 0 & 0 & 0\\
+	l_{0} \cos{(q_{0} )} & 0 & 0 & 0\\
+	1 & 0 & 0 & 0\\
+	0 & 0 & 0 & 0\\
+	0 & 0 & 0 & 0
+	\end{bsmallmatrix}
+\end{equation}
+
+\begin{equation}
+	J_1 = Jacobian({}_{org}^0 T \, com_1) =
+	\begin{bsmallmatrix}
+	0 & - l_{1} \cos{(q_{1} )} & 0 & 0\\- (L_{0} + l_{1} \cos{(q_{1} )}) \sin{(q_{0} )} & - l_{1} \sin{(q_{1} )} \cos{(q_{0} )} & 0 & 0\\
 	(L_{0} + l_{1} \cos{(q_{1} )}) \cos{(q_{0} )} & - l_{1} \sin{(q_{0} )} \sin{(q_{1} )} & 0 & 0\\
 	1 & 0 & 0 & 0\\
 	0 & 0 & 0 & 0\\
@@ -112,35 +137,15 @@
 \end{equation}
 
 \begin{equation}
-	J_2 = \begin{bsmallmatrix}
-	0 & L_{1} \cos{(q_{1} )} - l_{2} \cos{(q_{1} - q_{2} )} & l_{2} \cos{(q_{1} - q_{2} )} & 0\\
-	- (L_{0} + L_{1} \cos{(q_{1} )} + l_{2} \cos{(q_{1} - q_{2} )}) \sin{(q_{0} )} & - (L_{1} \sin{(q_{1} )} + l_{2} \sin{(q_{1} - q_{2} )}) \cos{(q_{0} )} & l_{2} \sin{(q_{1} - q_{2} )} \cos{(q_{0} )} & 0\\
-	(L_{0} + L_{1} \cos{(q_{1} )} + l_{2} \cos{(q_{1} - q_{2} )}) \cos{(q_{0} )} & - (L_{1} \sin{(q_{1} )} +l_{2} \sin{(q_{1} - q_{2} )}) \sin{(q_{0} )} & l_{2} \sin{(q_{0} )} \sin{(q_{1} - q_{2} )} & 0\\
-	1 & 0 & 0& 0\\
-	0 & 0 & 0 & 0\\
-	0 & 1 & 1 & 0
-\end{bsmallmatrix}
+	J_2 = Jacobian({}_{org}^1 T \, com_2)
 \end{equation}
 
 \begin{equation}
-	J_3 = \begin{bsmallmatrix}
-	0 & L_{1} \cos{(q_{1} )} - L_{2} \cos{(q_{1} - q_{2} )} - l_{3} \cos{(q_{1} + q_{2} - q_{3} )} & L_{2} \cos{(q_{1} - q_{2} )} - l_{3} \cos{(q_{1} + q_{2} - q_{3} )} & l_{3} \cos{(q_{1} + q_{2} - q_{3} )}\\- (L_{0} + L_{1} \cos{(q_{1} )} + L_{2} \cos{(q_{1} - q_{2} )} + l_{3} \cos{(q_{1} + q_{2} - q_{3} )}) \sin{(q_{0} )} & - (L_{1} \sin{(q_{1} )} + L_{2} \sin{(q_{1} - q_{2} )} + l_{3} \sin{(q_{1} + q_{2} - q_{3} )}) \cos{(q_{0} )} & (L_{2} \sin{(q_{1} - q_{2} )} - l_{3} \sin{(q_{1} + q_{2} - q_{3} )}) \cos{(q_{0} )} & l_{3} \sin{(q_{1} + q_{2} - q_{3} )} \cos{(q_{0} )}\\
-	(L_{0} + L_{1} \cos{(q_{1} )} + L_{2} \cos{(q_{1} - q_{2} )} + l_{3}\cos{(q_{1} + q_{2} - q_{3} )}) \cos{(q_{0} )} & - (L_{1} \sin{(q_{1} )} + L_{2} \sin{(q_{1} - q_{2} )} + l_{3} \sin{(q_{1} + q_{2} - q_{3} )}) \sin{(q_{0} )} & (L_{2} \sin{(q_{1} - q_{2} )} - l_{3} \sin{(q_{1} + q_{2} - q_{3} )}) \sin{(q_{0} )} & l_{3} \sin{(q_{0} )} \sin{(q_{1} + q_{2} - q_{3} )}\\
-	1 & 0 & 0 & 0\\
-	0 & 0 & 0 & 0\\
-	0 & 1 & 1 & 1
-\end{bsmallmatrix}
+	J_3 = Jacobian({}_{org}^2 T \, com_3)
 \end{equation}
 
 \begin{equation}
-	J_{EE} = \begin{bsmallmatrix}
-	0 & L_{1} \cos{(- q_{1} + q_{2} + q_{3} )} & - L_{1} \cos{(- q_{1} + q_{2} + q_{3} )} + L_{2} \cos{(q_{2} -q_{3} )} & - L_{1} \cos{(- q_{1} + q_{2} + q_{3} )} - L_{2} \cos{(q_{2} - q_{3} )} + L_{3} \cos{(q_{3} )}\\
-	- (L_{0} + L_{1} \cos{(- q_{1} + q_{2} + q_{3} )} + L_{2} \cos{(q_{2} - q_{3} )} + L_{3} \cos{(q_{3} )}) \sin{(q_{0})} & L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} \cos{(q_{0} )} & - (L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} + L_{2} \sin{(q_{2} - q_{3} )}) \cos{(q_{0} )} & (- L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} + L_{2} \sin{(q_{2} - q_{3} )} - L_{3} \sin{(q_{3} )}) \cos{(q_{0} )}\\
-	(L_{0} + L_{1} \cos{(- q_{1} + q_{2} + q_{3} )} + L_{2} \cos{(q_{2} - q_{3} )} + L_{3} \cos{(q_{3} )}) \cos{(q_{0} )} & L_{1} \sin{(q_{0} )} \sin{(- q_{1} + q_{2} + q_{3} )} & - (L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} + L_{2} \sin{(q_{2} - q_{3} )}) \sin{(q_{0} )} &(- L_{1} \sin{(- q_{1} + q_{2} + q_{3} )} + L_{2} \sin{(q_{2} - q_{3} )} - L_{3} \sin{(q_{3} )}) \sin{(q_{0} )}\\
-	1 & 0 & 0 & 0\\
-	0 & 0 & 0 & 0\\
-	0 & 1 & 1 & 1
-\end{bsmallmatrix}
+	J_{EE} = Jacobian({}_{org}^3 T \, x_{ee})
 \end{equation}
 
 \end{document}
