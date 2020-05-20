@@ -1,4 +1,4 @@
-'''
+"""
 Copyright (C) 2020 Benjamin Bokser
 
 This program is free software: you can redistribute it and/or modify
@@ -13,7 +13,7 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-'''
+"""
 
 import time
 import sys
@@ -40,19 +40,23 @@ bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 2],
                  robotStartOrientation, useFixedBase=1, flags=p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER)
 
 p.setGravity(0, 0, GRAVITY)
-# print(p.getJointInfo(bot, 0))
+
+# print(p.getJointInfo(bot, 7))
+
 
 class Runner:
 
     def __init__(self, dt=1e-3):
         self.dt = dt
-        self.tau = None
+        self.tau_l = None
+        self.tau_r = None
 
-    def run(self, robot, control_shell):
+    def run(self, leg_left, leg_right, controller_left, controller_right):
 
-        self.robot = robot
-
-        self.shell = control_shell
+        self.leg_left = leg_left
+        self.leg_right = leg_right
+        self.controller_left = controller_left
+        self.controller_right = controller_right
 
         p.setTimeStep(self.dt)
 
@@ -77,22 +81,29 @@ class Runner:
             steps = steps + 1
 
             if steps == 1:
-                self.target = self.shell.controller.gen_target(self.robot)
+                self.target_l = self.controller_left.gen_target(self.leg_left)
+                self.target_r = self.controller_right.gen_target(self.leg_right)
             else:
-                self.target = self.shell.controller.target
+                self.target_l = self.controller_left.target
+                self.target_r = self.controller_right.target
 
-            self.tau = self.shell.control(self.robot)
+            self.tau_l = self.controller_left.control(self.leg_left)
+            self.tau_r = self.controller_right.control(self.leg_right)
             torque = np.zeros(8)
 
-            u = self.robot.apply_torque(u=self.tau, dt=self.dt)
-            torque[0:4] = u
+            u_l = self.leg_left.apply_torque(u=self.tau_l, dt=self.dt)
+            u_r = self.leg_right.apply_torque(u=self.tau_r, dt=self.dt)
+            torque[0:4] = u_l
             torque[0] *= -1  # readjust to match motor polarity
+            torque[4:8] = -u_r
+            torque[4] *= 1  # readjust to match motor polarity
             # print(torque)
-            # print(robot.position()[:, -1])  # forward kinematics
-            # print("vel = ", robot.velocity())
-            print(np.transpose(robot.q))  # encoder
-            # print(np.transpose(robot.dq))  # joint space vel
-            # print(robot.gen_grav()) # gravity term
+            # fw kinematics
+            # print(np.transpose(np.append((leg_left.position()[:, -1]), (leg_right.position()[:, -1]))))
+            # print("vel = ", leg_left.velocity())
+            # print(np.transpose(np.append(leg_left.q, leg_right.q)))  # encoder
+            # print(np.transpose(leg_left.dq))  # joint space vel
+            # print(leg_left.gen_grav()) # gravity term
             # sys.stdout.write("\033[F")  # back to previous line
             # sys.stdout.write("\033[K")  # clear line
 

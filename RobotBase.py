@@ -1,4 +1,4 @@
-'''
+"""
 Copyright (C) 2013 Travis DeWolf
 Copyright (C) 2020 Benjamin Bokser
 
@@ -14,7 +14,7 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-'''
+"""
 
 import numpy as np
 
@@ -42,7 +42,7 @@ class RobotBase:
         raise NotImplementedError
 
     def gen_Mq(self):
-        # Generates the mass matrix for the arm in joint space
+        # Generates the mass matrix for the leg in joint space
 
         raise NotImplementedError
 
@@ -71,7 +71,7 @@ class RobotBase:
     #   raise NotImplementedError
 
     def reset(self, q=[], dq=[]):
-        # Resets the state of the arm
+        # Resets the state of the leg
 
         if isinstance(q, np.ndarray):
             q = q.tolist()

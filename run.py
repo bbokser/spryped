@@ -1,5 +1,4 @@
 """
-Copyright (C) 2015 Travis DeWolf
 Copyright (C) 2020 Benjamin Bokser
 
 This program is free software: you can redistribute it and/or modify
@@ -18,15 +17,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from sim import Runner
 
-import robot  # from robot import Robot
+import leg  # from robot import Robot
 
 import osc  # from osc import Control
 
-import movement
-
+left = 1
+right = 0
 dt = 1e-3
-robot = robot.Robot(dt=dt)
+
+leg_left = leg.Leg(dt=dt, leg=left)
+leg_right = leg.Leg(dt=dt, leg=right)
 controller_class = osc
-control_shell = movement.Task(robot, controller_class, dt=dt)
+
+controller_left = controller_class.Control(leg=leg_left, dt=dt)
+controller_right = controller_class.Control(leg=leg_right, dt=dt)
+
 runner = Runner(dt=dt)
-runner.run(robot=robot, control_shell=control_shell)
+runner.run(leg_left=leg_left, leg_right=leg_right,
+           controller_left=controller_left, controller_right=controller_right)

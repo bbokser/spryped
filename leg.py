@@ -26,9 +26,9 @@ import transformations
 from RobotBase import RobotBase
 
 
-class Robot(RobotBase):
+class Leg(RobotBase):
     # first value in q and dq refer to BODY position
-    def __init__(self, init_q=None, init_dq=None, **kwargs):
+    def __init__(self, init_q=None, init_dq=None, leg=None, **kwargs):
 
         if init_dq is None:
             init_dq = [0., 0., 0., 0.]  # just left leg
@@ -114,7 +114,7 @@ class Robot(RobotBase):
         self.q_previous = init_q
         self.dq_previous = init_dq
         self.kv = 0.05
-
+        self.leg = leg
         self.reset()
         self.update_state()
 
@@ -128,8 +128,6 @@ class Robot(RobotBase):
 
         u = -1 * k * np.array(u, dtype='float')
 
-        # for ii in range(int(np.ceil(dt / 1e-5))):
-        #    self.sim.step(self.state, u)
         self.update_state()
         return u
 
@@ -139,7 +137,7 @@ class Robot(RobotBase):
         q = self.q if q is None else q
         q0 = q[0]
 
-        L0 = self.L[0]
+        # L0 = self.L[0]
         l0 = self.coml[0]
 
         JCOM0 = np.zeros((6, 4))
@@ -183,7 +181,7 @@ class Robot(RobotBase):
 
         L0 = self.L[0]
         L1 = self.L[1]
-        L2 = self.L[2]
+        # L2 = self.L[2]
 
         l2 = self.coml[2]
 
@@ -215,7 +213,7 @@ class Robot(RobotBase):
         L0 = self.L[0]
         L1 = self.L[1]
         L2 = self.L[2]
-        L3 = self.L[3]
+        # L3 = self.L[3]
 
         l3 = self.coml[3]
 
@@ -309,7 +307,7 @@ class Robot(RobotBase):
         L3 = self.L[3]
 
         x = xyz[0]
-        y = xyz[1]
+        # y = xyz[1]
         z = xyz[2]
 
         d = np.sqrt(x**2 + (abs(z) - L0 - L3)**2)
@@ -412,11 +410,17 @@ class Robot(RobotBase):
     def update_state(self):
         # Update the local variables
         # Pull values in from PyBullet, select relevant ones, reshape to 2D array
-        self.q = np.reshape([j[0] for j in p.getJointStates(1, range(0, 4))], (-1, 1))  # only using left leg values rn
-        # self.q = np.dot(np.squeeze(self.q), np.transpose([1., -1., -1., 1.]))  # adjust polarity of motors to match math
-        self.q[1] *= -1
-        self.q[2] *= -1
-        self.q[3] *= -1
+        self.q = np.reshape([j[0] for j in p.getJointStates(1, range(0, 8))], (-1, 1))
+        # self.q = np.dot(np.squeeze(self.q), np.transpose([1., -1., -1., 1.]))  # adjust polarity of motors
+        if self.leg == 1:
+            self.q = self.q[0:4]
+            self.q[1] *= -1
+            self.q[2] *= -1
+            self.q[3] *= -1
+        elif self.leg == 0:
+            self.q = self.q[4:8]
+            self.q[3] *= -1
+
         # Calibrate encoders
         self.q = np.add(self.q.flatten(), np.array([-2 * np.pi / 4, np.pi * 32 / 180,
                                                    -np.pi * 44.17556088 / 180, np.pi * 12.17556088 / 180.]))
