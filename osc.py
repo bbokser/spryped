@@ -38,11 +38,12 @@ class Control(control.Control):
         self.dt = dt
         self.DOF = 3  # task space dimensionality
         self.null_control = null_control
+        self.leveler = True
 
         self.kp = np.zeros((3, 3))
-        self.kp[0, 0] = 500
-        self.kp[1, 1] = 500
-        self.kp[2, 2] = 400
+        self.kp[0, 0] = 2000
+        self.kp[1, 1] = 2000
+        self.kp[2, 2] = 2000
 
         # self.kv = np.zeros((3, 3))
         # self.kv[0, 0] = 10
@@ -53,7 +54,7 @@ class Control(control.Control):
         self.kd[0, 0] = 50
         self.kd[1, 1] = 50
         self.kd[2, 2] = 50
-        self.kd[3, 3] = 50
+        self.kd[3, 3] = 100
 
         self.ko = np.zeros((3, 3))
         self.ko[0, 0] = 100
@@ -64,13 +65,13 @@ class Control(control.Control):
         self.kn[0, 0] = 0
         self.kn[1, 1] = 0
         self.kn[2, 2] = 0
-        self.kn[3, 3] = 1000
+        self.kn[3, 3] = 10
 
         self.knd = np.zeros((4, 4))
         self.knd[0, 0] = 0
         self.knd[1, 1] = 0
         self.knd[2, 2] = 0
-        self.knd[3, 3] = 100
+        self.knd[3, 3] = 1
 
     def control(self, leg, x_dd_des=None):
         """
@@ -135,7 +136,7 @@ class Control(control.Control):
         if self.null_control:
             # calculate our secondary control signal
             # calculated desired joint angle acceleration
-            prop_val = ((leg.angles - leg.q) + np.pi) % (np.pi * 2) - np.pi
+            prop_val = ((leg.ee_angle() - leg.q) + np.pi) % (np.pi * 2) - np.pi
             q_des = (np.dot(self.kn, prop_val) +
                      np.dot(self.knd, -leg.dq.reshape(-1, )))
 
@@ -149,6 +150,11 @@ class Control(control.Control):
             null_signal = np.dot(null_filter, Fq_null).reshape(-1, )
 
             self.u += null_signal
+
+        if self.leveler:
+            # keeps toes level (for now)
+            u_level = np.dot(self.kn, leg.ee_angle()-leg.q)
+            self.u += u_level
 
         # add in any additional signals
         for addition in self.additions:

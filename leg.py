@@ -396,25 +396,21 @@ class Leg(RobotBase):
         # q_euler = transformations.euler_from_matrix(REE)
         # print(q_euler)
         return q_e
-    """
+
     def ee_angle(self, q=None):
         if q is None:
-            q0 = self.q[0]
             q1 = self.q[1]
             q2 = self.q[2]
-            q3 = self.q[3]
         else:
-            q0 = q[0]
             q1 = q[1]
             q2 = q[2]
-            q3 = q[3]
 
         # keep ee level
         ee_target = -(q1+q2)
         angles = np.array([0, 0, 0, ee_target])
 
         return angles
-    """
+
     def reset(self, q=None, dq=None):
         if q is None:
             q = []

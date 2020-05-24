@@ -96,16 +96,16 @@ class Runner:
             u_r = self.leg_right.apply_torque(u=self.tau_r, dt=self.dt)
             torque[0:4] = u_l
             torque[0] *= -1  # readjust to match motor polarity
-            torque[3] *= -1  # readjust to match motor polarity
             torque[4:8] = -u_r
-            torque[3] *= -1  # readjust to match motor polarity
+            torque[7] *= -1  # readjust to match motor polarity
             # print(torque)
+
             # fw kinematics
             print(np.transpose(np.append((leg_left.position()[:, -1]), (leg_right.position()[:, -1]))))
+            # velocity
             # print("vel = ", leg_left.velocity())
-            # print(np.transpose(np.append(leg_left.q, leg_right.q)))  # encoder
-            # print(np.transpose(leg_left.dq))  # joint space vel
-            # print(leg_left.gen_grav()) # gravity term
+            # encoder
+            # print(np.transpose(np.append(leg_left.q, leg_right.q)))
 
             # sys.stdout.write("\033[F")  # back to previous line
             # sys.stdout.write("\033[K")  # clear line
