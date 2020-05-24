@@ -1,0 +1,3 @@
+Matrix([[cos(q1 + q2 + q3), -sin(q1 + q2 + q3), 0]])
+Matrix([[sin(q1 + q2 + q3)*cos(q0), cos(q0)*cos(q1 + q2 + q3), -sin(q0)]])
+Matrix([[sin(q0)*sin(q1 + q2 + q3), sin(q0)*cos(q1 + q2 + q3), cos(q0)]])

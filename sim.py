@@ -41,7 +41,8 @@ bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 2],
 
 p.setGravity(0, 0, GRAVITY)
 
-# print(p.getJointInfo(bot, 7))
+# print(p.getJointInfo(bot, 3))
+np.set_printoptions(suppress=True, linewidth=np.nan)
 
 
 class Runner:
@@ -95,21 +96,23 @@ class Runner:
             u_r = self.leg_right.apply_torque(u=self.tau_r, dt=self.dt)
             torque[0:4] = u_l
             torque[0] *= -1  # readjust to match motor polarity
+            torque[3] *= -1  # readjust to match motor polarity
             torque[4:8] = -u_r
-            torque[4] *= 1  # readjust to match motor polarity
+            torque[3] *= -1  # readjust to match motor polarity
             # print(torque)
             # fw kinematics
-            # print(np.transpose(np.append((leg_left.position()[:, -1]), (leg_right.position()[:, -1]))))
+            print(np.transpose(np.append((leg_left.position()[:, -1]), (leg_right.position()[:, -1]))))
             # print("vel = ", leg_left.velocity())
             # print(np.transpose(np.append(leg_left.q, leg_right.q)))  # encoder
             # print(np.transpose(leg_left.dq))  # joint space vel
             # print(leg_left.gen_grav()) # gravity term
+
             # sys.stdout.write("\033[F")  # back to previous line
             # sys.stdout.write("\033[K")  # clear line
 
             p.setJointMotorControlArray(bot, jointArray, p.TORQUE_CONTROL, forces=torque)
 
-            if (useRealTime == 0):
+            if useRealTime == 0:
                 p.stepSimulation()
         '''
         def reaction(self):

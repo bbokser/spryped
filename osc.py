@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import sys
 
 import numpy as np
-from simple_pid import PID
+
 import transformations
 import control
 
@@ -38,29 +38,39 @@ class Control(control.Control):
         self.dt = dt
         self.DOF = 3  # task space dimensionality
         self.null_control = null_control
-        self.pid = PID(self.kp, self.ki, self.kd)
-        self.pid.sample_time = self.dt  # 1e-3
 
         self.kp = np.zeros((3, 3))
-        self.kp[0, 0] = 150
-        self.kp[1, 1] = 150
-        self.kp[2, 2] = 150
+        self.kp[0, 0] = 500
+        self.kp[1, 1] = 500
+        self.kp[2, 2] = 400
 
-        self.ki = np.zeros((3, 3))
-        self.ki[0, 0] = 5
-        self.ki[1, 1] = 5
-        self.ki[2, 2] = 5
+        # self.kv = np.zeros((3, 3))
+        # self.kv[0, 0] = 10
+        # self.kv[1, 1] = 10
+        # self.kv[2, 2] = 10
 
         self.kd = np.zeros((4, 4))
-        self.kd[0, 0] = 10
-        self.kd[1, 1] = 10
-        self.kd[2, 2] = 10
-        self.kd[3, 3] = 10
+        self.kd[0, 0] = 50
+        self.kd[1, 1] = 50
+        self.kd[2, 2] = 50
+        self.kd[3, 3] = 50
 
         self.ko = np.zeros((3, 3))
         self.ko[0, 0] = 100
         self.ko[1, 1] = 100
         self.ko[2, 2] = 100
+
+        self.kn = np.zeros((4, 4))
+        self.kn[0, 0] = 0
+        self.kn[1, 1] = 0
+        self.kn[2, 2] = 0
+        self.kn[3, 3] = 1000
+
+        self.knd = np.zeros((4, 4))
+        self.knd[0, 0] = 0
+        self.knd[1, 1] = 0
+        self.knd[2, 2] = 0
+        self.knd[3, 3] = 100
 
     def control(self, leg, x_dd_des=None):
         """
@@ -83,15 +93,13 @@ class Control(control.Control):
 
         x_dd_des = np.zeros(6)  # [x, y, z, alpha, beta, gamma]
 
-        # self.pid.setpoint = self.target
         self.x = leg.position()[:, -1]
 
-        # Calculate operational space linear velocity vector
-        # self.velocity = np.transpose(np.dot(JEE, leg.dq)).flatten()
+        # Calculate operational space velocity vector
+        # self.velocity = (np.transpose(np.dot(JEE, leg.dq)).flatten())[0:3]
 
+        # x_dd_des[:3] = np.dot(self.kp, (self.target[0:3] - self.x)) + np.dot(self.kv, -self.velocity)
         x_dd_des[:3] = np.dot(self.kp, (self.target[0:3] - self.x))
-        # self.pid.setpoint = self.target[0:3]
-        # x_dd_des[:3] = self.pid(self.x)
 
         # calculate end effector orientation unit quaternion
         q_e = leg.orientation()
@@ -116,20 +124,11 @@ class Control(control.Control):
         # calculate force
         Fx = np.dot(Mx, x_dd_des)
 
-        # generate gravity term in task space
-        tau_grav = leg.gen_grav()
+        # self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - leg.gen_grav()
+
         # add in velocity compensation in GC space for stability
-        # self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - tau_grav
-
         self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
-                  np.dot(Mq, np.dot(self.kd, leg.dq)).flatten()) - tau_grav
-
-        # inverse kinematics basic proportional control
-        # self.u = self.kp*(leg.inv_kinematics(self.target)-leg.q)
-
-        # ik simple_pid
-        # self.pid.setpoint = leg.inv_kinematics(self.target)
-        # self.u = self.pid(leg.q)
+                  np.dot(Mq, np.dot(self.kd, leg.dq)).flatten()) - leg.gen_grav()
 
         # if null_control is selected, add a control signal in the
         # null space to try to move the leg to selected position
@@ -137,8 +136,8 @@ class Control(control.Control):
             # calculate our secondary control signal
             # calculated desired joint angle acceleration
             prop_val = ((leg.angles - leg.q) + np.pi) % (np.pi * 2) - np.pi
-            q_des = (self.ko * prop_val +
-                     self.kd * -leg.dq.reshape(-1, ))
+            q_des = (np.dot(self.kn, prop_val) +
+                     np.dot(self.knd, -leg.dq.reshape(-1, )))
 
             Fq_null = np.dot(Mq, q_des)
 
@@ -148,10 +147,6 @@ class Control(control.Control):
             null_filter = np.eye(len(leg.L)) - np.dot(JEE.T, Jdyn_inv)
 
             null_signal = np.dot(null_filter, Fq_null).reshape(-1, )
-            null_signal[0] *= 1
-            null_signal[1] *= 1
-            null_signal[2] *= 1
-            null_signal[3] *= 1
 
             self.u += null_signal
 

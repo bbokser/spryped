@@ -39,7 +39,7 @@ class Leg(RobotBase):
         RobotBase.__init__(self, init_q=init_q, init_dq=init_dq, **kwargs)
 
         values = []
-        with open('spryped_urdf_rev06/spryped_data_alt.csv', 'r') as csvfile:
+        with open('spryped_urdf_rev06/spryped_data.csv', 'r') as csvfile:
             data = csv.reader(csvfile, delimiter=',')
             next(data)  # skip headers
             values = list(zip(*(row for row in data)))  # transpose rows to columns
@@ -381,15 +381,40 @@ class Leg(RobotBase):
             q2 = q[2]
             q3 = q[3]
 
-        alpha = q0  # x-axis rotation
-        beta = q1+q2+q3  # y-axis rotation
-        gamma = 0  # z-axis rotation
+        REE = np.zeros((4, 4))
+        REE[0, 0] = np.cos(q1 + q2 + q3)
+        REE[0, 1] = -np.sin(q1 + q2 + q3)
+        REE[1, 0] = np.sin(q1 + q2 + q3)*np.cos(q0)
+        REE[1, 1] = np.cos(q0)*np.cos(q1 + q2 + q3)
+        REE[1, 2] = -np.sin(q0)
+        REE[2, 0] = np.sin(q0)*np.sin(q1 + q2 + q3)
+        REE[2, 1] = np.sin(q0)*np.cos(q1 + q2 + q3)
+        REE[2, 2] = np.cos(q0)
+        # REE[3, 3] = 1
         q_e = transformations.unit_vector(
-            transformations.quaternion_from_euler(
-                alpha, beta, gamma, axes='rxyz'))  # 'rotating xyz'
-
+            transformations.quaternion_from_matrix(REE))
+        # q_euler = transformations.euler_from_matrix(REE)
+        # print(q_euler)
         return q_e
+    """
+    def ee_angle(self, q=None):
+        if q is None:
+            q0 = self.q[0]
+            q1 = self.q[1]
+            q2 = self.q[2]
+            q3 = self.q[3]
+        else:
+            q0 = q[0]
+            q1 = q[1]
+            q2 = q[2]
+            q3 = q[3]
 
+        # keep ee level
+        ee_target = -(q1+q2)
+        angles = np.array([0, 0, 0, ee_target])
+
+        return angles
+    """
     def reset(self, q=None, dq=None):
         if q is None:
             q = []
@@ -411,7 +436,7 @@ class Leg(RobotBase):
         # Update the local variables
         # Pull values in from PyBullet, select relevant ones, reshape to 2D array
         self.q = np.reshape([j[0] for j in p.getJointStates(1, range(0, 8))], (-1, 1))
-        # self.q = np.dot(np.squeeze(self.q), np.transpose([1., -1., -1., 1.]))  # adjust polarity of motors
+
         if self.leg == 1:
             self.q = self.q[0:4]
             self.q[1] *= -1
@@ -426,5 +451,6 @@ class Leg(RobotBase):
                                                    -np.pi * 44.17556088 / 180, np.pi * 12.17556088 / 180.]))
         # self.dq = np.reshape([j[1] for j in p.getJointStates(1, range(0, 4))], (-1, 1))
         self.dq = [i * self.kv for i in self.dq_previous] + (self.q - self.q_previous) / self.dt
+        # check--are you sure this only happens once per time step?
         self.dq_previous = self.dq
         self.q_previous = self.q
