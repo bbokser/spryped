@@ -166,6 +166,6 @@ class Control(control.Control):
         target_alpha = -np.pi / 2
         target_beta = 0  # can't control, ee Jacobian is zeros in that row
         target_gamma = 0
-        self.target = np.array([0.077, 0.131, -0.708, target_alpha, target_beta, target_gamma])
+        self.target = np.array([0, 0, -0.8325, target_alpha, target_beta, target_gamma])
 
         return self.target.tolist()

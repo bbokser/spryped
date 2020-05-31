@@ -34,10 +34,9 @@ p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.resetSimulation()
 planeID = p.loadURDF("plane.urdf")
 robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])
-# bot = p.loadURDF("spryped_urdf_rev05/urdf/spryped_urdf_rev05.urdf", [0, 0, 0.8],
-#                 robotStartOrientation, useFixedBase=1)
-bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 2],
-                 robotStartOrientation, useFixedBase=1, flags=p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER)
+
+bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 0.8],
+                 robotStartOrientation, useFixedBase=0, flags=p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER)
 
 p.setGravity(0, 0, GRAVITY)
 
@@ -100,15 +99,21 @@ class Runner:
             torque[7] *= -1  # readjust to match motor polarity
             # print(torque)
 
+            baseorientation = p.getBasePositionAndOrientation(bot)[1]
+            # print(p.getEulerFromQuaternion(baseorientation))
+
+            omega = p.getBaseVelocity(bot)[1]  # base angular velocity in global coordinates
+            print(omega)
+
             # fw kinematics
-            print(np.transpose(np.append((leg_left.position()[:, -1]), (leg_right.position()[:, -1]))))
-            # velocity
+            # print(np.transpose(np.append((leg_left.position()[:, -1]), (leg_right.position()[:, -1]))))
+            # joint velocity
             # print("vel = ", leg_left.velocity())
-            # encoder
+            # encoder feedback
             # print(np.transpose(np.append(leg_left.q, leg_right.q)))
 
-            # sys.stdout.write("\033[F")  # back to previous line
-            # sys.stdout.write("\033[K")  # clear line
+            sys.stdout.write("\033[F")  # back to previous line
+            sys.stdout.write("\033[K")  # clear line
 
             p.setJointMotorControlArray(bot, jointArray, p.TORQUE_CONTROL, forces=torque)
 
