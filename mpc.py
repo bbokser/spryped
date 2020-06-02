@@ -17,34 +17,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from casadi import *
 
-x = SX.sym('x')
-u = SX.sym('u')
 
-xk = ([theta.T, p.T, omega.T, pdot.T]).T
+class Mpc(control.Control):
+    def __init__(self, dt=1e-3, **kwargs):
 
-fk = ([f1, f2]).T
+        super(Control, self).__init__(**kwargs)
+        self.dt = dt
 
-g = ([SX.zeros(1, 3), SX.zeros(1, 3), SX.zeros(1, 3), grav.T]).T
+    def _control(self, leg, x_dd_des=None):
 
-A = SX.eye(4)
-A[0, 2] = dot(Rz(phi), dt)
-A[1, 3] = dt
+        theta = MX.sym('theta')  # states
+        p = MX.sym('p')  # states
+        omega = MX.sym('omega')  # states
+        pdot = MX.sym('pdot')  # states
+        # grav = MX.sym('grav')  # states
+        
+        f1 = MX.sym('f1')  # controls
+        f2 = MX.sym('f2')  # controls
 
-B = ([SX.zeros(3, 3), SX.zeros(3, 3)],
-     [SX.zeros(3, 3), SX.zeros(3, 3)],
-     [SX.zeros(3, 3), SX.zeros(3, 3)],
-     [SX.zeros(3, 3), SX.zeros(3, 3)])
-B[2, 0] = gIinv1*dt
-B[2, 1] = gIinv2*dt
-B[3, 0] = ones(3, 3)*dt/m
-B[3, 1] = ones(3, 3)*dt/m
+        xk = ([theta.T, p.T, omega.T, pdot.T]).T
 
-xk1 = dot(A, xk) + dot(B, fk) + g  # the discrete dynamics of the system
+        fk = ([f1, f2]).T
 
-qp = {'x': vertcat(xk1, fk),
-      'f': dot(dot((xk1-x_d).T, Q), xk1-x_d) + dot(dot(fk.T, R), fk),
-      'g': dot(A, xk) + dot(B, fk) + g - xk1}
-S = qpsol('S', 'qpoases', qp)
-r = S(lbg=0)  # initial guess
-x_opt = r['x']
-print('x_opt:', x_opt)
+        g = ([MX.zeros(1, 3), MX.zeros(1, 3), MX.zeros(1, 3), grav.T]).T
+
+        A = MX.eye(4)
+        A[0, 2] = dot(Rz(phi), dt)  # define
+        A[1, 3] = dt
+
+        B = ([MX.zeros(3, 3), MX.zeros(3, 3)],
+             [MX.zeros(3, 3), MX.zeros(3, 3)],
+             [MX.zeros(3, 3), MX.zeros(3, 3)],
+             [MX.zeros(3, 3), MX.zeros(3, 3)])
+        B[2, 0] = gIinv1*dt
+        B[2, 1] = gIinv2*dt
+        B[3, 0] = ones(3, 3)*dt/m
+        B[3, 1] = ones(3, 3)*dt/m
+
+        x_next = dot(A, xk) + dot(B, fk) + g  # the discrete dynamics of the system
+
+        qp = {'x': vertcat(x_next, fk),
+              'f': dot(dot((x_next-x_d).T, Q), x_next-x_d) + dot(dot(fk.T, R), fk),
+              'g': dot(A, xk) + dot(B, fk) + g - x_next}
+        S = qpsol('S', 'qpoases', qp)
+        r = S(lbg=0)  # initial guess
+        x_opt = r['x']
+        print('x_opt:', x_opt)

@@ -35,7 +35,7 @@ class Control(object):
         self.u = np.zeros((4, 1))  # control signal
 
         self.additions = additions
-        # self.task = task
+
         self.target = None
 
     def control(self, leg, x_dd_des):

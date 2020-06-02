@@ -51,12 +51,18 @@ class Runner:
         self.tau_l = None
         self.tau_r = None
 
-    def run(self, leg_left, leg_right, controller_left, controller_right):
+    def run(self, leg_left, leg_right,
+            controller_left, controller_right,
+            mpc_left, mpc_right):
+
+        # p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "file1.mp4")
 
         self.leg_left = leg_left
         self.leg_right = leg_right
         self.controller_left = controller_left
         self.controller_right = controller_right
+        self.mpc_left = mpc_left
+        self.mpc_right = mpc_right
 
         p.setTimeStep(self.dt)
 
@@ -70,8 +76,6 @@ class Runner:
             p.setJointMotorControl2(bot, i, p.VELOCITY_CONTROL, force=0.5)
             # force=1 allows us to easily mimic joint friction rather than disabling
             p.enableJointForceTorqueSensor(bot, i, 1)  # enable joint torque sensing
-
-        # p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "file1.mp4")
 
         steps = 0
 
@@ -89,6 +93,7 @@ class Runner:
 
             self.tau_l = self.controller_left.control(self.leg_left)
             self.tau_r = self.controller_right.control(self.leg_right)
+
             torque = np.zeros(8)
 
             u_l = self.leg_left.apply_torque(u=self.tau_l, dt=self.dt)
@@ -98,6 +103,7 @@ class Runner:
             torque[4:8] = -u_r
             torque[7] *= -1  # readjust to match motor polarity
             # print(torque)
+            p.setJointMotorControlArray(bot, jointArray, p.TORQUE_CONTROL, forces=torque)
 
             baseorientation = p.getBasePositionAndOrientation(bot)[1]
             # print(p.getEulerFromQuaternion(baseorientation))
@@ -114,8 +120,6 @@ class Runner:
 
             sys.stdout.write("\033[F")  # back to previous line
             sys.stdout.write("\033[K")  # clear line
-
-            p.setJointMotorControlArray(bot, jointArray, p.TORQUE_CONTROL, forces=torque)
 
             if useRealTime == 0:
                 p.stepSimulation()

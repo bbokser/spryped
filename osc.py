@@ -29,7 +29,7 @@ class Control(control.Control):
     Controls the (x,y) position of the end-effector.
     """
 
-    def __init__(self, leg, dt=1e-3, null_control=False, **kwargs):
+    def __init__(self, dt=1e-3, null_control=False, **kwargs):
         """
         null_control boolean: apply second controller in null space or not
         """

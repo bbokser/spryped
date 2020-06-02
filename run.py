@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from sim import Runner
 
 import leg  # from robot import Robot
-
-import osc  # from osc import Control
+import osc # from osc import Control
+import mpc
 
 left = 1
 right = 0
@@ -27,11 +27,15 @@ dt = 1e-3
 
 leg_left = leg.Leg(dt=dt, leg=left)
 leg_right = leg.Leg(dt=dt, leg=right)
-controller_class = osc
 
+controller_class = osc
 controller_left = controller_class.Control(leg=leg_left, dt=dt)
 controller_right = controller_class.Control(leg=leg_right, dt=dt)
 
+mpc_left = mpc.Mpc(leg=leg_left, dt=dt)
+mpc_right = mpc.Mpc(leg=leg_right, dt=dt)
+
 runner = Runner(dt=dt)
 runner.run(leg_left=leg_left, leg_right=leg_right,
-           controller_left=controller_left, controller_right=controller_right)
+           controller_left=controller_left, controller_right=controller_right,
+           mpc_left=mpc_left, mpc_right=mpc_right)
