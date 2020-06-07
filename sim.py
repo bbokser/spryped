@@ -123,16 +123,15 @@ class Runner:
 
             if useRealTime == 0:
                 p.stepSimulation()
-        '''
-        def reaction(self):
-            reaction_force = [j[2] for j in p.getJointStates(bot, range(7))]  # j[2]=jointReactionForces
-            #  [Fx, Fy, Fz, Mx, My, Mz]
-            # print(states[1][4]) #'%s' % float('%.1g' % pront[1])) # selected joint 2, My
-            return reaction_force[:][4]  # selected joint 1 and 5 Mz, all other joints My
-        '''
 
-        def get_states(self):
-            self.q = [j[0] for j in p.getJointStates(bot, range(7))]
-            self.dq = [j[1] for j in p.getJointStates(bot, range(7))]
-            state = append(state_q, state_dq)
-            return state
+    def reaction(self):
+        reaction_force = [j[2] for j in p.getJointStates(bot, range(7))]  # j[2]=jointReactionForces
+        #  [Fx, Fy, Fz, Mx, My, Mz]
+        # print(states[1][4]) #'%s' % float('%.1g' % pront[1])) # selected joint 2, My
+        return reaction_force[:][4]  # selected joint 1 and 5 Mz, all other joints My
+
+    def get_states(self):
+        self.q = [j[0] for j in p.getJointStates(bot, range(7))]
+        self.dq = [j[1] for j in p.getJointStates(bot, range(7))]
+        state = append(state_q, state_dq)
+        return state
