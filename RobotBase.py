@@ -90,7 +90,3 @@ class RobotBase:
     def update_state(self):
         # Update the state
         pass
-
-    # @property
-    # def x(self):
-    #     return self.position()[:, -1]

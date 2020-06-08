@@ -38,6 +38,6 @@ class Control(object):
 
         self.target = None
 
-    def control(self, leg, x_dd_des):
+    def control(self, leg, target, x_dd_des):
         """Generates a control signal to apply to the leg"""
         raise NotImplementedError

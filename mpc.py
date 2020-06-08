@@ -18,18 +18,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from casadi import *
 import numpy as np
 
+import control
 
-class Mpc(control.Control):
-    def __init__(self, dt=1e-3, **kwargs):
 
-        super(Control, self).__init__(**kwargs)
+class Mpc:
+
+    def __init__(self, leg, dt=1e-3, **kwargs):
+
+        self.u = np.zeros((4, 1))  # control signal
         self.dt = dt  # sampling time (s)
         self.N = 3  # prediction horizon
 
         self.f_max = 5
         self.f_min = -self.f_max
 
-    def _control(self, leg, x_dd_des=None):
+    def control(self, leg, x_dd_des=None):
 
         theta = SX.sym('theta')
         p = SX.sym('p')

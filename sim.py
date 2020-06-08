@@ -46,23 +46,28 @@ np.set_printoptions(suppress=True, linewidth=np.nan)
 
 class Runner:
 
-    def __init__(self, dt=1e-3):
+    def __init__(self, leg_left, leg_right,
+                 controller_left, controller_right,
+                 mpc_left, mpc_right, dt=1e-3):
         self.dt = dt
         self.tau_l = None
         self.tau_r = None
-
-    def run(self, leg_left, leg_right,
-            controller_left, controller_right,
-            mpc_left, mpc_right):
-
-        # p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "file1.mp4")
-
         self.leg_left = leg_left
         self.leg_right = leg_right
         self.controller_left = controller_left
         self.controller_right = controller_right
         self.mpc_left = mpc_left
         self.mpc_right = mpc_right
+        self.init_alpha = -np.pi / 2
+        self.init_beta = 0  # can't control, ee Jacobian is zeros in that row
+        self.init_gamma = 0
+        self.target_init = np.array([0, 0, -0.8325, self.init_alpha, self.init_beta, self.init_gamma])
+        self.target_l = self.target_init
+        self.target_r = self.target_init
+
+    def run(self):
+
+        # p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "file1.mp4")
 
         p.setTimeStep(self.dt)
 
@@ -84,20 +89,20 @@ class Runner:
             # update target after specified period of time passes
             steps = steps + 1
 
-            if steps == 1:
-                self.target_l = self.controller_left.gen_target(self.leg_left)
-                self.target_r = self.controller_right.gen_target(self.leg_right)
-            else:
-                self.target_l = self.controller_left.target
-                self.target_r = self.controller_right.target
+            if self.statemachine() == 1:
+                self.target_r = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
+                self.target_l = self.target_init
+            elif self.statemachine() == 0:
+                self.target_l = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
+                self.target_r = self.target_init
 
-            self.tau_l = self.controller_left.control(self.leg_left)
-            self.tau_r = self.controller_right.control(self.leg_right)
-
-            torque = np.zeros(8)
+            self.tau_l = self.controller_left.control(leg=self.leg_left, target=self.target_l)
+            self.tau_r = self.controller_right.control(leg=self.leg_right, target=self.target_r)
 
             u_l = self.leg_left.apply_torque(u=self.tau_l, dt=self.dt)
             u_r = self.leg_right.apply_torque(u=self.tau_r, dt=self.dt)
+
+            torque = np.zeros(8)
             torque[0:4] = u_l
             torque[0] *= -1  # readjust to match motor polarity
             torque[4:8] = -u_r
@@ -109,7 +114,6 @@ class Runner:
             # print(p.getEulerFromQuaternion(baseorientation))
 
             omega = p.getBaseVelocity(bot)[1]  # base angular velocity in global coordinates
-            print(omega)
 
             # fw kinematics
             # print(np.transpose(np.append((leg_left.position()[:, -1]), (leg_right.position()[:, -1]))))
@@ -117,21 +121,35 @@ class Runner:
             # print("vel = ", leg_left.velocity())
             # encoder feedback
             # print(np.transpose(np.append(leg_left.q, leg_right.q)))
-
+            print(self.statemachine())
             sys.stdout.write("\033[F")  # back to previous line
             sys.stdout.write("\033[K")  # clear line
 
             if useRealTime == 0:
                 p.stepSimulation()
 
-    def reaction(self):
-        reaction_force = [j[2] for j in p.getJointStates(bot, range(7))]  # j[2]=jointReactionForces
+    def statemachine(self):
+        state = 1
+        left_torque_check = np.average(np.absolute(self.reaction_torques()[0:4]))
+        right_torque_check = np.average(np.absolute(self.reaction_torques()[4:8]))
+        if left_torque_check <= right_torque_check:
+            state = 1  # right swing
+        else:
+            state = 0  # left swing
+        return state
+
+    def reaction_torques(self):
+        # returns joint reaction torques
+        reaction_force = [j[2] for j in p.getJointStates(bot, range(8))]  # j[2]=jointReactionForces
         #  [Fx, Fy, Fz, Mx, My, Mz]
-        # print(states[1][4]) #'%s' % float('%.1g' % pront[1])) # selected joint 2, My
-        return reaction_force[:][4]  # selected joint 1 and 5 Mz, all other joints My
+        reaction_force = np.array(reaction_force)
+        torques = reaction_force[:, 4]  # selected all joints My
+        torques[0] = reaction_force[0, 5]  # selected joint 1 Mz
+        torques[4] = reaction_force[4, 5]  # selected joint 5 Mz
+        return torques
 
     def get_states(self):
-        self.q = [j[0] for j in p.getJointStates(bot, range(7))]
-        self.dq = [j[1] for j in p.getJointStates(bot, range(7))]
+        self.q = [j[0] for j in p.getJointStates(bot, range(8))]
+        self.dq = [j[1] for j in p.getJointStates(bot, range(8))]
         state = append(state_q, state_dq)
         return state

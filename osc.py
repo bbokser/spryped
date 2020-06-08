@@ -26,15 +26,15 @@ import control
 class Control(control.Control):
     """
     A controller that implements operational space control.
-    Controls the (x,y) position of the end-effector.
+    Controls the (x,y,z) position of the end-effector.
     """
 
-    def __init__(self, dt=1e-3, null_control=False, **kwargs):
+    def __init__(self, leg, dt=1e-3, null_control=False, **kwargs):
         """
         null_control boolean: apply second controller in null space or not
         """
 
-        super(Control, self).__init__(**kwargs)
+        super(Control,  self).__init__(**kwargs)
         self.dt = dt
         self.DOF = 3  # task space dimensionality
         self.null_control = null_control
@@ -73,7 +73,7 @@ class Control(control.Control):
         self.knd[2, 2] = 0
         self.knd[3, 3] = 1
 
-    def control(self, leg, x_dd_des=None):
+    def control(self, leg, target, x_dd_des=None):
         """
         Generates a control signal to move the
         joints to the specified target.
@@ -82,6 +82,7 @@ class Control(control.Control):
         des list: the desired system position
         x_dd_des np.array: desired acceleration
         """
+        self.target = target
         # which dim to control of [x, y, z, alpha, beta, gamma]
         ctrlr_dof = np.array([True, True, True, False, False, False])
 
@@ -161,11 +162,12 @@ class Control(control.Control):
             self.u += addition.generate(self.u, leg)
 
         return self.u
-
-    def gen_target(self, leg):
+    '''
+    def gen_target(self):
         target_alpha = -np.pi / 2
         target_beta = 0  # can't control, ee Jacobian is zeros in that row
         target_gamma = 0
         self.target = np.array([0, 0, -0.8325, target_alpha, target_beta, target_gamma])
 
         return self.target.tolist()
+    '''
