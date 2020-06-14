@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from sim import Runner
 
-import leg  # from robot import Robot
-import osc  # from osc import Control
+import leg
+import osc
 import mpc
 
 left = 1

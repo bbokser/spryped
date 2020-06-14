@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import sys
 
 import numpy as np
+import transforms3d
 
-import transformations
 import control
 
 
@@ -34,7 +34,7 @@ class Control(control.Control):
         null_control boolean: apply second controller in null space or not
         """
 
-        super(Control,  self).__init__(**kwargs)
+        super(Control, self).__init__(**kwargs)
         self.dt = dt
         self.DOF = 3  # task space dimensionality
         self.null_control = null_control
@@ -73,7 +73,7 @@ class Control(control.Control):
         self.knd[2, 2] = 0
         self.knd[3, 3] = 1
 
-    def control(self, leg, target, x_dd_des=None):
+    def control(self, leg, target, base_orientation, x_dd_des=None):
         """
         Generates a control signal to move the
         joints to the specified target.
@@ -83,6 +83,8 @@ class Control(control.Control):
         x_dd_des np.array: desired acceleration
         """
         self.target = target
+        self.base_orientation = np.array(base_orientation)
+
         # which dim to control of [x, y, z, alpha, beta, gamma]
         ctrlr_dof = np.array([True, True, True, False, False, False])
 
@@ -95,7 +97,7 @@ class Control(control.Control):
 
         x_dd_des = np.zeros(6)  # [x, y, z, alpha, beta, gamma]
 
-        self.x = leg.position()[:, -1]
+        self.x = np.dot(base_orientation, leg.position()[:, -1])  # multiply with rotation matrix for base to world
 
         # Calculate operational space velocity vector
         # self.velocity = (np.transpose(np.dot(JEE, leg.dq)).flatten())[0:3]
@@ -107,14 +109,12 @@ class Control(control.Control):
         q_e = leg.orientation()
 
         # calculate the target orientation unit quaternion
-        q_d = transformations.unit_vector(
-            transformations.quaternion_from_euler(
-                self.target[3], self.target[4], self.target[5],
-                axes='rxyz'))  # converting angles from 'rotating xyz'
+        q_d = transforms3d.euler.euler2quat(self.target[3], self.target[4], self.target[5], axes='rxyz')
+        q_d = q_d / np.linalg.norm(q_d)  # convert to unit vector quaternion
 
         # calculate the rotation between current and target orientations
-        q_r = transformations.quaternion_multiply(
-            q_d, transformations.quaternion_conjugate(q_e))
+        q_r = transforms3d.quaternions.qmult(
+            q_d, transforms3d.quaternions.qconjugate(q_e))
 
         # convert rotation quaternion to Euler angle forces
         x_dd_des[3:] = np.dot(self.ko, q_r[1:] * np.sign(q_r[0]))
@@ -129,8 +129,8 @@ class Control(control.Control):
         # self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - leg.gen_grav()
 
         # add in velocity compensation in GC space for stability
-        self.u = (np.dot(JEE.T, Fx).reshape(-1, ) -
-                  np.dot(Mq, np.dot(self.kd, leg.dq)).flatten()) - leg.gen_grav()
+        self.u = np.dot(JEE.T, Fx).reshape(-1, ) \
+            - np.dot(Mq, np.dot(self.kd, leg.dq)).flatten() - leg.gen_grav()
 
         # if null_control is selected, add a control signal in the
         # null space to try to move the leg to selected position
@@ -154,7 +154,7 @@ class Control(control.Control):
 
         if self.leveler:
             # keeps toes level (for now)
-            u_level = np.dot(self.kn, leg.ee_angle()-leg.q)
+            u_level = np.dot(self.kn, np.dot(base_orientation[1, 1], leg.ee_angle()) - leg.q)
             self.u += u_level
 
         # add in any additional signals
@@ -162,12 +162,3 @@ class Control(control.Control):
             self.u += addition.generate(self.u, leg)
 
         return self.u
-    '''
-    def gen_target(self):
-        target_alpha = -np.pi / 2
-        target_beta = 0  # can't control, ee Jacobian is zeros in that row
-        target_gamma = 0
-        self.target = np.array([0, 0, -0.8325, target_alpha, target_beta, target_gamma])
-
-        return self.target.tolist()
-    '''

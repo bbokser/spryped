@@ -20,12 +20,9 @@ import sys
 import curses
 
 import numpy as np
-
+import transforms3d
 import pybullet as p
 import pybullet_data
-
-# from osc import Control
-# from robot import Robot
 
 GRAVITY = -9.807
 
@@ -33,10 +30,10 @@ physicsClient = p.connect(p.GUI)
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.resetSimulation()
 planeID = p.loadURDF("plane.urdf")
-robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])
+robotStartOrientation = p.getQuaternionFromEuler([np.pi/8, np.pi/8, 0])
 
-bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 0.8],
-                 robotStartOrientation, useFixedBase=0, flags=p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER)
+bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 1.2],
+                 robotStartOrientation, useFixedBase=1, flags=p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER)
 
 p.setGravity(0, 0, GRAVITY)
 
@@ -61,7 +58,7 @@ class Runner:
         self.init_alpha = -np.pi / 2
         self.init_beta = 0  # can't control, ee Jacobian is zeros in that row
         self.init_gamma = 0
-        self.target_init = np.array([0, 0, -0.8325, self.init_alpha, self.init_beta, self.init_gamma])
+        self.target_init = np.array([0, 0, -0.6, self.init_alpha, self.init_beta, self.init_gamma])
         self.target_l = self.target_init
         self.target_r = self.target_init
 
@@ -88,20 +85,38 @@ class Runner:
             time.sleep(self.dt)
             # update target after specified period of time passes
             steps = steps + 1
+            base_orientation = p.getBasePositionAndOrientation(bot)[1]
+            base_orientation = transforms3d.quaternions.quat2mat(base_orientation)
+            trnsfrm = np.identity(3)  # coordinate transformation
+            trnsfrm[0] *= -1
+            trnsfrm[1] *= -1
+            base_orientation = np.dot(base_orientation, trnsfrm)
+            print(base_orientation)
+            # self.target_r = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
+            self.tau_r = self.controller_right.control(
+                leg=self.leg_right, target=self.target_r, base_orientation=base_orientation)
+            u_r = self.leg_right.apply_torque(u=self.tau_r, dt=self.dt)
+            # self.target_l = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
+            self.tau_l = self.controller_left.control(
+                leg=self.leg_left, target=self.target_l, base_orientation=base_orientation)
+            u_l = self.leg_left.apply_torque(u=self.tau_l, dt=self.dt)
 
+            '''
             if self.statemachine() == 1:
                 self.target_r = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
-                self.target_l = self.target_init
-            elif self.statemachine() == 0:
+                self.tau_r = self.controller_right.control(leg=self.leg_right, target=self.target_r)
+                u_r = self.leg_right.apply_torque(u=self.tau_r, dt=self.dt)
+
+                
+                # u_l = self.mpc_left.mpcontrol(leg=self.leg_left)  # and positions, velocities
+
+            else:
                 self.target_l = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
-                self.target_r = self.target_init
+                self.tau_l = self.controller_left.control(leg=self.leg_left, target=self.target_l)
+                u_l = self.leg_left.apply_torque(u=self.tau_l, dt=self.dt)
 
-            self.tau_l = self.controller_left.control(leg=self.leg_left, target=self.target_l)
-            self.tau_r = self.controller_right.control(leg=self.leg_right, target=self.target_r)
-
-            u_l = self.leg_left.apply_torque(u=self.tau_l, dt=self.dt)
-            u_r = self.leg_right.apply_torque(u=self.tau_r, dt=self.dt)
-
+                # u_r = self.mpc_right.mpcontrol(leg=self.leg_right)  # and positions, velocities
+            '''
             torque = np.zeros(8)
             torque[0:4] = u_l
             torque[0] *= -1  # readjust to match motor polarity
@@ -110,18 +125,16 @@ class Runner:
             # print(torque)
             p.setJointMotorControlArray(bot, jointArray, p.TORQUE_CONTROL, forces=torque)
 
-            baseorientation = p.getBasePositionAndOrientation(bot)[1]
-            # print(p.getEulerFromQuaternion(baseorientation))
-
             omega = p.getBaseVelocity(bot)[1]  # base angular velocity in global coordinates
 
             # fw kinematics
-            # print(np.transpose(np.append((leg_left.position()[:, -1]), (leg_right.position()[:, -1]))))
+            # print(np.transpose(np.append(np.dot(base_orientation, self.leg_left.position()[:, -1]),
+            #                              np.dot(base_orientation, self.leg_right.position()[:, -1]))))
             # joint velocity
-            # print("vel = ", leg_left.velocity())
+            # print("vel = ", self.leg_left.velocity())
             # encoder feedback
-            # print(np.transpose(np.append(leg_left.q, leg_right.q)))
-            print(self.statemachine())
+            # print(np.transpose(np.append(self.leg_left.q, self.leg_right.q)))
+
             sys.stdout.write("\033[F")  # back to previous line
             sys.stdout.write("\033[K")  # clear line
 

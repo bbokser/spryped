@@ -21,7 +21,7 @@ import numpy as np
 import csv
 
 import pybullet as p
-import transformations
+import transforms3d
 
 from RobotBase import RobotBase
 
@@ -137,7 +137,6 @@ class Leg(RobotBase):
         q = self.q if q is None else q
         q0 = q[0]
 
-        # L0 = self.L[0]
         l0 = self.coml[0]
 
         JCOM0 = np.zeros((6, 4))
@@ -155,7 +154,6 @@ class Leg(RobotBase):
         q1 = q[1]
 
         L0 = self.L[0]
-        L1 = self.L[1]
 
         l1 = self.coml[1]
 
@@ -181,7 +179,6 @@ class Leg(RobotBase):
 
         L0 = self.L[0]
         L1 = self.L[1]
-        # L2 = self.L[2]
 
         l2 = self.coml[2]
 
@@ -213,7 +210,6 @@ class Leg(RobotBase):
         L0 = self.L[0]
         L1 = self.L[1]
         L2 = self.L[2]
-        # L3 = self.L[3]
 
         l3 = self.coml[3]
 
@@ -381,7 +377,7 @@ class Leg(RobotBase):
             q2 = q[2]
             q3 = q[3]
 
-        REE = np.zeros((4, 4))
+        REE = np.zeros((3, 3))
         REE[0, 0] = np.cos(q1 + q2 + q3)
         REE[0, 1] = -np.sin(q1 + q2 + q3)
         REE[1, 0] = np.sin(q1 + q2 + q3)*np.cos(q0)
@@ -391,10 +387,9 @@ class Leg(RobotBase):
         REE[2, 1] = np.sin(q0)*np.cos(q1 + q2 + q3)
         REE[2, 2] = np.cos(q0)
         # REE[3, 3] = 1
-        q_e = transformations.unit_vector(
-            transformations.quaternion_from_matrix(REE))
-        # q_euler = transformations.euler_from_matrix(REE)
-        # print(q_euler)
+        q_e = transforms3d.quaternions.mat2quat(REE)
+        q_e = q_e / np.linalg.norm(q_e)  # convert to unit vector quaternion
+
         return q_e
 
     def ee_angle(self, q=None):

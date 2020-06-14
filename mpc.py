@@ -32,18 +32,18 @@ class Mpc:
         self.f_max = 5
         self.f_min = -self.f_max
 
-    def control(self, leg, x_dd_des=None):
+    def mpcontrol(self, leg, x_dd_des=None):
 
         theta = SX.sym('theta')
         p = SX.sym('p')
         omega = SX.sym('omega')
         pdot = SX.sym('pdot')
-        states = array([theta, p, omega, pdot]).T  # state vector x
+        states = np.array([theta, p, omega, pdot]).T  # state vector x
         n_states = len(states)  # number of states
 
         f1 = SX.sym('f1')  # controls
         f2 = SX.sym('f2')  # controls
-        controls = array([f1, f2]).T
+        controls = np.array([f1, f2]).T
         n_controls = len(controls)  # number of controls
 
         g = ([SX.zeros(1, 3), SX.zeros(1, 3), SX.zeros(1, 3), grav.T]).T
