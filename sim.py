@@ -30,7 +30,7 @@ physicsClient = p.connect(p.GUI)
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.resetSimulation()
 planeID = p.loadURDF("plane.urdf")
-robotStartOrientation = p.getQuaternionFromEuler([np.pi/8, np.pi/8, 0])
+robotStartOrientation = p.getQuaternionFromEuler([-np.pi/8, 0, 0])
 
 bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 1.2],
                  robotStartOrientation, useFixedBase=1, flags=p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER)
@@ -63,9 +63,7 @@ class Runner:
         self.target_r = self.target_init
 
     def run(self):
-
         # p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "file1.mp4")
-
         p.setTimeStep(self.dt)
 
         useRealTime = 0
@@ -85,13 +83,17 @@ class Runner:
             time.sleep(self.dt)
             # update target after specified period of time passes
             steps = steps + 1
-            base_orientation = p.getBasePositionAndOrientation(bot)[1]
+
+            base_or_p = np.array(p.getBasePositionAndOrientation(bot)[1])
+            # pybullet gives quaternions in xyzw format
+            # transforms3d takes quaternions in wxyz format, so you need to shift values
+            base_orientation = np.zeros(4)
+            base_orientation[0] = base_or_p[3]  # w
+            base_orientation[1] = base_or_p[0]  # x
+            base_orientation[2] = base_or_p[1]  # y
+            base_orientation[3] = base_or_p[2]  # z
             base_orientation = transforms3d.quaternions.quat2mat(base_orientation)
-            trnsfrm = np.identity(3)  # coordinate transformation
-            trnsfrm[0] *= -1
-            trnsfrm[1] *= -1
-            base_orientation = np.dot(base_orientation, trnsfrm)
-            print(base_orientation)
+
             # self.target_r = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
             self.tau_r = self.controller_right.control(
                 leg=self.leg_right, target=self.target_r, base_orientation=base_orientation)
@@ -107,7 +109,6 @@ class Runner:
                 self.tau_r = self.controller_right.control(leg=self.leg_right, target=self.target_r)
                 u_r = self.leg_right.apply_torque(u=self.tau_r, dt=self.dt)
 
-                
                 # u_l = self.mpc_left.mpcontrol(leg=self.leg_left)  # and positions, velocities
 
             else:
@@ -135,8 +136,8 @@ class Runner:
             # encoder feedback
             # print(np.transpose(np.append(self.leg_left.q, self.leg_right.q)))
 
-            sys.stdout.write("\033[F")  # back to previous line
-            sys.stdout.write("\033[K")  # clear line
+            # sys.stdout.write("\033[F")  # back to previous line
+            # sys.stdout.write("\033[K")  # clear line
 
             if useRealTime == 0:
                 p.stepSimulation()

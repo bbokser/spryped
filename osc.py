@@ -67,12 +67,6 @@ class Control(control.Control):
         self.kn[2, 2] = 0
         self.kn[3, 3] = 10
 
-        self.knd = np.zeros((4, 4))
-        self.knd[0, 0] = 0
-        self.knd[1, 1] = 0
-        self.knd[2, 2] = 0
-        self.knd[3, 3] = 1
-
     def control(self, leg, target, base_orientation, x_dd_des=None):
         """
         Generates a control signal to move the
@@ -138,8 +132,8 @@ class Control(control.Control):
             # calculate our secondary control signal
             # calculated desired joint angle acceleration
             prop_val = ((leg.ee_angle() - leg.q) + np.pi) % (np.pi * 2) - np.pi
-            q_des = (np.dot(self.kn, prop_val) +
-                     np.dot(self.knd, -leg.dq.reshape(-1, )))
+            q_des = (np.dot(self.kn, prop_val))
+            #        + np.dot(self.knd, -leg.dq.reshape(-1, )))
 
             Fq_null = np.dot(Mq, q_des)
 
@@ -154,7 +148,8 @@ class Control(control.Control):
 
         if self.leveler:
             # keeps toes level (for now)
-            u_level = np.dot(self.kn, np.dot(base_orientation[1, 1], leg.ee_angle()) - leg.q)
+            basey = transforms3d.euler.mat2euler(base_orientation, axes='ryxz')[0]  # get y axis rotation of base
+            u_level = np.dot(self.kn, -basey + leg.ee_angle() - leg.q)
             self.u += u_level
 
         # add in any additional signals
