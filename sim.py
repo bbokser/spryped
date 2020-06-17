@@ -30,7 +30,7 @@ physicsClient = p.connect(p.GUI)
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.resetSimulation()
 planeID = p.loadURDF("plane.urdf")
-robotStartOrientation = p.getQuaternionFromEuler([-np.pi/8, 0, 0])
+robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])
 
 bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 1.2],
                  robotStartOrientation, useFixedBase=1, flags=p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER)

@@ -124,7 +124,7 @@ class Control(control.Control):
 
         # add in velocity compensation in GC space for stability
         self.u = np.dot(JEE.T, Fx).reshape(-1, ) \
-            - np.dot(Mq, np.dot(self.kd, leg.dq)).flatten() - leg.gen_grav()
+            - np.dot(Mq, np.dot(self.kd, leg.dq)).flatten() - leg.gen_grav(base_orientation=base_orientation)
 
         # if null_control is selected, add a control signal in the
         # null space to try to move the leg to selected position

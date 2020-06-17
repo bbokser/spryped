@@ -91,7 +91,9 @@ class Leg(RobotBase):
         # mass matrices and gravity
         self.MM = []
         self.Fg = []
-        self.gravity = np.array([[0, 0, -9.81, 0, 0, 0]]).T
+        self.gravity = np.array([[0, 0, -9.81]]).T
+        self.extra = np.array([[0, 0, 0]]).T
+
         for i in range(0, 4):
             M = np.zeros((6, 6))
             fgi = np.zeros((6, 1))
@@ -106,8 +108,6 @@ class Leg(RobotBase):
             M[5, 4] = iyz[i]
             M[5, 5] = izz[i]
             self.MM.append(M)
-            fgi = float(self.mass[i])*self.gravity  # apply mass*gravity term to 3rd column (z axis)
-            self.Fg.append(fgi)
 
         self.k = 1
         self.angles = init_q
@@ -284,8 +284,13 @@ class Leg(RobotBase):
 
         return Mq
 
-    def gen_grav(self, q=None):
+    def gen_grav(self, base_orientation, q=None):
         # Generate gravity term g(q)
+        body_grav = np.dot(base_orientation.T, self.gravity)  # adjust gravity vector from body orientation pov
+        body_grav = np.append(body_grav, np.array([[0, 0, 0]]).T)
+        for i in range(0, 4):
+            fgi = float(self.mass[i])*body_grav  # apply mass*gravity
+            self.Fg.append(fgi)
 
         J0T = np.transpose(self.gen_jacCOM0(q=q))
         J1T = np.transpose(self.gen_jacCOM1(q=q))
