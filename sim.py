@@ -45,7 +45,7 @@ class Runner:
 
     def __init__(self, leg_left, leg_right,
                  controller_left, controller_right,
-                 mpc_left, mpc_right, dt=1e-3):
+                 mpc_left, mpc_right, contact_left, contact_right, dt=1e-3):
         self.dt = dt
         self.tau_l = None
         self.tau_r = None
@@ -61,11 +61,13 @@ class Runner:
         self.target_init = np.array([0, 0, -0.6, self.init_alpha, self.init_beta, self.init_gamma])
         self.target_l = self.target_init
         self.target_r = self.target_init
+        self.s_r = 1
+        self.s_l = 1
+        self.delay_term = 0
 
     def run(self):
         # p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "file1.mp4")
         p.setTimeStep(self.dt)
-
         useRealTime = 0
         p.setRealTimeSimulation(useRealTime)
 
@@ -118,6 +120,9 @@ class Runner:
 
                 # u_r = self.mpc_right.mpcontrol(leg=self.leg_right)  # and positions, velocities
             '''
+
+            # tau_d_left = self.contact_left.contact(leg=self.leg_left, g=self.leg_left.grav)
+            
             torque = np.zeros(8)
             torque[0:4] = u_l
             torque[0] *= -1  # readjust to match motor polarity
@@ -143,14 +148,18 @@ class Runner:
                 p.stepSimulation()
 
     def statemachine(self):
-        state = 1
-        left_torque_check = np.average(np.absolute(self.reaction_torques()[0:4]))
-        right_torque_check = np.average(np.absolute(self.reaction_torques()[4:8]))
+        # finite state machine
+        left_torque_check = self.reaction_torques()[0:4]
+        right_torque_check = self.reaction_torques()[4:8]
         if left_torque_check <= right_torque_check:
-            state = 1  # right swing
-        else:
-            state = 0  # left swing
-        return state
+            self.s_r = 1  # right swing
+        elif something:
+            self.s_r = 0  # left swing
+        if somethingelse:
+            self.s_l = 1
+        elif somethingother:
+            self.s_l = 0
+        return self.s_r, self.s_l
 
     def reaction_torques(self):
         # returns joint reaction torques

@@ -20,6 +20,7 @@ from sim import Runner
 import leg
 import osc
 import mpc
+import contact
 
 left = 1
 right = 0
@@ -35,7 +36,11 @@ controller_right = controller_class.Control(leg=leg_right, dt=dt)
 mpc_left = mpc.Mpc(leg=leg_left, dt=dt)
 mpc_right = mpc.Mpc(leg=leg_right, dt=dt)
 
+contact_left = contact.Contact(leg=leg_left, dt=dt)
+contact_right = contact.Contact(leg=leg_right, dt=dt)
+
 runner = Runner(dt=dt, leg_left=leg_left, leg_right=leg_right,
                 controller_left=controller_left, controller_right=controller_right,
-                mpc_left=mpc_left, mpc_right=mpc_right)
+                mpc_left=mpc_left, mpc_right=mpc_right,
+                contact_left=contact_left, contact_right=contact_right)
 runner.run()

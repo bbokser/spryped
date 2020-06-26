@@ -45,17 +45,17 @@ class Control(control.Control):
         self.kp[1, 1] = 2000
         self.kp[2, 2] = 2000
 
-        # self.kv = np.zeros((3, 3))
-        # self.kv[0, 0] = 10
-        # self.kv[1, 1] = 10
-        # self.kv[2, 2] = 10
-
+        self.kv = np.zeros((3, 3))
+        self.kv[0, 0] = 100
+        self.kv[1, 1] = 100
+        self.kv[2, 2] = 100
+        '''
         self.kd = np.zeros((4, 4))
         self.kd[0, 0] = 50
         self.kd[1, 1] = 50
         self.kd[2, 2] = 50
         self.kd[3, 3] = 100
-
+        '''
         self.ko = np.zeros((3, 3))
         self.ko[0, 0] = 100
         self.ko[1, 1] = 100
@@ -93,14 +93,14 @@ class Control(control.Control):
 
         self.x = np.dot(base_orientation, leg.position()[:, -1])  # multiply with rotation matrix for base to world
 
-        # Calculate operational space velocity vector
-        # self.velocity = (np.transpose(np.dot(JEE, leg.dq)).flatten())[0:3]
+        # calculate operational space velocity vector
+        self.velocity = np.dot(base_orientation, (np.transpose(np.dot(JEE, leg.dq)).flatten())[0:3])
 
-        # x_dd_des[:3] = np.dot(self.kp, (self.target[0:3] - self.x)) + np.dot(self.kv, -self.velocity)
-        x_dd_des[:3] = np.dot(self.kp, (self.target[0:3] - self.x))
+        # calculate linear acceleration term based on PD control
+        x_dd_des[:3] = np.dot(self.kp, (self.target[0:3] - self.x)) + np.dot(self.kv, -self.velocity)
 
         # calculate end effector orientation unit quaternion
-        q_e = leg.orientation()
+        q_e = leg.orientation(base_orientation=base_orientation)
 
         # calculate the target orientation unit quaternion
         q_d = transforms3d.euler.euler2quat(self.target[3], self.target[4], self.target[5], axes='rxyz')
@@ -120,11 +120,11 @@ class Control(control.Control):
         # calculate force
         Fx = np.dot(Mx, x_dd_des)
 
-        # self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - leg.gen_grav()
+        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - leg.gen_grav(base_orientation=base_orientation)
 
         # add in velocity compensation in GC space for stability
-        self.u = np.dot(JEE.T, Fx).reshape(-1, ) \
-            - np.dot(Mq, np.dot(self.kd, leg.dq)).flatten() - leg.gen_grav(base_orientation=base_orientation)
+        # self.u = np.dot(JEE.T, Fx).reshape(-1, ) \
+        #     - np.dot(Mq, np.dot(self.kd, leg.dq)).flatten() - leg.gen_grav(base_orientation=base_orientation)
 
         # if null_control is selected, add a control signal in the
         # null space to try to move the leg to selected position

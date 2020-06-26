@@ -28,14 +28,16 @@ from RobotBase import RobotBase
 
 class Leg(RobotBase):
     # first value in q and dq refer to BODY position
-    def __init__(self, init_q=None, init_dq=None, leg=None, **kwargs):
+    def __init__(self, leg, init_q=None, init_dq=None, **kwargs):
 
         if init_dq is None:
             init_dq = [0., 0., 0., 0.]  # just left leg
 
         if init_q is None:
             init_q = [-2 * np.pi / 4, np.pi * 32 / 180, -np.pi * 44.17556088 / 180, np.pi * 12.17556088 / 180.]
+
         self.DOF = 4
+
         RobotBase.__init__(self, init_q=init_q, init_dq=init_dq, **kwargs)
 
         values = []
@@ -369,7 +371,7 @@ class Leg(RobotBase):
         JEE = self.gen_jacEE(q=q)
         return np.dot(JEE, self.dq).flatten()
 
-    def orientation(self, q=None):
+    def orientation(self, base_orientation, q=None):
         # Calculate orientation of end effector in quaternions
         if q is None:
             q0 = self.q[0]
@@ -392,6 +394,7 @@ class Leg(RobotBase):
         REE[2, 1] = np.sin(q0)*np.cos(q1 + q2 + q3)
         REE[2, 2] = np.cos(q0)
         # REE[3, 3] = 1
+        REE = np.dot(base_orientation, REE)
         q_e = transforms3d.quaternions.mat2quat(REE)
         q_e = q_e / np.linalg.norm(q_e)  # convert to unit vector quaternion
 
