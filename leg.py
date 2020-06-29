@@ -288,7 +288,7 @@ class Leg(RobotBase):
 
     def gen_grav(self, base_orientation, q=None):
         # Generate gravity term g(q)
-        body_grav = np.dot(base_orientation.T, self.gravity)  # adjust gravity vector from body orientation pov
+        body_grav = np.dot(base_orientation.T, self.gravity)  # adjust gravity vector based on body orientation
         body_grav = np.append(body_grav, np.array([[0, 0, 0]]).T)
         for i in range(0, 4):
             fgi = float(self.mass[i])*body_grav  # apply mass*gravity

@@ -55,15 +55,19 @@ class Runner:
         self.controller_right = controller_right
         self.mpc_left = mpc_left
         self.mpc_right = mpc_right
+        self.contact_left = contact_left
+        self.contact_right = contact_right
+
         self.init_alpha = -np.pi / 2
         self.init_beta = 0  # can't control, ee Jacobian is zeros in that row
         self.init_gamma = 0
-        self.target_init = np.array([0, 0, -0.6, self.init_alpha, self.init_beta, self.init_gamma])
+        self.target_init = np.array([0, 0, -0.8, self.init_alpha, self.init_beta, self.init_gamma])
         self.target_l = self.target_init
         self.target_r = self.target_init
         self.s_r = 1
         self.s_l = 1
-        self.delay_term = 0
+        self.dist_force_l = None
+        self.dist_force_r = None
 
     def run(self):
         # p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "file1.mp4")
@@ -105,6 +109,21 @@ class Runner:
                 leg=self.leg_left, target=self.target_l, base_orientation=base_orientation)
             u_l = self.leg_left.apply_torque(u=self.tau_l, dt=self.dt)
 
+            dist_tau_l = self.contact_left.disturbance_torque(Mq=self.controller_left.Mq,
+                                                              dq=self.leg_left.dq,
+                                                              tau_actuated=self.tau_l,
+                                                              grav=self.controller_left.grav)
+            self.dist_force_l = np.dot(np.linalg.pinv(np.transpose(self.leg_left.gen_jacEE()[0:3])),
+                                       np.array(dist_tau_l))
+
+            dist_tau_r = self.contact_right.disturbance_torque(Mq=self.controller_right.Mq,
+                                                               dq=self.leg_right.dq,
+                                                               tau_actuated=self.tau_r,
+                                                               grav=self.controller_right.grav)
+            self.dist_force_r = np.dot(np.linalg.pinv(np.transpose(self.leg_right.gen_jacEE()[0:3])),
+                                       np.array(dist_tau_r))
+
+            # print(self.reaction_torques()[0:4])
             '''
             if self.statemachine() == 1:
                 self.target_r = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
@@ -122,7 +141,7 @@ class Runner:
             '''
 
             # tau_d_left = self.contact_left.contact(leg=self.leg_left, g=self.leg_left.grav)
-            
+
             torque = np.zeros(8)
             torque[0:4] = u_l
             torque[0] *= -1  # readjust to match motor polarity
@@ -149,16 +168,14 @@ class Runner:
 
     def statemachine(self):
         # finite state machine
-        left_torque_check = self.reaction_torques()[0:4]
-        right_torque_check = self.reaction_torques()[4:8]
-        if left_torque_check <= right_torque_check:
-            self.s_r = 1  # right swing
-        elif something:
+        if self.dist_force_l[2] <= 10:
+            self.s_r = 1  # left stance
+        else:
             self.s_r = 0  # left swing
-        if somethingelse:
-            self.s_l = 1
-        elif somethingother:
-            self.s_l = 0
+        if self.dist_force_r[2] <= 10:
+            self.s_l = 1  # right stance
+        else:
+            self.s_l = 0  # right swing
         return self.s_r, self.s_l
 
     def reaction_torques(self):

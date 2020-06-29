@@ -67,6 +67,10 @@ class Control(control.Control):
         self.kn[2, 2] = 0
         self.kn[3, 3] = 10
 
+        self.Mq = None
+
+        self.grav = None
+
     def control(self, leg, target, base_orientation, x_dd_des=None):
         """
         Generates a control signal to move the
@@ -86,8 +90,8 @@ class Control(control.Control):
         JEE = leg.gen_jacEE()[ctrlr_dof]
 
         # generate the mass matrix in end-effector space
-        Mq = leg.gen_Mq()
-        Mx = leg.gen_Mx(Mq=Mq, JEE=JEE)
+        self.Mq = leg.gen_Mq()
+        Mx = leg.gen_Mx(Mq=self.Mq, JEE=JEE)
 
         x_dd_des = np.zeros(6)  # [x, y, z, alpha, beta, gamma]
 
@@ -120,11 +124,13 @@ class Control(control.Control):
         # calculate force
         Fx = np.dot(Mx, x_dd_des)
 
-        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - leg.gen_grav(base_orientation=base_orientation)
+        self.grav = leg.gen_grav(base_orientation=base_orientation)
+
+        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - self.grav
 
         # add in velocity compensation in GC space for stability
         # self.u = np.dot(JEE.T, Fx).reshape(-1, ) \
-        #     - np.dot(Mq, np.dot(self.kd, leg.dq)).flatten() - leg.gen_grav(base_orientation=base_orientation)
+        #     - np.dot(Mq, np.dot(self.kd, leg.dq)).flatten() - self.grav
 
         # if null_control is selected, add a control signal in the
         # null space to try to move the leg to selected position

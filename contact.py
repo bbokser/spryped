@@ -29,16 +29,22 @@ class Contact:
 
         self.dt = dt
         self.delay_term = 0
-        self.tau_d = 0
-        la = 1  # lambda, cutoff frequency. PLACEHOLDER VALUE
+        self.tau_d = None
+        la = 15  # lambda, cutoff frequency. PLACEHOLDER VALUE
         self.gamma = np.exp(-la * self.dt)
         self.beta = (1 - self.gamma) / (self.gamma * self.dt)
 
-    def tau_d(self, p_k, tau, g, leg):
+    def disturbance_torque(self, Mq, dq, tau_actuated, grav):
         """
         Generalized momentum-based discrete time filtered disturbance torque observer
         Isolates disturbance torque from other sources
+        From:
+        Contact Model Fusion for Event-Based Locomotion in Unstructured Terrains
+        Gerardo Bledt, Patrick M. Wensing, Sam Ingersoll, and Sangbae Kim
         """
-        self.tau_d = self.gamma * self.delay_term + self.beta * p_k - (1 - self.gamma) * (self.beta * p + tau - g)
-        self.delay_term = self.tau_d - beta * p_k
+        p = np.dot(Mq, dq)
+        self.tau_d = self.gamma * self.delay_term \
+            + self.beta * p \
+            - (1 - self.gamma) * (self.beta * p + tau_actuated + grav)
+        self.delay_term = self.tau_d - self.beta * p
         return self.tau_d
