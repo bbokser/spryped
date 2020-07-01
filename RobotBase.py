@@ -31,6 +31,9 @@ class RobotBase:
         self.init_q = np.zeros(self.DOF) if init_q is None else init_q
         self.init_dq = np.zeros(self.DOF) if init_dq is None else init_dq
 
+        self.q = None
+        self.dq = None
+
     def apply_torque(self, u, dt):
         # Takes in a torque and timestep and updates the arm simulation accordingly.
 
@@ -80,8 +83,7 @@ class RobotBase:
 
         self.q = np.copy(self.init_q) if not q else np.copy(q)
         self.dq = np.copy(self.init_dq) if not dq else np.copy(dq)
-        self.t = 0.0
 
-    def update_state(self):
+    def update_state(self, q_in):
         # Update the state
         pass

@@ -20,14 +20,13 @@ import numpy as np
 # import math
 import csv
 
-import pybullet as p
 import transforms3d
 
 from RobotBase import RobotBase
 
 
 class Leg(RobotBase):
-    # first value in q and dq refer to BODY position
+
     def __init__(self, leg, init_q=None, init_dq=None, **kwargs):
 
         if init_dq is None:
@@ -111,27 +110,12 @@ class Leg(RobotBase):
             M[5, 5] = izz[i]
             self.MM.append(M)
 
-        self.k = 1
         self.angles = init_q
         self.q_previous = init_q
         self.dq_previous = init_dq
         self.kv = 0.05
         self.leg = leg
         self.reset()
-        self.update_state()
-
-    def apply_torque(self, u, dt=None, k=None):
-        # Takes in torque and timestep and updates robot accordingly
-
-        if dt is None:
-            dt = self.dt
-        if k is None:
-            k = self.k
-
-        u = -1 * k * np.array(u, dtype='float')
-
-        self.update_state()
-        return u
 
     def gen_jacCOM0(self, q=None):
         """Generates the Jacobian from the COM of the first
@@ -429,21 +413,10 @@ class Leg(RobotBase):
         if dq:
             assert len(dq) == self.DOF
 
-        self.update_state()  # is this necessary? Seems redundant
-
-    def update_state(self):
+    def update_state(self, q_in):
         # Update the local variables
-        # Pull values in from PyBullet, select relevant ones, reshape to 2D array
-        self.q = np.reshape([j[0] for j in p.getJointStates(1, range(0, 8))], (-1, 1))
-
-        if self.leg == 1:
-            self.q = self.q[0:4]
-            self.q[1] *= -1
-            self.q[2] *= -1
-            self.q[3] *= -1
-        elif self.leg == 0:
-            self.q = self.q[4:8]
-            self.q[3] *= -1
+        # Pull values in from simulator
+        self.q = q_in
 
         # Calibrate encoders
         self.q = np.add(self.q.flatten(), np.array([-2 * np.pi / 4, np.pi * 32 / 180,

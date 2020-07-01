@@ -25,7 +25,7 @@ import control
 
 class Control(control.Control):
     """
-    A controller that implements operational space control.
+    A controller that implements whole body control.
     Controls the (x,y,z) position of the end-effector.
     """
 
