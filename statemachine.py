@@ -14,55 +14,71 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from random import randint
-from time import clock
+
 
 class State:
-    def __init__(self, FSM):
-        self.FSM = FSM
-        self.timer = 0
-        self.startTime = 0
+    def __init__(self, fsm):
+        self.FSM = fsm
+        self.s = 0
+        self.sh = 0
 
     def enter(self):
         pass
 
-    def execute(self):
-        pass
+    def execute(self, s, sh):
+        self.s = s
+        self.sh = sh
 
     def exit(self):
         pass
 
 
-class Swing:
+class Swing(State):
     def __init__(self, fsm):
-        super().__init__()
+        super().__init__(fsm)
 
-    def execute(self):
-        print("swingin!")
+    def execute(self, s, sh):
+        super().execute(s, sh)
+        print("swinging.")
+        if self.s == 1 and self.sh == 1:
+            self.FSM.to_transition("toStance")
+        elif self.s == 0 and self.sh == 1:
+            self.FSM.to_transition("toEarly")
+        elif self.s == 1 and self.sh == 0:
+            self.FSM.to_transition("toLate")
 
 
-class Stance:
+class Stance(State):
     def __init__(self, fsm):
-        super().__init__()
+        super().__init__(fsm)
 
-    def execute(self):
-        print("standin!")
+    def execute(self, s, sh):
+        super().execute(s, sh)
+        print("standing.")
+        if self.s == 0:
+            self.FSM.to_transition("toSwing")
 
 
-class Late:
+class Early(State):
     def __init__(self, fsm):
-        super().__init__()
+        super().__init__(fsm)
 
-    def execute(self):
+    def execute(self, s, sh):
+        super().execute(s, sh)
+        print("early.")
+        if self.s == 1:
+            self.FSM.to_transition("toStance")
+
+
+class Late(State):
+    def __init__(self, fsm):
+        super().__init__(fsm)
+
+    def execute(self, s, sh):
+        super().execute(s, sh)
         print("late.")
-
-
-class Early:
-    def __init__(self, fsm):
-        super().__init__()
-
-    def execute(self):
-        print("early!?")
+        if self.sh == 1:
+            self.FSM.to_transition("toStance")
 
 
 class Transition:
@@ -97,14 +113,14 @@ class FSM:
         # set the transition state
         self.trans = self.transitions[to_trans]
 
-    def execute(self):
+    def execute(self, s, sh):
         if self.trans:
             self.curState.exit()
             self.trans.execute()
             self.setstate(self.trans.toState)
             self.curState.enter()
             self.trans = None
-        self.curState.execute()
+        self.curState.execute(s, sh)
 
 
 class Char:
@@ -125,9 +141,4 @@ class Char:
         self.FSM.setstate("Swing")
 
     def execute(self):
-        self.FSM.execute()
-
-
-if __name__ == "__main__":
-    gait_l = Char()
-    gait_l.FSM.execute()
+        self.FSM.execute(s, sh)

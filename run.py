@@ -22,6 +22,7 @@ import wbc
 import mpc
 import contact
 import simulationbridge
+import statemachine
 
 left = 1
 right = 0
@@ -42,10 +43,14 @@ contact_right = contact.Contact(leg=leg_right, dt=dt)
 
 simulator = simulationbridge.Sim(dt=dt)
 
+gait_l = statemachine.Char()
+gait_r = statemachine.Char()
+
 runner = Runner(dt=dt, leg_left=leg_left, leg_right=leg_right,
                 controller_left=controller_left, controller_right=controller_right,
                 mpc_left=mpc_left, mpc_right=mpc_right,
                 contact_left=contact_left, contact_right=contact_right,
-                simulator=simulator)
+                simulator=simulator,
+                gait_l=gait_l, gait_r=gait_r)
 runner.run()
 

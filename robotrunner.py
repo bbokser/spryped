@@ -29,7 +29,7 @@ class Runner:
     def __init__(self, leg_left, leg_right,
                  controller_left, controller_right,
                  mpc_left, mpc_right, contact_left, contact_right,
-                 simulator, dt=1e-3):
+                 simulator, gait_l, gait_r, dt=1e-3):
 
         self.dt = dt
         self.u_l = np.zeros(4)
@@ -43,6 +43,8 @@ class Runner:
         self.contact_left = contact_left
         self.contact_right = contact_right
         self.simulator = simulator
+        self.gait_l = gait_l
+        self.gait_r = gait_r
 
         self.init_alpha = -np.pi / 2
         self.init_beta = 0  # can't control, ee Jacobian is zeros in that row
@@ -52,18 +54,19 @@ class Runner:
         self.target_r = self.target_init
         self.sh_l = 1  # estimated contact state (left)
         self.sh_r = 1  # estimated contact state (right)
-        self.dist_force_l = None
-        self.dist_force_r = None
+        self.dist_force_l = np.array([0, 0, 0])
+        self.dist_force_r = np.array([0, 0, 0])
+
+        self.t_p = 4  # gait period, seconds
+        self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Switches b/t swing and stance
 
     def run(self):
 
         steps = 0
-
         t = 0  # time
-        t_p = 4  # gait period, seconds
-        phi_switch = 0.75  # switching phase, user determined, must be between 0 and 1. Switches b/t swing and stance
+
         t0_l = t  # starting time, left leg
-        t0_r = t + t_p/2  # starting time, right leg. Half a period out of phase with left
+        t0_r = t0_l + self.t_p/2  # starting time, right leg. Half a period out of phase with left
 
         while 1:
             time.sleep(self.dt)
@@ -72,18 +75,13 @@ class Runner:
             t = t + self.dt
 
             # gait scheduler
-            phi_l = np.mod((t - t0_l) / t_p, 1)
-            phi_r = np.mod((t - t0_r) / t_p, 1)
+            s_l = self.gait_scheduler(t, t0_l)
+            s_r = self.gait_scheduler(t, t0_r)
+            sh_l = self.gait_estimator(self.dist_force_l[2])
+            sh_r = self.gait_estimator(self.dist_force_r[2])
 
-            if phi_r > phi_switch:
-                s_r = 0  # scheduled swing
-            else:
-                s_r = 1  # scheduled stance
-
-            if phi_l > phi_switch:
-                s_l = 0  # scheduled swing
-            else:
-                s_l = 1  # scheduled stance
+            self.gait_l.FSM.execute(s_l, sh_l)
+            self.gait_r.FSM.execute(s_r, sh_r)
 
             # run simulator to get encoder and IMU feedback
             # put an if statement here once we have hardware bridge too
@@ -122,7 +120,7 @@ class Runner:
                                                                grav=self.controller_right.grav)
             self.dist_force_r = np.dot(np.linalg.pinv(np.transpose(self.leg_right.gen_jacEE()[0:3])),
                                        np.array(dist_tau_r))
-
+            # print(self.dist_force_l[2])
             # print(self.reaction_torques()[0:4])
             '''
             if self.statemachine() == 1:
@@ -142,11 +140,9 @@ class Runner:
 
             # tau_d_left = self.contact_left.contact(leg=self.leg_left, g=self.leg_left.grav)
 
-            # print(torque)
-
             # fw kinematics
-            print(np.transpose(np.append(np.dot(base_orientation, self.leg_left.position()[:, -1]),
-                                         np.dot(base_orientation, self.leg_right.position()[:, -1]))))
+            # print(np.transpose(np.append(np.dot(base_orientation, self.leg_left.position()[:, -1]),
+            #                              np.dot(base_orientation, self.leg_right.position()[:, -1]))))
             # joint velocity
             # print("vel = ", self.leg_left.velocity())
             # encoder feedback
@@ -155,20 +151,26 @@ class Runner:
             # sys.stdout.write("\033[F")  # back to previous line
             # sys.stdout.write("\033[K")  # clear line
 
-    def statemachine(self):
-        # finite state machine
+    def gait_scheduler(self, t, t0):
+        # Add variable period later
+        phi = np.mod((t - t0) / self.t_p, 1)
 
-        if self.dist_force_l[2] <= 10:
-            self.sh_r = 1  # left stance
+        if phi > self.phi_switch:
+            s = 0  # scheduled swing
         else:
-            self.sh_r = 0  # left swing
+            s = 1  # scheduled stance
 
-        if self.dist_force_r[2] <= 10:
-            self.sh_l = 1  # right stance
+        return s
+
+    def gait_estimator(self, dist_force):
+        # Determines whether foot is actually in contact or not
+
+        if dist_force >= 10:
+            sh = 1  # stance
         else:
-            self.sh_l = 0  # right swing
+            sh = 0  # swing
 
-        return self.sh_r, self.s_l
+        return sh
 
 
 
