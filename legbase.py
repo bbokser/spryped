@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import numpy as np
 
 
-class RobotBase:
+class LegBase:
 
     def __init__(self, init_q=None, init_dq=None,
                  dt=1e-3, singularity_thresh=0.00025, options=None):

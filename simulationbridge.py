@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import time
-import sys
-import curses
-
 import numpy as np
 import transforms3d
 import pybullet as p
@@ -42,6 +38,7 @@ p.setGravity(0, 0, GRAVITY)
 jointArray = range(p.getNumJoints(bot))
 
 useRealTime = 0
+
 
 def reaction_torques():
     # returns joint reaction torques
@@ -72,9 +69,6 @@ class Sim:
             p.enableJointForceTorqueSensor(bot, i, 1)  # enable joint torque sensing
 
     def sim_run(self, u_l, u_r):
-        
-        time.sleep(self.dt)
-        # update target after specified period of time passes
 
         base_or_p = np.array(p.getBasePositionAndOrientation(bot)[1])
         # pybullet gives quaternions in xyzw format

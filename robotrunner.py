@@ -50,8 +50,8 @@ class Runner:
         self.target_init = np.array([0, 0, -0.8, self.init_alpha, self.init_beta, self.init_gamma])
         self.target_l = self.target_init
         self.target_r = self.target_init
-        self.s_r = 1
-        self.s_l = 1
+        self.sh_l = 1  # estimated contact state (left)
+        self.sh_r = 1  # estimated contact state (right)
         self.dist_force_l = None
         self.dist_force_r = None
 
@@ -59,11 +59,34 @@ class Runner:
 
         steps = 0
 
+        t = 0  # time
+        t_p = 4  # gait period, seconds
+        phi_switch = 0.75  # switching phase, user determined, must be between 0 and 1. Switches b/t swing and stance
+        t0_l = t  # starting time, left leg
+        t0_r = t + t_p/2  # starting time, right leg. Half a period out of phase with left
+
         while 1:
             time.sleep(self.dt)
             # update target after specified period of time passes
             steps = steps + 1
+            t = t + self.dt
 
+            # gait scheduler
+            phi_l = np.mod((t - t0_l) / t_p, 1)
+            phi_r = np.mod((t - t0_r) / t_p, 1)
+
+            if phi_r > phi_switch:
+                s_r = 0  # scheduled swing
+            else:
+                s_r = 1  # scheduled stance
+
+            if phi_l > phi_switch:
+                s_l = 0  # scheduled swing
+            else:
+                s_l = 1  # scheduled stance
+
+            # run simulator to get encoder and IMU feedback
+            # put an if statement here once we have hardware bridge too
             q, base_orientation = self.simulator.sim_run(u_l=self.u_l, u_r=self.u_r)
 
             q_left = q[0:4]
@@ -74,6 +97,7 @@ class Runner:
             q_right = q[4:8]
             q_right[3] *= -1
 
+            # enter encoder values into leg kinematics/dynamics
             self.leg_left.update_state(q_in=q_left)
             self.leg_right.update_state(q_in=q_right)
 
@@ -121,8 +145,8 @@ class Runner:
             # print(torque)
 
             # fw kinematics
-            # print(np.transpose(np.append(np.dot(base_orientation, self.leg_left.position()[:, -1]),
-            #                              np.dot(base_orientation, self.leg_right.position()[:, -1]))))
+            print(np.transpose(np.append(np.dot(base_orientation, self.leg_left.position()[:, -1]),
+                                         np.dot(base_orientation, self.leg_right.position()[:, -1]))))
             # joint velocity
             # print("vel = ", self.leg_left.velocity())
             # encoder feedback
@@ -133,12 +157,20 @@ class Runner:
 
     def statemachine(self):
         # finite state machine
+
         if self.dist_force_l[2] <= 10:
-            self.s_r = 1  # left stance
+            self.sh_r = 1  # left stance
         else:
-            self.s_r = 0  # left swing
+            self.sh_r = 0  # left swing
+
         if self.dist_force_r[2] <= 10:
-            self.s_l = 1  # right stance
+            self.sh_l = 1  # right stance
         else:
-            self.s_l = 0  # right swing
-        return self.s_r, self.s_l
+            self.sh_l = 0  # right swing
+
+        return self.sh_r, self.s_l
+
+
+
+
+

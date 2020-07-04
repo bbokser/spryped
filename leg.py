@@ -22,10 +22,10 @@ import csv
 
 import transforms3d
 
-from RobotBase import RobotBase
+from legbase import LegBase
 
 
-class Leg(RobotBase):
+class Leg(LegBase):
 
     def __init__(self, leg, init_q=None, init_dq=None, **kwargs):
 
@@ -37,7 +37,7 @@ class Leg(RobotBase):
 
         self.DOF = 4
 
-        RobotBase.__init__(self, init_q=init_q, init_dq=init_dq, **kwargs)
+        LegBase.__init__(self, init_q=init_q, init_dq=init_dq, **kwargs)
 
         values = []
         with open('spryped_urdf_rev06/spryped_data.csv', 'r') as csvfile:
@@ -423,6 +423,6 @@ class Leg(RobotBase):
                                                    -np.pi * 44.17556088 / 180, np.pi * 12.17556088 / 180.]))
         # self.dq = np.reshape([j[1] for j in p.getJointStates(1, range(0, 4))], (-1, 1))
         self.dq = [i * self.kv for i in self.dq_previous] + (self.q - self.q_previous) / self.dt
-        # check--are you sure this only happens once per time step?
+        # Make sure this only happens once per time step
         self.dq_previous = self.dq
         self.q_previous = self.q
