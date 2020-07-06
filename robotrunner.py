@@ -20,6 +20,7 @@ import sys
 import curses
 
 import numpy as np
+from scipy.interpolate import CubicSpline
 
 np.set_printoptions(suppress=True, linewidth=np.nan)
 
@@ -49,7 +50,7 @@ class Runner:
         self.init_alpha = -np.pi / 2
         self.init_beta = 0  # can't control, ee Jacobian is zeros in that row
         self.init_gamma = 0
-        self.target_init = np.array([0, 0, -0.8, self.init_alpha, self.init_beta, self.init_gamma])
+        self.target_init = np.array([0, 0, -0.8325, self.init_alpha, self.init_beta, self.init_gamma])
         self.target_l = self.target_init
         self.target_r = self.target_init
         self.sh_l = 1  # estimated contact state (left)
@@ -57,8 +58,8 @@ class Runner:
         self.dist_force_l = np.array([0, 0, 0])
         self.dist_force_r = np.array([0, 0, 0])
 
-        self.t_p = 4  # gait period, seconds
-        self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Switches b/t swing and stance
+        self.t_p = 2  # gait period, seconds
+        self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Percentage of gait spent in contact.
 
     def run(self):
 
@@ -73,15 +74,6 @@ class Runner:
             # update target after specified period of time passes
             steps = steps + 1
             t = t + self.dt
-
-            # gait scheduler
-            s_l = self.gait_scheduler(t, t0_l)
-            s_r = self.gait_scheduler(t, t0_r)
-            sh_l = self.gait_estimator(self.dist_force_l[2])
-            sh_r = self.gait_estimator(self.dist_force_r[2])
-
-            self.gait_l.FSM.execute(s_l, sh_l)
-            self.gait_r.FSM.execute(s_r, sh_r)
 
             # run simulator to get encoder and IMU feedback
             # put an if statement here once we have hardware bridge too
@@ -99,44 +91,46 @@ class Runner:
             self.leg_left.update_state(q_in=q_left)
             self.leg_right.update_state(q_in=q_right)
 
-            # self.target_r = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
+            # gait scheduler
+            s_l = self.gait_scheduler(t, t0_l)
+            s_r = self.gait_scheduler(t, t0_r)
+            sh_l = self.gait_estimator(self.dist_force_l[2])
+            sh_r = self.gait_estimator(self.dist_force_r[2])
+
+            self.gait_l.FSM.execute(s_l, sh_l)
+            self.gait_r.FSM.execute(s_r, sh_r)
+
+            # set target position
+            self.target_r = self.traj(0, 0.5, 0, 0.2)[:, steps]
+            self.target_r = np.hstack(np.append(self.target_r,
+                                                np.array([self.init_alpha, self.init_beta, self.init_gamma])))
+            # calculate wbc control signal
             self.u_r = -self.controller_right.control(
                 leg=self.leg_right, target=self.target_r, base_orientation=base_orientation)
 
-            # self.target_l = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
+            # set target position
+            self.target_l = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
+            # calculate wbc control signal
             self.u_l = -self.controller_left.control(
                 leg=self.leg_left, target=self.target_l, base_orientation=base_orientation)
 
+            # receive disturbance torques
             dist_tau_l = self.contact_left.disturbance_torque(Mq=self.controller_left.Mq,
                                                               dq=self.leg_left.dq,
                                                               tau_actuated=-self.u_l,
                                                               grav=self.controller_left.grav)
-            self.dist_force_l = np.dot(np.linalg.pinv(np.transpose(self.leg_left.gen_jacEE()[0:3])),
-                                       np.array(dist_tau_l))
-
             dist_tau_r = self.contact_right.disturbance_torque(Mq=self.controller_right.Mq,
                                                                dq=self.leg_right.dq,
                                                                tau_actuated=-self.u_r,
                                                                grav=self.controller_right.grav)
+            # convert disturbance torques to forces
+            self.dist_force_l = np.dot(np.linalg.pinv(np.transpose(self.leg_left.gen_jacEE()[0:3])),
+                                       np.array(dist_tau_l))
             self.dist_force_r = np.dot(np.linalg.pinv(np.transpose(self.leg_right.gen_jacEE()[0:3])),
                                        np.array(dist_tau_r))
+
             # print(self.dist_force_l[2])
             # print(self.reaction_torques()[0:4])
-            '''
-            if self.statemachine() == 1:
-                self.target_r = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
-                self.tau_r = self.controller_right.control(leg=self.leg_right, target=self.target_r)
-                u_r = self.leg_right.apply_torque(u=self.tau_r, dt=self.dt)
-
-                # u_l = self.mpc_left.mpcontrol(leg=self.leg_left)  # and positions, velocities
-
-            else:
-                self.target_l = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
-                self.tau_l = self.controller_left.control(leg=self.leg_left, target=self.target_l)
-                u_l = self.leg_left.apply_torque(u=self.tau_l, dt=self.dt)
-
-                # u_r = self.mpc_right.mpcontrol(leg=self.leg_right)  # and positions, velocities
-            '''
 
             # tau_d_left = self.contact_left.contact(leg=self.leg_left, g=self.leg_left.grav)
 
@@ -171,6 +165,28 @@ class Runner:
             sh = 0  # swing
 
         return sh
+
+    def traj(self, x_prev, x_d, y_prev, y_d):
+        # Generates Bezier curve trajectory for foot swing
+
+        # number of time steps allotted for swing trajectory
+        timesteps = self.t_p * (1 - self.phi_switch) / self.dt
+        if not timesteps.is_integer():
+            print("Error: period and timesteps are not divisible")  # if t_p is variable
+        path = np.zeros(int(timesteps))
+
+        horizontal = np.array([0.0, timesteps/2, timesteps])
+        vertical = np.array([-0.8325, -0.7, -0.8325])
+        cs = CubicSpline(horizontal, vertical)
+
+        # create evenly spaced sample points of desired trajectory
+        for t in range(int(timesteps)):
+            path[t] = cs(t)
+        z_traj = path
+        x_traj = np.linspace(x_prev, x_d, timesteps)
+        y_traj = np.linspace(y_prev, y_d, timesteps)
+
+        return np.array([x_traj.T, y_traj.T, z_traj.T])
 
 
 

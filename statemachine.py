@@ -40,6 +40,9 @@ class Swing(State):
     def execute(self, s, sh):
         super().execute(s, sh)
         print("swinging.")
+        # self.target_l = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
+        # self.tau_l = self.controller_left.control(leg=self.leg_left, target=self.target_l)
+
         if self.s == 1 and self.sh == 1:
             self.FSM.to_transition("toStance")
         elif self.s == 0 and self.sh == 1:
@@ -55,6 +58,8 @@ class Stance(State):
     def execute(self, s, sh):
         super().execute(s, sh)
         print("standing.")
+        # u_l = self.mpc_left.mpcontrol(leg=self.leg_left)  # and positions, velocities
+        # u_r = self.mpc_right.mpcontrol(leg=self.leg_right)  # and positions, velocities
         if self.s == 0:
             self.FSM.to_transition("toSwing")
 
