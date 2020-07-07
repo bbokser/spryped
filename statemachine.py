@@ -14,20 +14,20 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+from scipy.interpolate import CubicSpline
 
 
 class State:
     def __init__(self, fsm):
         self.FSM = fsm
-        self.s = 0
-        self.sh = 0
 
     def enter(self):
         pass
 
-    def execute(self, s, sh):
-        self.s = s
-        self.sh = sh
+    def execute(self):
+        # self.s = s
+        # self.sh = sh
+        pass
 
     def exit(self):
         pass
@@ -37,9 +37,18 @@ class Swing(State):
     def __init__(self, fsm):
         super().__init__(fsm)
 
-    def execute(self, s, sh):
-        super().execute(s, sh)
+    def execute(self):
+        # super().execute(s, sh)
         print("swinging.")
+
+        # set target position
+        target = self.traj(0, 0.5, 0, 0.2)[:, steps]
+        target = np.hstack(np.append(target,
+                                     np.array([self.init_alpha, self.init_beta, self.init_gamma])))
+        # calculate wbc control signal
+        u = -self.controller_right.control(
+            leg=self.leg_right, target=target, base_orientation=base_orientation)
+
         # self.target_l = np.array([0, 0, -0.7, self.init_alpha, self.init_beta, self.init_gamma])
         # self.tau_l = self.controller_left.control(leg=self.leg_left, target=self.target_l)
 
@@ -50,26 +59,37 @@ class Swing(State):
         elif self.s == 1 and self.sh == 0:
             self.FSM.to_transition("toLate")
 
+        return u
+
 
 class Stance(State):
     def __init__(self, fsm):
         super().__init__(fsm)
 
-    def execute(self, s, sh):
-        super().execute(s, sh)
+    def execute(self):
+        # super().execute(s, sh)
         print("standing.")
-        # u_l = self.mpc_left.mpcontrol(leg=self.leg_left)  # and positions, velocities
-        # u_r = self.mpc_right.mpcontrol(leg=self.leg_right)  # and positions, velocities
         if self.s == 0:
             self.FSM.to_transition("toSwing")
+
+        # set target position
+        target = np.array([0, 0, -0.8235, self.init_alpha, self.init_beta, self.init_gamma])
+        # calculate wbc control signal
+        u = -self.controller_left.control(
+            leg=self.leg, target=target, base_orientation=self.base_orientation)
+
+        # u_l = self.mpc_left.mpcontrol(leg=self.leg_left)  # and positions, velocities
+        # u_r = self.mpc_right.mpcontrol(leg=self.leg_right)  # and positions, velocities
+
+        return u
 
 
 class Early(State):
     def __init__(self, fsm):
         super().__init__(fsm)
 
-    def execute(self, s, sh):
-        super().execute(s, sh)
+    def execute(self):
+        # super().execute(s, sh)
         print("early.")
         if self.s == 1:
             self.FSM.to_transition("toStance")
@@ -79,8 +99,7 @@ class Late(State):
     def __init__(self, fsm):
         super().__init__(fsm)
 
-    def execute(self, s, sh):
-        super().execute(s, sh)
+    def execute(self):
         print("late.")
         if self.sh == 1:
             self.FSM.to_transition("toStance")
@@ -103,6 +122,16 @@ class FSM:
         self.prevState = None
         self.trans = None
 
+        self.s = None
+        self.sh = None
+        self.t_p = None
+        self.phi_switch = phi_switch
+        self.base_orientation = None
+        self.leg = None
+        self.init_alpha = -np.pi / 2
+        self.init_beta = 0  # can't control, ee Jacobian is zeros in that row
+        self.init_gamma = 0
+
     def add_transition(self, transname, transition):
         self.transitions[transname] = transition
 
@@ -118,14 +147,42 @@ class FSM:
         # set the transition state
         self.trans = self.transitions[to_trans]
 
-    def execute(self, s, sh):
+    def execute(self, s, sh, t_p, base_orientation, leg):
+        self.s = s
+        self.sh = sh
+        self.base_orientation = base_orientation
+        self.leg = leg
+        self.t_p = t_p
+
         if self.trans:
             self.curState.exit()
             self.trans.execute()
             self.setstate(self.trans.toState)
             self.curState.enter()
             self.trans = None
-        self.curState.execute(s, sh)
+        self.curState.execute()
+
+    def traj(self, x_prev, x_d, y_prev, y_d):
+        # Generates cubic spline curve trajectory for foot swing
+
+        # number of time steps allotted for swing trajectory
+        timesteps = self.t_p * (1 - self.phi_switch) / self.dt
+        if not timesteps.is_integer():
+            print("Error: period and timesteps are not divisible")  # if t_p is variable
+        path = np.zeros(int(timesteps))
+
+        horizontal = np.array([0.0, timesteps / 2, timesteps])
+        vertical = np.array([-0.8325, -0.7, -0.8325])  # z position
+        cs = CubicSpline(horizontal, vertical)
+
+        # create evenly spaced sample points of desired trajectory
+        for t in range(int(timesteps)):
+            path[t] = cs(t)
+        z_traj = path
+        x_traj = np.linspace(x_prev, x_d, timesteps)
+        y_traj = np.linspace(y_prev, y_d, timesteps)
+
+        return np.array([x_traj.T, y_traj.T, z_traj.T])
 
 
 class Char:
@@ -146,4 +203,5 @@ class Char:
         self.FSM.setstate("Swing")
 
     def execute(self):
-        self.FSM.execute(s, sh)
+        self.FSM.execute(s, sh, base_orientation, leg)
+
