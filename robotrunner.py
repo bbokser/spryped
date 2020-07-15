@@ -46,9 +46,9 @@ class Runner:
         self.gait_l = gait_l
         self.gait_r = gait_r
 
-        self.target_init = np.array([0, 0, -0.8325, self.init_alpha, self.init_beta, self.init_gamma])
-        self.target_l = self.target_init
-        self.target_r = self.target_init
+        # self.target_init = np.array([0, 0, -0.8325, self.init_alpha, self.init_beta, self.init_gamma])
+        # self.target_l = self.target_init
+        # self.target_r = self.target_init
         self.sh_l = 1  # estimated contact state (left)
         self.sh_r = 1  # estimated contact state (right)
         self.dist_force_l = np.array([0, 0, 0])
@@ -93,8 +93,11 @@ class Runner:
             sh_l = self.gait_estimator(self.dist_force_l[2])
             sh_r = self.gait_estimator(self.dist_force_r[2])
 
-            self.u_l = self.gait_l.FSM.execute(s_l, sh_l, base_orientation=base_orientation, leg=self.leg_left)
-            self.u_r = self.gait_r.FSM.execute(s_r, sh_r, base_orientation=base_orientation, leg=self.leg_right)
+            self.u_l = self.gait_l.FSM.execute(s_l, sh_l, t_p=self.t_p,
+                                               base_orientation=base_orientation, leg=self.leg_left, dt=self.dt)
+            # print(self.u_l)
+            self.u_r = self.gait_r.FSM.execute(s_r, sh_r, t_p=self.t_p,
+                                               base_orientation=base_orientation, leg=self.leg_right, dt=self.dt)
             '''
             # set target position
             self.target_r = self.traj(0, 0.5, 0, 0.2)[:, steps]

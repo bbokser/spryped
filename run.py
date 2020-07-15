@@ -43,8 +43,8 @@ contact_right = contact.Contact(leg=leg_right, dt=dt)
 
 simulator = simulationbridge.Sim(dt=dt)
 
-gait_l = statemachine.Char()
-gait_r = statemachine.Char()
+gait_l = statemachine.Char(controller=controller_left)
+gait_r = statemachine.Char(controller=controller_right)
 
 runner = Runner(dt=dt, leg_left=leg_left, leg_right=leg_right,
                 controller_left=controller_left, controller_right=controller_right,
