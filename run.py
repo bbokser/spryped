@@ -17,40 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from robotrunner import Runner
 
-import leg
-import wbc
-import mpc
-import contact
-import simulationbridge
-import statemachine
 
-left = 1
-right = 0
 dt = 1e-3
 
-leg_left = leg.Leg(dt=dt, leg=left)
-leg_right = leg.Leg(dt=dt, leg=right)
+runner = Runner(dt=dt)
 
-controller_class = wbc
-controller_left = controller_class.Control(leg=leg_left, dt=dt)
-controller_right = controller_class.Control(leg=leg_right, dt=dt)
-
-mpc_left = mpc.Mpc(leg=leg_left, dt=dt)
-mpc_right = mpc.Mpc(leg=leg_right, dt=dt)
-
-contact_left = contact.Contact(leg=leg_left, dt=dt)
-contact_right = contact.Contact(leg=leg_right, dt=dt)
-
-simulator = simulationbridge.Sim(dt=dt)
-
-gait_l = statemachine.Char(controller=controller_left)
-gait_r = statemachine.Char(controller=controller_right)
-
-runner = Runner(dt=dt, leg_left=leg_left, leg_right=leg_right,
-                controller_left=controller_left, controller_right=controller_right,
-                mpc_left=mpc_left, mpc_right=mpc_right,
-                contact_left=contact_left, contact_right=contact_right,
-                simulator=simulator,
-                gait_l=gait_l, gait_r=gait_r)
 runner.run()
-

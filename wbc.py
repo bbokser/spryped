@@ -68,8 +68,9 @@ class Control(control.Control):
         self.kn[3, 3] = 10
 
         self.Mq = None
-
+        self.x = None
         self.grav = None
+        self.velocity = None
 
     def control(self, leg, target, base_orientation, x_dd_des=None):
         """
