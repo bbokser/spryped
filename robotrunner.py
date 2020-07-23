@@ -25,6 +25,7 @@ import time
 import sys
 import curses
 
+import transforms3d
 import numpy as np
 from scipy.interpolate import CubicSpline
 
@@ -47,8 +48,8 @@ class Runner:
         controller_class = wbc
         self.controller_left = controller_class.Control(leg=self.leg_left, dt=dt)
         self.controller_right = controller_class.Control(leg=self.leg_right, dt=dt)
-        self.mpc_left = mpc.Mpc(leg=self.leg_left, dt=dt)
-        self.mpc_right = mpc.Mpc(leg=self.leg_right, dt=dt)
+        self.mpc_left = mpc.Mpc(leg=self.leg_left, m=12.12427, dt=dt)
+        self.mpc_right = mpc.Mpc(leg=self.leg_right, m=12.12427, dt=dt)
         self.contact_left = contact.Contact(leg=self.leg_left, dt=dt)
         self.contact_right = contact.Contact(leg=self.leg_right, dt=dt)
         self.simulator = simulationbridge.Sim(dt=dt)
@@ -63,7 +64,7 @@ class Runner:
         self.dist_force_l = np.array([0, 0, 0])
         self.dist_force_r = np.array([0, 0, 0])
 
-        self.t_p = 2  # gait period, seconds
+        self.t_p = 0.5  # gait period, seconds
         self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Percentage of gait spent in contact.
 
         self.gait_left = Gait(controller=self.controller_left, robotleg=self.leg_left,
@@ -89,7 +90,7 @@ class Runner:
             # update target after specified period of time passes
             steps += 1
             t = t + self.dt
-
+            # print(t)
             # run simulator to get encoder and IMU feedback
             # put an if statement here once we have hardware bridge too
             q, base_orientation = self.simulator.sim_run(u_l=self.u_l, u_r=self.u_r)
@@ -114,10 +115,26 @@ class Runner:
 
             state_l = self.state_left.FSM.execute(s_l, sh_l)
             state_r = self.state_right.FSM.execute(s_r, sh_r)
-
+            # print(state_l, sh_l, self.dist_force_l[2])
             # forward kinematics
             pos_l = np.dot(base_orientation, self.leg_left.position()[:, -1])
             pos_r = np.dot(base_orientation, self.leg_right.position()[:, -1])
+
+            # yaw angle
+            phi = transforms3d.euler.mat2euler(base_orientation, axes='szyx')[0]
+            # angular velocity
+            c_phi = np.cos(phi)
+            s_phi = np.sin(phi)
+            # rotation matrix Rz(phi)
+            rz_phi = np.zeros((3, 3))
+            rz_phi[0, 0] = c_phi
+            rz_phi[0, 1] = s_phi
+            rz_phi[1, 0] = -c_phi
+            rz_phi[1, 1] = s_phi
+            rz_phi[2, 2] = 1
+
+            # omega = transforms3d.euler.quat2euler(self.simulator.omega, axes='szyx')
+            v = self.simulator.v
 
             # calculate wbc control signal
             self.u_l = self.gait_left.u(state=state_l,
@@ -176,12 +193,25 @@ class Runner:
     def gait_estimator(self, dist_force):
         # Determines whether foot is actually in contact or not
 
-        if dist_force >= 10:
+        if dist_force >= 50:
             sh = 1  # stance
         else:
             sh = 0  # swing
 
         return sh
+
+    def footstep(self, robotleg, rz_phi, v, omega, t_stance, v_d):
+        # plans next footstep location
+        if robotleg == 1:
+            l_i = 0.144  # left hip length
+        else:
+            l_i = -0.144  # right hip length
+
+        p_hip = np.dot(rz_phi, np.array([0, l_i, 0]))
+        p_symmetry = t_stance*0.5*v + k_f*(v - v_d)
+        p_cent = 0.5*np.sqrt(self.h/-9.807)*np.cross(v, omega)
+
+        return p_hip + p_symmetry + p_cent
 
 
 class Gait:
@@ -201,7 +231,6 @@ class Gait:
     def u(self, state, prev_state, pos_in, pos_d, base_orientation):
 
         if state == 'swing':
-
             if prev_state != state:
                 self.swing_steps = 0
                 self.trajectory = self.traj(x_prev=pos_in[0], x_d=pos_d[0], y_prev=pos_in[1], y_d=pos_d[1])
@@ -253,3 +282,5 @@ class Gait:
         y_traj = np.linspace(y_prev, y_d, timesteps)
 
         return np.array([x_traj.T, y_traj.T, z_traj.T])
+
+

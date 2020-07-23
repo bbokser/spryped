@@ -36,7 +36,6 @@ class Swing(State):
         super().__init__(fsm)
 
     def execute(self):
-        print("swinging.")
         if self.FSM.s == 1 and self.FSM.sh == 1:
             self.FSM.to_transition("toStance")
         elif self.FSM.s == 0 and self.FSM.sh == 1:
@@ -52,7 +51,6 @@ class Stance(State):
         super().__init__(fsm)
 
     def execute(self):
-        print("standing.")
         if self.FSM.s == 0:
             self.FSM.to_transition("toSwing")
 
@@ -64,7 +62,6 @@ class Early(State):
         super().__init__(fsm)
 
     def execute(self):
-        print("early.")
         if self.FSM.s == 1:
             self.FSM.to_transition("toStance")
 
@@ -76,10 +73,9 @@ class Late(State):
         super().__init__(fsm)
 
     def execute(self):
-        print("late.")
         if self.FSM.sh == 1:
             self.FSM.to_transition("toStance")
-
+        # MUST recognize ground reaction force before leaving "late" state
         return str("late")
 
 
@@ -88,7 +84,7 @@ class Transition:
         self.toState = tostate
 
     def execute(self):
-        print("...transitioning...")
+        pass
 
 
 class FSM:
@@ -149,7 +145,7 @@ class Char:
         self.FSM.add_transition("toEarly", Transition("Early"))
         self.FSM.add_transition("toLate", Transition("Late"))
 
-        self.FSM.setstate("Swing")
+        self.FSM.setstate("Stance")
 
     def execute(self):
         self.FSM.execute(s, sh)

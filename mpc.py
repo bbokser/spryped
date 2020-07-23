@@ -17,23 +17,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from casadi import *
 import numpy as np
+import scipy
 
 import control
 
 
 class Mpc:
 
-    def __init__(self, leg, dt=1e-3, **kwargs):
+    def __init__(self, leg, m, dt=1e-3, **kwargs):
 
         self.u = np.zeros((4, 1))  # control signal
         self.dt = dt  # sampling time (s)
         self.N = 3  # prediction horizon
+        self.leg = leg
+        self.m = m
 
         self.f_max = 5
         self.f_min = -self.f_max
 
-    def mpcontrol(self, leg, x_dd_des=None):
-
+    def mpcontrol(self, grav, Iinv, r1, r2, xs):
+        # r1 = foot position
         theta = SX.sym('theta')
         p = SX.sym('p')
         omega = SX.sym('omega')
@@ -49,38 +52,39 @@ class Mpc:
         g = ([SX.zeros(1, 3), SX.zeros(1, 3), SX.zeros(1, 3), grav.T]).T
 
         A = SX.eye(4)
-        A[0, 2] = dot(Rz(phi), dt)  # define
-        A[1, 3] = dt
+        A[0, 2] = dot(Rz(phi), self.dt)  # define
+        A[1, 3] = self.dt
 
         B = ([SX.zeros(3, 3), SX.zeros(3, 3)],
              [SX.zeros(3, 3), SX.zeros(3, 3)],
              [SX.zeros(3, 3), SX.zeros(3, 3)],
              [SX.zeros(3, 3), SX.zeros(3, 3)])
-        B[2, 0] = gIinv1*dt
-        B[2, 1] = gIinv2*dt
-        B[3, 0] = ones(3, 3)*self.dt/m
-        B[3, 1] = ones(3, 3)*self.dt/m
+        B[2, 0] = Iinv * r1 * self.dt
+        B[2, 1] = Iinv * r2 * self.dt
+        B[3, 0] = ones(3, 3) * self.dt / m
+        B[3, 1] = ones(3, 3) * self.dt / m
 
         x_next = dot(A, states) + dot(B, controls) + g  # the discrete dynamics of the system
 
         fn = Function('fn', [states, controls], x_next)  # nonlinear mapping of function f(x,u)
         u = SX.sym('u', n_controls, self.N)  # decision variables, control action matrix
-        param = SX.sym('param', n_states + n_states)  # parameters, including initial and reference
+        st_ref = SX.sym('st_ref', n_states + n_states)  # initial and reference states
 
-        x = SX.sym('x', n_states, (self.N+1))
+        x = SX.sym('x', n_states, (self.N + 1))  # represents the states over the opt problem.
 
         # compute solution symbolically
-        x[:, 0] = P[0:3]  # check to make sure slicing is done correctly here!
+        x[:, 0] = st_ref[0:3]  # initial state
         'In Python, slicing is left inclusive and right exclusive, '
         'whereas in MATLAB slicing is inclusive at both.'
         'Matlab uses one based indexing while python uses zero based indexing.'
-        for k in range(0, self.N-1):  # N-1 because of python zero based indexing
-            st = x[:, k]
-            con = u[:, k]
-            st_next = fn(st, con)
-            x[:, k+1] = st_next
+        for k in range(0, self.N - 1):  # N-1 because of python zero based indexing
+            st = x[:, k]  # extract the previous state from x
+            con = u[:, k]  # extract controls from control matrix
+            st_next = fn(st, con)  # pass states and controls through function
+            x[:, k + 1] = st_next
+
         # function for optimal traj knowing optimal sol
-        ff = Function('ff', [u, param], x)
+        ff = Function('ff', [u, st_ref], x)
 
         obj = 0  # objective function
         constr = []  # constraints vector
@@ -96,12 +100,13 @@ class Mpc:
         R[1, 1] = 1
 
         # compute objective
-        for k in range(0, self.N-1):  # 0 and N-1 because of python zero based indexing
-            st = x[:, k]
+        for k in range(0, self.N - 1):  # 0 and N-1 because of python zero based indexing
+            st = x[:, k + 1]
             con = u[:, k]  # control action
             # calculate objective
-            obj = obj + dot(dot((st-param[3:6]).T, Q), st-param[3:6]) \
-                + dot(dot(con.T, R), con)
+            obj = obj + dot(dot((st - st_ref[3:6]).T, Q), st - st_ref[3:6]) \
+                  + dot(dot(con.T, R), con)
+
         # compute constraints
         for k in range(0, self.N):  # would be N+1 in matlab
             constr = np.vstack(constr, x(0, k))
@@ -110,23 +115,28 @@ class Mpc:
             constr = np.vstack(constr, x(3, k))
 
         # make decision variables one column vector
-        opt_variables = reshape(u, 2*self.N, 1)
-        qp = {'f', obj, 'x', opt_variables, 'constr', constr, 'param', param}
+        opt_variables = reshape(u, 2 * self.N, 1)
+        qp = {'f', obj, 'x', opt_variables, 'constr', constr, 'st_ref', st_ref}
 
         solver = qpsol('S', 'qpoases', qp)
+
         args = {lbg: -2,  # inequality constraints: lower bound
                 ubg: 2,  # inequality constraints: upper bound
-                lbx: f_min,  # input constraints: lower bound
-                ubx: f_max,  # input constraints: upper bound
+                lbx: self.f_min,  # input constraints: lower bound
+                ubx: self.f_max,  # input constraints: upper bound
                 }
 
+        # -------------Starting Simulation Loop Now------------------------------------- #
         t0 = 0
-        x0 = array([0, 0, 0, 0]).T  # initial condition
-        xs = array([0, 0, 0, 0]).T  # reference posture
+        x0 = array([0, 0, 0, 0]).T  # initial condition, gets updated every iteration
+        xs = array([0, 0, 0, 0]).T  # reference posture (INPUT?)
 
         xx[:, 0] = x0  # contains history of states
         t[0] = t0
 
+        u0 = np.zeros(N, 2)  # two control inputs
+
+        sim_tim = 4  # max sim time
         # start MPC
         mpciter = 0
         xx1 = []
@@ -134,29 +144,31 @@ class Mpc:
 
         while np.linalg.norm(x0 - xs) > 1e-2 and mpciter < sim_tim / T:
             args[p] = array([x0, xs]).T  # set values of parameters vector
-            args[x0] = np.reshape(u0.T, (2*N, 1))  # init value of optimization variables
+            args[x0] = np.reshape(u0.T, (2 * N, 1))  # init value of optimization variables
 
-            sol = solver('x0', args.x0, 'lbx', args.lbx, 'ubx', args.ubx,
-                         'lbg', args.lbg, 'ubg', args.ubg, 'p', args.p)
+            sol = solver('x0', args[x0], 'lbx', args[lbx], 'ubx', args[ubx],
+                         'lbg', args[lbg], 'ubg', args[ubg], 'p', args[p])
 
             u = np.reshape(np.full(sol.x).T, (2, self.N)).T
-            ff_value = ff(u.T, args.p)  # compute optimal solution trajectory
-            xx1[:, 0:3, mpciter+1] = np.full(ff_value).T
+            ff_value = ff(u.T, args[p])  # compute optimal solution trajectory
+            xx1[:, 0:3, mpciter + 1] = np.full(ff_value).T  # store the "predictions" here
+            u_cl = [u_cl, u[0, :]]  # control actions. might have to append
 
-            u_cl = [u_cl, u[0, :]]
-            t[mpciter+1] = t0  # assign new start time for next iteration
+            t[mpciter + 1] = t0
             [t0, x0, u0] = shift(t0, x0, u, f)
 
-            xx[:, mpciter+2] = x0
+            xx[:, mpciter + 2] = x0
             mpciter = mpciter + 1
 
-        ss_error = np.linalg.norm(x0-xs)  # defaults to Euclidean norm
+        ss_error = np.linalg.norm(x0 - xs)  # defaults to Euclidean norm
+
+        return u_cl
 
     def shift(self, t0, x0, u, f):
         st = x0
-        con = u[0, :].T
-        st = f(st, con)
-        x0 = np.full(st)
+        con = u[0, :].T  # propagate control action
+        st = f(st, con)  # st+dt*f(st,con)
+        x0 = scipy.sparse.csr_matrix.todense(st)  # convert sparse matrix to dense
 
         t0 = t0 + self.dt
         u0 = [u[1:size(u, 0), :], u[size(u, 0), :]]

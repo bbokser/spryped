@@ -30,7 +30,7 @@ p.loadURDF("plane.urdf")
 robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])
 
 bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 1.2],
-                 robotStartOrientation, useFixedBase=1,
+                 robotStartOrientation, useFixedBase=0,
                  flags=p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER)
 
 p.setGravity(0, 0, GRAVITY)
@@ -55,7 +55,8 @@ class Sim:
 
     def __init__(self, dt=1e-3):
         self.dt = dt
-
+        self.omega = None
+        self.v = None
         # print(p.getJointInfo(bot, 3))
         # p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "file1.mp4")
         p.setTimeStep(self.dt)
@@ -88,8 +89,13 @@ class Sim:
         # print(torque)
         # print(self.reaction_torques()[0:4])
         p.setJointMotorControlArray(bot, jointArray, p.TORQUE_CONTROL, forces=torque)
-
-        # omega = p.getBaseVelocity(bot)[1]  # base angular velocity in global coordinates
+        velocities = p.getBaseVelocity(bot)
+        self.v = velocities[0]  # base linear velocity in global Cartesian coordinates
+        omega_xyz = velocities[1]  # base angular velocity in Euler XYZ
+        # print(omega_xyz[2], omega_xyz[1], omega_xyz[0])
+        # base angular velocity in quaternions
+        self.omega = transforms3d.euler.euler2quat(omega_xyz[0], omega_xyz[1], omega_xyz[2], axes='rxyz')
+        # found to be intrinsic Euler angles (r)
 
         # Pull values in from simulator, select relevant ones, reshape to 2D array
         q = np.reshape([j[0] for j in p.getJointStates(1, range(0, 8))], (-1, 1))
