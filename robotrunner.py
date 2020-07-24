@@ -56,6 +56,7 @@ class Runner:
         self.state_left = statemachine.Char()
         self.state_right = statemachine.Char()
 
+        # gait scheduler values
         self.target_init = np.array([0, 0, -0.8325])  # , self.init_alpha, self.init_beta, self.init_gamma])
         self.target_l = self.target_init
         self.target_r = self.target_init
@@ -63,10 +64,8 @@ class Runner:
         self.sh_r = 1  # estimated contact state (right)
         self.dist_force_l = np.array([0, 0, 0])
         self.dist_force_r = np.array([0, 0, 0])
-
         self.t_p = 0.5  # gait period, seconds
         self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Percentage of gait spent in contact.
-
         self.gait_left = Gait(controller=self.controller_left, robotleg=self.leg_left,
                               t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
         self.gait_right = Gait(controller=self.controller_right, robotleg=self.leg_right,
@@ -120,30 +119,18 @@ class Runner:
             pos_l = np.dot(base_orientation, self.leg_left.position()[:, -1])
             pos_r = np.dot(base_orientation, self.leg_right.position()[:, -1])
 
-            # yaw angle
-            phi = transforms3d.euler.mat2euler(base_orientation, axes='szyx')[0]
-            # angular velocity
-            c_phi = np.cos(phi)
-            s_phi = np.sin(phi)
-            # rotation matrix Rz(phi)
-            rz_phi = np.zeros((3, 3))
-            rz_phi[0, 0] = c_phi
-            rz_phi[0, 1] = s_phi
-            rz_phi[1, 0] = -c_phi
-            rz_phi[1, 1] = s_phi
-            rz_phi[2, 2] = 1
-
             # omega = transforms3d.euler.quat2euler(self.simulator.omega, axes='szyx')
-            v = self.simulator.v
+
+            v = np.array(self.simulator.v)
 
             # calculate wbc control signal
             self.u_l = self.gait_left.u(state=state_l,
                                         prev_state=prev_state_l, pos_in=pos_l, pos_d=self.target_l,
-                                        base_orientation=base_orientation)  # just standing for now
+                                        base_orientation=base_orientation, v=v)  # just standing for now
 
             self.u_r = self.gait_right.u(state=state_r,
                                          prev_state=prev_state_r, pos_in=pos_r, pos_d=self.target_r,
-                                         base_orientation=base_orientation)  # just standing for now
+                                         base_orientation=base_orientation, v=v)  # just standing for now
 
             # receive disturbance torques
             dist_tau_l = self.contact_left.disturbance_torque(Mq=self.controller_left.Mq,
@@ -200,19 +187,6 @@ class Runner:
 
         return sh
 
-    def footstep(self, robotleg, rz_phi, v, omega, t_stance, v_d):
-        # plans next footstep location
-        if robotleg == 1:
-            l_i = 0.144  # left hip length
-        else:
-            l_i = -0.144  # right hip length
-
-        p_hip = np.dot(rz_phi, np.array([0, l_i, 0]))
-        p_symmetry = t_stance*0.5*v + k_f*(v - v_d)
-        p_cent = 0.5*np.sqrt(self.h/-9.807)*np.cross(v, omega)
-
-        return p_hip + p_symmetry + p_cent
-
 
 class Gait:
     def __init__(self, controller, robotleg, t_p, phi_switch, dt=1e-3, **kwargs):
@@ -228,7 +202,13 @@ class Gait:
         self.controller = controller
         self.robotleg = robotleg
 
-    def u(self, state, prev_state, pos_in, pos_d, base_orientation):
+        # footstep planner values
+        self.omega_d = np.array([0, 0, 0])  # desired angular acceleration for footstep planner
+        self.k_f = 0.5  # Raibert heuristic gain
+        self.h = np.array([0, 0, 0.8325])  # height, assumed to be constant
+        self.r = np.array([0, 0, 0])  # initial footstep planning position
+
+    def u(self, state, prev_state, pos_in, pos_d, base_orientation, v):
 
         if state == 'swing':
             if prev_state != state:
@@ -244,7 +224,9 @@ class Gait:
             # calculate wbc control signal
             u = -self.controller.control(leg=self.robotleg, target=target, base_orientation=base_orientation)
 
-        elif state == 'stance' or 'early':
+        elif state == 'stance' or state == 'early':
+            if prev_state != 'stance' and prev_state != 'early':
+                self.r = self.footstep(robotleg=self.robotleg, base_orientation=base_orientation, v=v, v_d=0)
             # execute MPC
             target = np.array([0, 0, -0.8235, self.init_alpha, self.init_beta, self.init_gamma])
             # calculate wbc control signal
@@ -282,5 +264,32 @@ class Gait:
         y_traj = np.linspace(y_prev, y_d, timesteps)
 
         return np.array([x_traj.T, y_traj.T, z_traj.T])
+
+    def footstep(self, robotleg, base_orientation, v, v_d):
+        # plans next footstep location
+        if robotleg == 1:
+            l_i = 0.144  # left hip length
+        else:
+            l_i = -0.144  # right hip length
+        # yaw angle
+        phi = transforms3d.euler.mat2euler(base_orientation, axes='szyx')[0]
+        # angular velocity
+        c_phi = np.cos(phi)
+        s_phi = np.sin(phi)
+        # rotation matrix Rz(phi)
+        rz_phi = np.zeros((3, 3))
+        rz_phi[0, 0] = c_phi
+        rz_phi[0, 1] = s_phi
+        rz_phi[1, 0] = -c_phi
+        rz_phi[1, 1] = s_phi
+        rz_phi[2, 2] = 1
+
+        p_hip = np.dot(rz_phi, np.array([0, l_i, 0]))
+        t_stance = self.t_p*self.phi_switch
+        p_symmetry = t_stance*0.5*v + self.k_f*(v - v_d)
+        p_cent = 0.5*np.sqrt(self.h/9.807)*np.cross(v, self.omega_d)
+
+        return p_hip + p_symmetry + p_cent
+
 
 
