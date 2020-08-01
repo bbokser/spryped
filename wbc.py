@@ -71,8 +71,9 @@ class Control(control.Control):
         self.x = None
         self.grav = None
         self.velocity = None
+        self.q_e = None
 
-    def control(self, leg, target, base_orientation, x_dd_des=None):
+    def control(self, leg, target, b_orient, x_dd_des=None):
         """
         Generates a control signal to move the
         joints to the specified target.
@@ -82,7 +83,7 @@ class Control(control.Control):
         x_dd_des np.array: desired acceleration
         """
         self.target = target
-        self.base_orientation = np.array(base_orientation)
+        self.b_orient = np.array(b_orient)
 
         # which dim to control of [x, y, z, alpha, beta, gamma]
         ctrlr_dof = np.array([True, True, True, False, False, False])
@@ -96,16 +97,16 @@ class Control(control.Control):
 
         x_dd_des = np.zeros(6)  # [x, y, z, alpha, beta, gamma]
 
-        self.x = np.dot(base_orientation, leg.position()[:, -1])  # multiply with rotation matrix for base to world
+        self.x = np.dot(b_orient, leg.position()[:, -1])  # multiply with rotation matrix for base to world
 
         # calculate operational space velocity vector
-        self.velocity = np.dot(base_orientation, (np.transpose(np.dot(JEE, leg.dq)).flatten())[0:3])
+        self.velocity = np.dot(b_orient, (np.transpose(np.dot(JEE, leg.dq)).flatten())[0:3])
 
         # calculate linear acceleration term based on PD control
         x_dd_des[:3] = np.dot(self.kp, (self.target[0:3] - self.x)) + np.dot(self.kv, -self.velocity)
 
         # calculate end effector orientation unit quaternion
-        q_e = leg.orientation(base_orientation=base_orientation)
+        self.q_e = leg.orientation(b_orient=b_orient)
 
         # calculate the target orientation unit quaternion
         q_d = transforms3d.euler.euler2quat(self.target[3], self.target[4], self.target[5], axes='rxyz')
@@ -113,7 +114,7 @@ class Control(control.Control):
 
         # calculate the rotation between current and target orientations
         q_r = transforms3d.quaternions.qmult(
-            q_d, transforms3d.quaternions.qconjugate(q_e))
+            q_d, transforms3d.quaternions.qconjugate(self.q_e))
 
         # convert rotation quaternion to Euler angle forces
         x_dd_des[3:] = np.dot(self.ko, q_r[1:] * np.sign(q_r[0]))
@@ -125,7 +126,7 @@ class Control(control.Control):
         # calculate force
         Fx = np.dot(Mx, x_dd_des)
 
-        self.grav = leg.gen_grav(base_orientation=base_orientation)
+        self.grav = leg.gen_grav(b_orient=b_orient)
 
         self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - self.grav
 
@@ -155,8 +156,8 @@ class Control(control.Control):
 
         if self.leveler:
             # keeps toes level (for now)
-            basey = transforms3d.euler.mat2euler(base_orientation, axes='ryxz')[0]  # get y axis rotation of base
-            u_level = np.dot(self.kn, -basey + leg.ee_angle() - leg.q)
+            base_y = transforms3d.euler.mat2euler(b_orient, axes='ryxz')[0]  # get y axis rotation of base
+            u_level = np.dot(self.kn, -base_y + leg.ee_angle() - leg.q)
             self.u += u_level
 
         # add in any additional signals

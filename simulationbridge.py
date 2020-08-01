@@ -29,8 +29,8 @@ p.resetSimulation()
 p.loadURDF("plane.urdf")
 robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])
 
-bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 1.2],
-                 robotStartOrientation, useFixedBase=0,
+bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 0.8],
+                 robotStartOrientation, useFixedBase=1,
                  flags=p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER)
 
 p.setGravity(0, 0, GRAVITY)
@@ -58,7 +58,10 @@ class Sim:
         self.omega = None
         self.v = None
         # print(p.getJointInfo(bot, 3))
+
+        # Record Video
         # p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "file1.mp4")
+
         p.setTimeStep(self.dt)
 
         p.setRealTimeSimulation(useRealTime)
@@ -74,12 +77,12 @@ class Sim:
         base_or_p = np.array(p.getBasePositionAndOrientation(bot)[1])
         # pybullet gives quaternions in xyzw format
         # transforms3d takes quaternions in wxyz format, so you need to shift values
-        base_orientation = np.zeros(4)
-        base_orientation[0] = base_or_p[3]  # w
-        base_orientation[1] = base_or_p[0]  # x
-        base_orientation[2] = base_or_p[1]  # y
-        base_orientation[3] = base_or_p[2]  # z
-        base_orientation = transforms3d.quaternions.quat2mat(base_orientation)
+        b_orient = np.zeros(4)
+        b_orient[0] = base_or_p[3]  # w
+        b_orient[1] = base_or_p[0]  # x
+        b_orient[2] = base_or_p[1]  # y
+        b_orient[3] = base_or_p[2]  # z
+        b_orient = transforms3d.quaternions.quat2mat(b_orient)
 
         torque = np.zeros(8)
         torque[0:4] = u_l
@@ -103,7 +106,7 @@ class Sim:
         if useRealTime == 0:
             p.stepSimulation()
 
-        return q, base_orientation
+        return q, b_orient
     '''
     def get_states(self):
         self.q = [j[0] for j in p.getJointStates(bot, range(8))]

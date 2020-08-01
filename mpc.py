@@ -15,27 +15,55 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from casadi import *
 import numpy as np
 import scipy
+import csv
+
+from casadi import *
 
 import control
 
 
 class Mpc:
 
-    def __init__(self, leg, m, dt=1e-3, **kwargs):
+    def __init__(self, dt=1e-3, **kwargs):
 
         self.u = np.zeros((4, 1))  # control signal
         self.dt = dt  # sampling time (s)
         self.N = 3  # prediction horizon
-        self.leg = leg
-        self.m = m
+        self.mass = float(12.12427)  # kg
+        self.gravity = np.array([[0, 0, 0, -9.807]]).T
 
         self.f_max = 5
         self.f_min = -self.f_max
 
-    def mpcontrol(self, grav, Iinv, r1, r2, xs):
+        with open('spryped_urdf_rev06/spryped_data_body.csv', 'r') as csvfile:
+            data = csv.reader(csvfile, delimiter=',')
+            next(data)  # skip headers
+            values = list(zip(*(row for row in data)))  # transpose rows to columns
+            values = np.array(values)  # convert list of nested lists to array
+
+        ixx = values[1].astype(np.float)
+        ixy = values[2].astype(np.float)
+        ixz = values[3].astype(np.float)
+        iyy = values[4].astype(np.float)
+        iyz = values[5].astype(np.float)
+        izz = values[6].astype(np.float)
+
+        m = np.zeros((6, 6))
+        m[0:3, 0:3] = np.eye(3) * self.mass
+        m[3, 3] = ixx
+        m[3, 4] = ixy
+        m[3, 5] = ixz
+        m[4, 3] = ixy
+        m[4, 4] = iyy
+        m[4, 5] = iyz
+        m[5, 3] = ixz
+        m[5, 4] = iyz
+        m[5, 5] = izz
+        self.inertia = m
+
+    def mpcontrol(self, rz_phi, r1, r2, xs):
         # r1 = foot position
         theta = SX.sym('theta')
         p = SX.sym('p')

@@ -37,7 +37,7 @@ class Control(object):
         self.additions = additions
 
         self.target = None
-        self.base_orientation = None
+        self.b_orient = None
 
     def control(self, leg, target, x_dd_des):
         """Generates a control signal to apply to the leg"""

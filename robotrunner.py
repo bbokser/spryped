@@ -29,6 +29,13 @@ import transforms3d
 import numpy as np
 from scipy.interpolate import CubicSpline
 
+import matplotlib.pyplot as plt
+from mpl_toolkits import mplot3d
+from matplotlib.lines import Line2D
+import matplotlib.animation as animation
+
+from pyquaternion import Quaternion
+
 np.set_printoptions(suppress=True, linewidth=np.nan)
 
 
@@ -48,8 +55,7 @@ class Runner:
         controller_class = wbc
         self.controller_left = controller_class.Control(leg=self.leg_left, dt=dt)
         self.controller_right = controller_class.Control(leg=self.leg_right, dt=dt)
-        self.mpc_left = mpc.Mpc(leg=self.leg_left, m=12.12427, dt=dt)
-        self.mpc_right = mpc.Mpc(leg=self.leg_right, m=12.12427, dt=dt)
+        self.force = mpc.Mpc(dt=dt)
         self.contact_left = contact.Contact(leg=self.leg_left, dt=dt)
         self.contact_right = contact.Contact(leg=self.leg_right, dt=dt)
         self.simulator = simulationbridge.Sim(dt=dt)
@@ -73,6 +79,13 @@ class Runner:
 
         self.target = None
 
+        # footstep planner values
+        self.omega_d = np.array([0, 0, 0])  # desired angular acceleration for footstep planner
+        self.k_f = 0.5  # Raibert heuristic gain
+        self.h = np.array([0, 0, 0.8325])  # height, assumed to be constant
+        self.r_l = np.array([0, 0, 0])  # initial footstep planning position
+        self.r_r = np.array([0, 0, 0])  # initial footstep planning position
+
     def run(self):
 
         steps = 0
@@ -83,6 +96,73 @@ class Runner:
 
         prev_state_l = str("init")
         prev_state_r = prev_state_l
+        prev_contact_l = False
+        prev_contact_r = False
+
+        # ------------------quaternion-animation---------------------------------#
+        x = 0
+        y = 0
+        z = 0
+
+        # Set up figure & 3D axis for animation
+        fig = plt.figure()
+        ax = fig.add_axes([0, 0, 1, 1], projection='3d')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        # ax.axis('off')
+
+        # use a different color for each axis
+        colors = ['r', 'g', 'b']
+
+        # set up lines and points
+        lines = sum([ax.plot([], [], [], c=c)
+                     for c in colors], [])
+
+        startpoints = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]])
+        endpoints = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+
+        # prepare the axes limits
+        ax.set_xlim((-8, 8))
+        ax.set_ylim((-8, 8))
+        ax.set_zlim((-8, 8))
+
+        # set point-of-view: specified by (altitude degrees, azimuth degrees)
+        ax.view_init(30, 0)
+
+        q_e = np.array([0., 0., 0., 0.])
+
+        def anim_init():
+            for line in lines:
+                line.set_data([], [])
+                line.set_3d_properties([])
+
+            return lines
+
+        def animate(i):
+            # animation function.  This will be called sequentially with the frame number
+            # we'll step two time-steps per frame.  This leads to nice results.
+            # i = (2 * i) % x_t.shape[1]
+
+            # q = next(quaternion_generator)
+            # print("q:", q)
+            q_in = Quaternion(q_e[0], q_e[1], q_e[2], q_e[3])
+            for line, start, end in zip(lines, startpoints, endpoints):
+                # end *= 5
+                start = q_in.rotate(start)
+                end = q_in.rotate(end)
+
+                line.set_data([start[0], end[0]], [start[1], end[1]])
+                line.set_3d_properties([start[2], end[2]])
+
+                # pt.set_data(x[-1:], y[-1:])
+                # pt.set_3d_properties(z[-1:])
+
+            # ax.view_init(30, 0.6 * i)
+            fig.canvas.draw()
+            return lines
+
+        # --------------------------------------------------------------------#
 
         while 1:
             time.sleep(self.dt)
@@ -92,7 +172,7 @@ class Runner:
             # print(t)
             # run simulator to get encoder and IMU feedback
             # put an if statement here once we have hardware bridge too
-            q, base_orientation = self.simulator.sim_run(u_l=self.u_l, u_r=self.u_r)
+            q, b_orient = self.simulator.sim_run(u_l=self.u_l, u_r=self.u_r)
 
             q_left = q[0:4]
             q_left[1] *= -1
@@ -116,21 +196,50 @@ class Runner:
             state_r = self.state_right.FSM.execute(s_r, sh_r)
             # print(state_l, sh_l, self.dist_force_l[2])
             # forward kinematics
-            pos_l = np.dot(base_orientation, self.leg_left.position()[:, -1])
-            pos_r = np.dot(base_orientation, self.leg_right.position()[:, -1])
+            pos_l = np.dot(b_orient, self.leg_left.position()[:, -1])
+            pos_r = np.dot(b_orient, self.leg_right.position()[:, -1])
 
             # omega = transforms3d.euler.quat2euler(self.simulator.omega, axes='szyx')
 
             v = np.array(self.simulator.v)
 
+            phi = transforms3d.euler.mat2euler(b_orient, axes='szyx')[0]
+            c_phi = np.cos(phi)
+            s_phi = np.sin(phi)
+            # rotation matrix Rz(phi)
+            rz_phi = np.zeros((3, 3))
+            rz_phi[0, 0] = c_phi
+            rz_phi[0, 1] = s_phi
+            rz_phi[1, 0] = -c_phi
+            rz_phi[1, 1] = s_phi
+            rz_phi[2, 2] = 1
+
+            if state_l == ('stance' or 'early'):
+                contact_l = True
+            else:
+                contact_l = False
+
+            if state_r == ('stance' or 'early'):
+                contact_r = True
+            else:
+                contact_r = False
+
+            if contact_l is True and prev_contact_l is False:
+                self.r_l = self.footstep(robotleg=1, rz_phi=rz_phi, v=v, v_d=0)
+
+            if contact_r is True and prev_contact_r is False:
+                self.r_r = self.footstep(robotleg=0, rz_phi=rz_phi, v=v, v_d=0)
+
+            # forces = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, xs=1)
+
             # calculate wbc control signal
             self.u_l = self.gait_left.u(state=state_l,
-                                        prev_state=prev_state_l, pos_in=pos_l, pos_d=self.target_l,
-                                        base_orientation=base_orientation, v=v)  # just standing for now
+                                        prev_state=prev_state_l, r_in=pos_l, r_d=self.r_l,
+                                        b_orient=b_orient)  # just standing for now
 
             self.u_r = self.gait_right.u(state=state_r,
-                                         prev_state=prev_state_r, pos_in=pos_r, pos_d=self.target_r,
-                                         base_orientation=base_orientation, v=v)  # just standing for now
+                                         prev_state=prev_state_r, r_in=pos_r, r_d=self.r_r,
+                                         b_orient=b_orient)  # just standing for now
 
             # receive disturbance torques
             dist_tau_l = self.contact_left.disturbance_torque(Mq=self.controller_left.Mq,
@@ -150,14 +259,31 @@ class Runner:
             prev_state_l = state_l
             prev_state_r = state_r
 
+            prev_contact_l = contact_l
+            prev_contact_r = contact_r
+
+            # ------------------------------------------------------------------------------------------ #
+            # q_euler = transforms3d.euler.quat2euler(self.controller_left.q_e, axes='rxyz')
+            # roll = q_euler[0]
+            # pitch = q_euler[1]
+            # yaw = q_euler[2]
+            # new_x = np.cos(yaw) * np.cos(pitch)
+            # new_y = np.sin(yaw) * np.cos(roll)
+            # new_z = np.sin(yaw) * np.sin(roll)
+            q_e = self.controller_left.q_e
+            anim_init()
+            animate(steps)
+            plt.pause(0.0001)
+            # ----------------------------------------------------------------------------------------- #
+
             # print(self.dist_force_l[2])
             # print(self.reaction_torques()[0:4])
 
             # tau_d_left = self.contact_left.contact(leg=self.leg_left, g=self.leg_left.grav)
 
             # fw kinematics
-            # print(np.transpose(np.append(np.dot(base_orientation, self.leg_left.position()[:, -1]),
-            #                              np.dot(base_orientation, self.leg_right.position()[:, -1]))))
+            # print(np.transpose(np.append(np.dot(b_orient, self.leg_left.position()[:, -1]),
+            #                              np.dot(b_orient, self.leg_right.position()[:, -1]))))
             # joint velocity
             # print("vel = ", self.leg_left.velocity())
             # encoder feedback
@@ -187,6 +313,20 @@ class Runner:
 
         return sh
 
+    def footstep(self, robotleg, rz_phi, v, v_d):
+        # plans next footstep location
+        if robotleg == 1:
+            l_i = 0.144  # left hip length
+        else:
+            l_i = -0.144  # right hip length
+
+        p_hip = np.dot(rz_phi, np.array([0, l_i, 0]))
+        t_stance = self.t_p * self.phi_switch
+        p_symmetry = t_stance * 0.5 * v + self.k_f * (v - v_d)
+        p_cent = 0.5 * np.sqrt(self.h / 9.807) * np.cross(v, self.omega_d)
+
+        return p_hip + p_symmetry + p_cent
+
 
 class Gait:
     def __init__(self, controller, robotleg, t_p, phi_switch, dt=1e-3, **kwargs):
@@ -202,18 +342,12 @@ class Gait:
         self.controller = controller
         self.robotleg = robotleg
 
-        # footstep planner values
-        self.omega_d = np.array([0, 0, 0])  # desired angular acceleration for footstep planner
-        self.k_f = 0.5  # Raibert heuristic gain
-        self.h = np.array([0, 0, 0.8325])  # height, assumed to be constant
-        self.r = np.array([0, 0, 0])  # initial footstep planning position
-
-    def u(self, state, prev_state, pos_in, pos_d, base_orientation, v):
+    def u(self, state, prev_state, r_in, r_d, b_orient):
 
         if state == 'swing':
             if prev_state != state:
                 self.swing_steps = 0
-                self.trajectory = self.traj(x_prev=pos_in[0], x_d=pos_d[0], y_prev=pos_in[1], y_d=pos_d[1])
+                self.trajectory = self.traj(x_prev=r_in[0], x_d=r_d[0], y_prev=r_in[1], y_d=r_d[1])
 
             # set target position
             target = self.trajectory[:, self.swing_steps]
@@ -222,20 +356,20 @@ class Gait:
 
             self.swing_steps += 1
             # calculate wbc control signal
-            u = -self.controller.control(leg=self.robotleg, target=target, base_orientation=base_orientation)
+            u = -self.controller.control(leg=self.robotleg, target=target, b_orient=b_orient)
 
         elif state == 'stance' or state == 'early':
-            if prev_state != 'stance' and prev_state != 'early':
-                self.r = self.footstep(robotleg=self.robotleg, base_orientation=base_orientation, v=v, v_d=0)
             # execute MPC
-            target = np.array([0, 0, -0.8235, self.init_alpha, self.init_beta, self.init_gamma])
+            force = 3
+            # u = force
             # calculate wbc control signal
-            u = -self.controller.control(leg=self.robotleg, target=target, base_orientation=base_orientation)
+            target = np.array([0, 0, -0.8235, self.init_alpha, self.init_beta, self.init_gamma])
+            u = -self.controller.control(leg=self.robotleg, target=target, b_orient=b_orient)
 
         elif state == 'late':  # position command should freeze at last target position
             target = np.array([0, 0, -0.8235, self.init_alpha, self.init_beta, self.init_gamma])
             # calculate wbc control signal
-            u = -self.controller.control(leg=self.robotleg, target=target, base_orientation=base_orientation)
+            u = -self.controller.control(leg=self.robotleg, target=target, b_orient=b_orient)
 
         else:
             u = None  # this'll throw an error if state machine is haywire or something
@@ -264,32 +398,3 @@ class Gait:
         y_traj = np.linspace(y_prev, y_d, timesteps)
 
         return np.array([x_traj.T, y_traj.T, z_traj.T])
-
-    def footstep(self, robotleg, base_orientation, v, v_d):
-        # plans next footstep location
-        if robotleg == 1:
-            l_i = 0.144  # left hip length
-        else:
-            l_i = -0.144  # right hip length
-        # yaw angle
-        phi = transforms3d.euler.mat2euler(base_orientation, axes='szyx')[0]
-        # angular velocity
-        c_phi = np.cos(phi)
-        s_phi = np.sin(phi)
-        # rotation matrix Rz(phi)
-        rz_phi = np.zeros((3, 3))
-        rz_phi[0, 0] = c_phi
-        rz_phi[0, 1] = s_phi
-        rz_phi[1, 0] = -c_phi
-        rz_phi[1, 1] = s_phi
-        rz_phi[2, 2] = 1
-
-        p_hip = np.dot(rz_phi, np.array([0, l_i, 0]))
-        t_stance = self.t_p*self.phi_switch
-        p_symmetry = t_stance*0.5*v + self.k_f*(v - v_d)
-        p_cent = 0.5*np.sqrt(self.h/9.807)*np.cross(v, self.omega_d)
-
-        return p_hip + p_symmetry + p_cent
-
-
-

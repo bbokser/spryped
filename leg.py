@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import numpy as np
-# import math
+
 import csv
 
 import transforms3d
@@ -39,8 +39,14 @@ class Leg(LegBase):
 
         LegBase.__init__(self, init_q=init_q, init_dq=init_dq, **kwargs)
 
-        values = []
-        with open('spryped_urdf_rev06/spryped_data.csv', 'r') as csvfile:
+        # values = []
+
+        if leg == 1:
+            spryped_data = str('spryped_urdf_rev06/spryped_data_left.csv')
+        else:
+            spryped_data = str('spryped_urdf_rev06/spryped_data_right.csv')
+
+        with open(spryped_data, 'r') as csvfile:
             data = csv.reader(csvfile, delimiter=',')
             next(data)  # skip headers
             values = list(zip(*(row for row in data)))  # transpose rows to columns
@@ -92,12 +98,11 @@ class Leg(LegBase):
         # mass matrices and gravity
         self.MM = []
         self.Fg = []
-        self.gravity = np.array([[0, 0, -9.81]]).T
+        self.gravity = np.array([[0, 0, -9.807]]).T
         self.extra = np.array([[0, 0, 0]]).T
 
         for i in range(0, 4):
             M = np.zeros((6, 6))
-            fgi = np.zeros((6, 1))
             M[0:3, 0:3] = np.eye(3) * float(self.mass[i])
             M[3, 3] = ixx[i]
             M[3, 4] = ixy[i]
@@ -116,6 +121,7 @@ class Leg(LegBase):
         self.kv = 0.05
         self.leg = leg
         self.reset()
+        self.q_calibration = np.array(init_q)
 
     def gen_jacCOM0(self, q=None):
         """Generates the Jacobian from the COM of the first
@@ -270,9 +276,9 @@ class Leg(LegBase):
 
         return Mq
 
-    def gen_grav(self, base_orientation, q=None):
+    def gen_grav(self, b_orient, q=None):
         # Generate gravity term g(q)
-        body_grav = np.dot(base_orientation.T, self.gravity)  # adjust gravity vector based on body orientation
+        body_grav = np.dot(b_orient.T, self.gravity)  # adjust gravity vector based on body orientation
         body_grav = np.append(body_grav, np.array([[0, 0, 0]]).T)
         for i in range(0, 4):
             fgi = float(self.mass[i])*body_grav  # apply mass*gravity
@@ -355,7 +361,7 @@ class Leg(LegBase):
         JEE = self.gen_jacEE(q=q)
         return np.dot(JEE, self.dq).flatten()
 
-    def orientation(self, base_orientation, q=None):
+    def orientation(self, b_orient, q=None):
         # Calculate orientation of end effector in quaternions
         if q is None:
             q0 = self.q[0]
@@ -378,7 +384,7 @@ class Leg(LegBase):
         REE[2, 1] = np.sin(q0)*np.cos(q1 + q2 + q3)
         REE[2, 2] = np.cos(q0)
         # REE[3, 3] = 1
-        REE = np.dot(base_orientation, REE)
+        REE = np.dot(b_orient, REE)
         q_e = transforms3d.quaternions.mat2quat(REE)
         q_e = q_e / np.linalg.norm(q_e)  # convert to unit vector quaternion
 
@@ -419,8 +425,7 @@ class Leg(LegBase):
         self.q = q_in
 
         # Calibrate encoders
-        self.q = np.add(self.q.flatten(), np.array([-2 * np.pi / 4, np.pi * 32 / 180,
-                                                   -np.pi * 44.17556088 / 180, np.pi * 12.17556088 / 180.]))
+        self.q = np.add(self.q.flatten(), self.q_calibration)
         # self.dq = np.reshape([j[1] for j in p.getJointStates(1, range(0, 4))], (-1, 1))
         self.dq = [i * self.kv for i in self.dq_previous] + (self.q - self.q_previous) / self.dt
         # Make sure this only happens once per time step
