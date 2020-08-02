@@ -29,7 +29,7 @@ class Control(control.Control):
     Controls the (x,y,z) position of the end-effector.
     """
 
-    def __init__(self, leg, dt=1e-3, null_control=False, **kwargs):
+    def __init__(self, dt=1e-3, null_control=False, **kwargs):
         """
         null_control boolean: apply second controller in null space or not
         """
@@ -49,21 +49,15 @@ class Control(control.Control):
         self.kv[0, 0] = 100
         self.kv[1, 1] = 100
         self.kv[2, 2] = 100
-        '''
-        self.kd = np.zeros((4, 4))
-        self.kd[0, 0] = 50
-        self.kd[1, 1] = 50
-        self.kd[2, 2] = 50
-        self.kd[3, 3] = 100
-        '''
+
         self.ko = np.zeros((3, 3))
-        self.ko[0, 0] = 100
-        self.ko[1, 1] = 100
-        self.ko[2, 2] = 100
+        self.ko[0, 0] = 1000
+        self.ko[1, 1] = 1000
+        self.ko[2, 2] = 1000
 
         self.kn = np.zeros((4, 4))
         self.kn[0, 0] = 0
-        self.kn[1, 1] = 0
+        self.kn[1, 1] = 0  # 100
         self.kn[2, 2] = 0
         self.kn[3, 3] = 10
 
@@ -87,9 +81,11 @@ class Control(control.Control):
 
         # which dim to control of [x, y, z, alpha, beta, gamma]
         ctrlr_dof = np.array([True, True, True, False, False, False])
+        # ctrlr_dof = np.array([False, False, False, True, True, True])
 
         # calculate the Jacobian
-        JEE = leg.gen_jacEE()[ctrlr_dof]
+        JEE = leg.gen_jacEE()[ctrlr_dof]  # print(np.linalg.matrix_rank(JEE))
+        # rank of matrix is 3, can only control 3 DOF with one OSC
 
         # generate the mass matrix in end-effector space
         self.Mq = leg.gen_Mq()
@@ -98,6 +94,7 @@ class Control(control.Control):
         x_dd_des = np.zeros(6)  # [x, y, z, alpha, beta, gamma]
 
         self.x = np.dot(b_orient, leg.position()[:, -1])  # multiply with rotation matrix for base to world
+        # self.x = leg.position()[:, -1]
 
         # calculate operational space velocity vector
         self.velocity = np.dot(b_orient, (np.transpose(np.dot(JEE, leg.dq)).flatten())[0:3])
@@ -105,19 +102,24 @@ class Control(control.Control):
         # calculate linear acceleration term based on PD control
         x_dd_des[:3] = np.dot(self.kp, (self.target[0:3] - self.x)) + np.dot(self.kv, -self.velocity)
 
+        # Orientation-Control------------------------------------------------------------------------------#
         # calculate end effector orientation unit quaternion
         self.q_e = leg.orientation(b_orient=b_orient)
 
         # calculate the target orientation unit quaternion
-        q_d = transforms3d.euler.euler2quat(self.target[3], self.target[4], self.target[5], axes='rxyz')
+        q_d = transforms3d.euler.euler2quat(self.target[3], self.target[4], self.target[5], axes='sxyz')
         q_d = q_d / np.linalg.norm(q_d)  # convert to unit vector quaternion
 
         # calculate the rotation between current and target orientations
         q_r = transforms3d.quaternions.qmult(
             q_d, transforms3d.quaternions.qconjugate(self.q_e))
-
+        # q_r = transforms3d.quaternions.qmult(
+        #     q_r, transforms3d.euler.euler2quat(-np.pi/2, 0, 0, axes='sxyz'))
+        # self.q_r = q_r
         # convert rotation quaternion to Euler angle forces
         x_dd_des[3:] = np.dot(self.ko, q_r[1:] * np.sign(q_r[0]))
+        # x_dd_des[3:] = np.dot(self.ko, transforms3d.euler.quat2euler(q_r, axes='rxyz'))
+        # ------------------------------------------------------------------------------------------------#
 
         x_dd_des = x_dd_des[ctrlr_dof]  # get rid of dim not being controlled
 
@@ -153,11 +155,28 @@ class Control(control.Control):
             null_signal = np.dot(null_filter, Fq_null).reshape(-1, )
 
             self.u += null_signal
-
-        if self.leveler:
-            # keeps toes level (for now)
+        '''
+        if self.posture:
+            # keeps body pitch level
             base_y = transforms3d.euler.mat2euler(b_orient, axes='ryxz')[0]  # get y axis rotation of base
-            u_level = np.dot(self.kn, -base_y + leg.ee_angle() - leg.q)
+            q1 = leg.q[1]
+            q2 = leg.q[2]
+
+            # keep base level
+            body_target = np.array([0, 0, 0, 0])
+            u_level = np.dot(self.kn, -base_y + angles - leg.q)
+            self.u += u_level
+        '''
+        if self.leveler:
+            # keeps ee pitch level
+            base_y = transforms3d.euler.mat2euler(b_orient, axes='ryxz')[0]  # get y axis rotation of base
+            q1 = leg.q[1]
+            q2 = leg.q[2]
+            print(q1)
+            # keep ee level
+            ee_target = -(q1 + q2)
+            angles = np.array([0, np.pi * 32 / 180, 0, ee_target])
+            u_level = np.dot(self.kn, -base_y + angles - leg.q)
             self.u += u_level
 
         # add in any additional signals

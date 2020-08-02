@@ -20,6 +20,7 @@ import leg
 import wbc
 import mpc
 import statemachine
+import qvis
 
 import time
 import sys
@@ -28,13 +29,6 @@ import curses
 import transforms3d
 import numpy as np
 from scipy.interpolate import CubicSpline
-
-import matplotlib.pyplot as plt
-from mpl_toolkits import mplot3d
-from matplotlib.lines import Line2D
-import matplotlib.animation as animation
-
-from pyquaternion import Quaternion
 
 np.set_printoptions(suppress=True, linewidth=np.nan)
 
@@ -53,8 +47,8 @@ class Runner:
         self.leg_left = leg.Leg(dt=dt, leg=left)
         self.leg_right = leg.Leg(dt=dt, leg=right)
         controller_class = wbc
-        self.controller_left = controller_class.Control(leg=self.leg_left, dt=dt)
-        self.controller_right = controller_class.Control(leg=self.leg_right, dt=dt)
+        self.controller_left = controller_class.Control(dt=dt)
+        self.controller_right = controller_class.Control(dt=dt)
         self.force = mpc.Mpc(dt=dt)
         self.contact_left = contact.Contact(leg=self.leg_left, dt=dt)
         self.contact_right = contact.Contact(leg=self.leg_right, dt=dt)
@@ -98,71 +92,6 @@ class Runner:
         prev_state_r = prev_state_l
         prev_contact_l = False
         prev_contact_r = False
-
-        # ------------------quaternion-animation---------------------------------#
-        x = 0
-        y = 0
-        z = 0
-
-        # Set up figure & 3D axis for animation
-        fig = plt.figure()
-        ax = fig.add_axes([0, 0, 1, 1], projection='3d')
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        # ax.axis('off')
-
-        # use a different color for each axis
-        colors = ['r', 'g', 'b']
-
-        # set up lines and points
-        lines = sum([ax.plot([], [], [], c=c)
-                     for c in colors], [])
-
-        startpoints = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]])
-        endpoints = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-
-        # prepare the axes limits
-        ax.set_xlim((-8, 8))
-        ax.set_ylim((-8, 8))
-        ax.set_zlim((-8, 8))
-
-        # set point-of-view: specified by (altitude degrees, azimuth degrees)
-        ax.view_init(30, 0)
-
-        q_e = np.array([0., 0., 0., 0.])
-
-        def anim_init():
-            for line in lines:
-                line.set_data([], [])
-                line.set_3d_properties([])
-
-            return lines
-
-        def animate(i):
-            # animation function.  This will be called sequentially with the frame number
-            # we'll step two time-steps per frame.  This leads to nice results.
-            # i = (2 * i) % x_t.shape[1]
-
-            # q = next(quaternion_generator)
-            # print("q:", q)
-            q_in = Quaternion(q_e[0], q_e[1], q_e[2], q_e[3])
-            for line, start, end in zip(lines, startpoints, endpoints):
-                # end *= 5
-                start = q_in.rotate(start)
-                end = q_in.rotate(end)
-
-                line.set_data([start[0], end[0]], [start[1], end[1]])
-                line.set_3d_properties([start[2], end[2]])
-
-                # pt.set_data(x[-1:], y[-1:])
-                # pt.set_3d_properties(z[-1:])
-
-            # ax.view_init(30, 0.6 * i)
-            fig.canvas.draw()
-            return lines
-
-        # --------------------------------------------------------------------#
 
         while 1:
             time.sleep(self.dt)
@@ -262,18 +191,9 @@ class Runner:
             prev_contact_l = contact_l
             prev_contact_r = contact_r
 
-            # ------------------------------------------------------------------------------------------ #
-            # q_euler = transforms3d.euler.quat2euler(self.controller_left.q_e, axes='rxyz')
-            # roll = q_euler[0]
-            # pitch = q_euler[1]
-            # yaw = q_euler[2]
-            # new_x = np.cos(yaw) * np.cos(pitch)
-            # new_y = np.sin(yaw) * np.cos(roll)
-            # new_z = np.sin(yaw) * np.sin(roll)
-            q_e = self.controller_left.q_e
-            anim_init()
-            animate(steps)
-            plt.pause(0.0001)
+            # -------------------------quaternion-visualizer-animation--------------------------------- #
+            # q_e = self.controller_left.q_e
+            # qvis.animate(q_e)
             # ----------------------------------------------------------------------------------------- #
 
             # print(self.dist_force_l[2])
@@ -314,7 +234,7 @@ class Runner:
         return sh
 
     def footstep(self, robotleg, rz_phi, v, v_d):
-        # plans next footstep location
+        # plans next footstep locatleg, ion
         if robotleg == 1:
             l_i = 0.144  # left hip length
         else:

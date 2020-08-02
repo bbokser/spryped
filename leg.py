@@ -33,7 +33,7 @@ class Leg(LegBase):
             init_dq = [0., 0., 0., 0.]  # just left leg
 
         if init_q is None:
-            init_q = [-2 * np.pi / 4, np.pi * 32 / 180, -np.pi * 44.17556088 / 180, np.pi * 12.17556088 / 180.]
+            init_q = [-np.pi / 2, np.pi * 32 / 180, -np.pi * 44.17556088 / 180, np.pi * 12.17556088 / 180.]
 
         self.DOF = 4
 
@@ -374,7 +374,7 @@ class Leg(LegBase):
             q2 = q[2]
             q3 = q[3]
 
-        REE = np.zeros((3, 3))
+        REE = np.zeros((3, 3))  # rotation matrix
         REE[0, 0] = np.cos(q1 + q2 + q3)
         REE[0, 1] = -np.sin(q1 + q2 + q3)
         REE[1, 0] = np.sin(q1 + q2 + q3)*np.cos(q0)
@@ -389,20 +389,6 @@ class Leg(LegBase):
         q_e = q_e / np.linalg.norm(q_e)  # convert to unit vector quaternion
 
         return q_e
-
-    def ee_angle(self, q=None):
-        if q is None:
-            q1 = self.q[1]
-            q2 = self.q[2]
-        else:
-            q1 = q[1]
-            q2 = q[2]
-
-        # keep ee level
-        ee_target = -(q1+q2)
-        angles = np.array([0, 0, 0, ee_target])
-
-        return angles
 
     def reset(self, q=None, dq=None):
         if q is None:

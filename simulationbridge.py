@@ -30,7 +30,7 @@ p.loadURDF("plane.urdf")
 robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])
 
 bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 0.8],
-                 robotStartOrientation, useFixedBase=1,
+                 robotStartOrientation, useFixedBase=0,
                  flags=p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER)
 
 p.setGravity(0, 0, GRAVITY)
