@@ -32,7 +32,7 @@ class Mpc:
         self.dt = dt  # sampling time (s)
         self.N = 3  # prediction horizon
         self.mass = float(12.12427)  # kg
-        self.gravity = np.array([[0, 0, 0, -9.807]]).T
+        self.gravity = np.array([[0, 0, -9.807]])
 
         self.f_max = 5
         self.f_min = -self.f_max
@@ -50,49 +50,75 @@ class Mpc:
         iyz = values[5].astype(np.float)
         izz = values[6].astype(np.float)
 
-        m = np.zeros((6, 6))
-        m[0:3, 0:3] = np.eye(3) * self.mass
-        m[3, 3] = ixx
-        m[3, 4] = ixy
-        m[3, 5] = ixz
-        m[4, 3] = ixy
-        m[4, 4] = iyy
-        m[4, 5] = iyz
-        m[5, 3] = ixz
-        m[5, 4] = iyz
-        m[5, 5] = izz
-        self.inertia = m
+        # m = np.zeros((6, 6))
+        # m[0:3, 0:3] = np.eye(3) * self.mass
+        i = np.zeros((3, 3))
+        i[0, 0] = ixx
+        i[0, 1] = ixy
+        i[0, 2] = ixz
+        i[1, 0] = ixy
+        i[1, 1] = iyy
+        i[1, 2] = iyz
+        i[2, 0] = ixz
+        i[2, 1] = iyz
+        i[2, 2] = izz
+        self.inertia = i  # inertia tensor in local frame
 
-    def mpcontrol(self, rz_phi, r1, r2, xs):
+    def mpcontrol(self, rz_phi, r1, r2, x):
+        i_global = np.dot(np.dot(rz_phi, self.inertia), rz_phi.T)
+        i_inv = np.linalg.inv(i_global)
         # r1 = foot position
-        theta = SX.sym('theta')
-        p = SX.sym('p')
-        omega = SX.sym('omega')
-        pdot = SX.sym('pdot')
-        states = np.array([theta, p, omega, pdot]).T  # state vector x
+        theta_x = SX.sym('theta_x')
+        theta_y = SX.sym('theta_y')
+        theta_z = SX.sym('theta_z')
+        theta = np.array([theta_x, theta_y, theta_z])
+        p_x = SX.sym('p_x')
+        p_y = SX.sym('p_y')
+        p_z = SX.sym('p_z')
+        p = np.array([p_x, p_y, p_z])
+        omega_x = SX.sym('omega_x')
+        omega_y = SX.sym('omega_y')
+        omega_z = SX.sym('omega_z')
+        omega = np.array([omega_x, omega_y, omega_z])
+        pdot_x = SX.sym('pdot_x')
+        pdot_y = SX.sym('pdot_y')
+        pdot_z = SX.sym('pdot_z')
+        pdot = np.array([pdot_x, pdot_y, pdot_z])
+        states = np.array([theta.T, p.T, omega.T, pdot.T]).T  # state vector x
         n_states = len(states)  # number of states
 
-        f1 = SX.sym('f1')  # controls
-        f2 = SX.sym('f2')  # controls
-        controls = np.array([f1, f2]).T
+        f1_x = SX.sym('f1_x')  # controls
+        f1_y = SX.sym('f1_y')  # controls
+        f1_z = SX.sym('f1_z')  # controls
+        f1 = np.array([f1_x, f1_y, f1_z])
+        f2_x = SX.sym('f2_x')  # controls
+        f2_y = SX.sym('f2_y')  # controls
+        f2_z = SX.sym('f2_z')  # controls
+        f2 = np.array([f2_x, f2_y, f2_z])
+        controls = np.array([f1.T, f2.T]).T
         n_controls = len(controls)  # number of controls
 
-        g = ([SX.zeros(1, 3), SX.zeros(1, 3), SX.zeros(1, 3), grav.T]).T
+        g = np.zeros((3, 4))
+        g[0:4, 3:] = self.gravity.T
+        g = g.T
+        print(g)
+        A = np.array([[np.ones((3, 3)), np.zeros((3, 3)), np.ones((3, 3)), np.zeros((3, 3))],
+                      [np.zeros((3, 3)), np.ones((3, 3)), np.zeros((3, 3)), np.ones((3, 3))],
+                      [np.zeros((3, 3)), np.zeros((3, 3)), np.ones((3, 3)), np.zeros((3, 3))],
+                      [np.zeros((3, 3)), np.zeros((3, 3)), np.zeros((3, 3)), np.ones((3, 3))]])
+        A[0, 2] *= rz_phi * self.dt  # define
+        A[1, 3] *= self.dt
 
-        A = SX.eye(4)
-        A[0, 2] = dot(Rz(phi), self.dt)  # define
-        A[1, 3] = self.dt
+        B = np.array([[np.zeros((3, 3)), np.zeros((3, 3))],
+                      [np.zeros((3, 3)), np.zeros((3, 3))],
+                      [np.zeros((3, 3)), np.zeros((3, 3))],
+                      [np.ones((3, 3)), np.ones((3, 3))]])
+        B[2, 0] = i_inv * r1 * self.dt
+        B[2, 1] = i_inv * r2 * self.dt
+        B[3, 0] *= self.dt / self.mass
+        B[3, 1] *= self.dt / self.mass
 
-        B = ([SX.zeros(3, 3), SX.zeros(3, 3)],
-             [SX.zeros(3, 3), SX.zeros(3, 3)],
-             [SX.zeros(3, 3), SX.zeros(3, 3)],
-             [SX.zeros(3, 3), SX.zeros(3, 3)])
-        B[2, 0] = Iinv * r1 * self.dt
-        B[2, 1] = Iinv * r2 * self.dt
-        B[3, 0] = ones(3, 3) * self.dt / m
-        B[3, 1] = ones(3, 3) * self.dt / m
-
-        x_next = dot(A, states) + dot(B, controls) + g  # the discrete dynamics of the system
+        x_next = np.dot(A, states) + np.dot(B, controls) + g  # the discrete dynamics of the system
 
         fn = Function('fn', [states, controls], x_next)  # nonlinear mapping of function f(x,u)
         u = SX.sym('u', n_controls, self.N)  # decision variables, control action matrix
@@ -108,7 +134,9 @@ class Mpc:
         for k in range(0, self.N - 1):  # N-1 because of python zero based indexing
             st = x[:, k]  # extract the previous state from x
             con = u[:, k]  # extract controls from control matrix
-            st_next = fn(st, con)  # pass states and controls through function
+            # st_next = fn(st, con)  # pass states and controls through function
+            f_value = fn(st, con)
+            st_next = st + (self.dt * f_value)
             x[:, k + 1] = st_next
 
         # function for optimal traj knowing optimal sol
@@ -156,8 +184,8 @@ class Mpc:
 
         # -------------Starting Simulation Loop Now------------------------------------- #
         t0 = 0
-        x0 = array([0, 0, 0, 0]).T  # initial condition, gets updated every iteration
-        xs = array([0, 0, 0, 0]).T  # reference posture (INPUT?)
+        x0 = array([0, 0, 0, 0]).T  # initial condition, gets updated every iteration (input)
+        xs = array([0, 0, 0, 0]).T  # reference posture (desired)
 
         xx[:, 0] = x0  # contains history of states
         t[0] = t0

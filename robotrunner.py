@@ -80,6 +80,8 @@ class Runner:
         self.r_l = np.array([0, 0, 0])  # initial footstep planning position
         self.r_r = np.array([0, 0, 0])  # initial footstep planning position
 
+        self.p = np.array([0, 0, 0])  # initial body position
+
     def run(self):
 
         steps = 0
@@ -128,11 +130,11 @@ class Runner:
             pos_l = np.dot(b_orient, self.leg_left.position()[:, -1])
             pos_r = np.dot(b_orient, self.leg_right.position()[:, -1])
 
-            # omega = transforms3d.euler.quat2euler(self.simulator.omega, axes='szyx')
+            v = np.array(self.simulator.v)  # base linear velocity in global Cartesian coordinates
 
-            v = np.array(self.simulator.v)
+            theta = np.array(transforms3d.euler.mat2euler(b_orient, axes='sxyz'))
 
-            phi = transforms3d.euler.mat2euler(b_orient, axes='szyx')[0]
+            phi = np.array(transforms3d.euler.mat2euler(b_orient, axes='szyx'))[0]
             c_phi = np.cos(phi)
             s_phi = np.sin(phi)
             # rotation matrix Rz(phi)
@@ -159,7 +161,11 @@ class Runner:
             if contact_r is True and prev_contact_r is False:
                 self.r_r = self.footstep(robotleg=0, rz_phi=rz_phi, v=v, v_d=0)
 
-            # forces = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, xs=1)
+            omega = np.array(self.simulator.omega_xyz)
+            p_dot = v
+            x = np.array([theta.T, self.p.T, omega.T, p_dot.T])
+            forces = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x=x)
+            print("forces = ", forces)
 
             # calculate wbc control signal
             self.u_l = self.gait_left.u(state=state_l,

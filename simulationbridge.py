@@ -55,6 +55,7 @@ class Sim:
 
     def __init__(self, dt=1e-3):
         self.dt = dt
+        self.omega_xyz = None
         self.omega = None
         self.v = None
         # print(p.getJointInfo(bot, 3))
@@ -94,10 +95,10 @@ class Sim:
         p.setJointMotorControlArray(bot, jointArray, p.TORQUE_CONTROL, forces=torque)
         velocities = p.getBaseVelocity(bot)
         self.v = velocities[0]  # base linear velocity in global Cartesian coordinates
-        omega_xyz = velocities[1]  # base angular velocity in Euler XYZ
+        self.omega_xyz = velocities[1]  # base angular velocity in Euler XYZ
         # print(omega_xyz[2], omega_xyz[1], omega_xyz[0])
         # base angular velocity in quaternions
-        self.omega = transforms3d.euler.euler2quat(omega_xyz[0], omega_xyz[1], omega_xyz[2], axes='rxyz')
+        # self.omega = transforms3d.euler.euler2quat(omega_xyz[0], omega_xyz[1], omega_xyz[2], axes='rxyz')
         # found to be intrinsic Euler angles (r)
 
         # Pull values in from simulator, select relevant ones, reshape to 2D array

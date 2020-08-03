@@ -155,24 +155,12 @@ class Control(control.Control):
             null_signal = np.dot(null_filter, Fq_null).reshape(-1, )
 
             self.u += null_signal
-        '''
-        if self.posture:
-            # keeps body pitch level
-            base_y = transforms3d.euler.mat2euler(b_orient, axes='ryxz')[0]  # get y axis rotation of base
-            q1 = leg.q[1]
-            q2 = leg.q[2]
 
-            # keep base level
-            body_target = np.array([0, 0, 0, 0])
-            u_level = np.dot(self.kn, -base_y + angles - leg.q)
-            self.u += u_level
-        '''
         if self.leveler:
             # keeps ee pitch level
             base_y = transforms3d.euler.mat2euler(b_orient, axes='ryxz')[0]  # get y axis rotation of base
             q1 = leg.q[1]
             q2 = leg.q[2]
-            print(q1)
             # keep ee level
             ee_target = -(q1 + q2)
             angles = np.array([0, np.pi * 32 / 180, 0, ee_target])
