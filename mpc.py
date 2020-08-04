@@ -32,7 +32,6 @@ class Mpc:
         self.dt = dt  # sampling time (s)
         self.N = 3  # prediction horizon
         self.mass = float(12.12427)  # kg
-        self.gravity = np.array([[0, 0, -9.807]])
 
         self.f_max = 5
         self.f_min = -self.f_max
@@ -71,55 +70,53 @@ class Mpc:
         theta_x = SX.sym('theta_x')
         theta_y = SX.sym('theta_y')
         theta_z = SX.sym('theta_z')
-        theta = np.array([theta_x, theta_y, theta_z])
+        theta = np.array([[theta_x, theta_y, theta_z]])
         p_x = SX.sym('p_x')
         p_y = SX.sym('p_y')
         p_z = SX.sym('p_z')
-        p = np.array([p_x, p_y, p_z])
+        p = np.array([[p_x, p_y, p_z]])
         omega_x = SX.sym('omega_x')
         omega_y = SX.sym('omega_y')
         omega_z = SX.sym('omega_z')
-        omega = np.array([omega_x, omega_y, omega_z])
+        omega = np.array([[omega_x, omega_y, omega_z]])
         pdot_x = SX.sym('pdot_x')
         pdot_y = SX.sym('pdot_y')
         pdot_z = SX.sym('pdot_z')
-        pdot = np.array([pdot_x, pdot_y, pdot_z])
-        states = np.array([theta.T, p.T, omega.T, pdot.T]).T  # state vector x
+        pdot = np.array([[pdot_x, pdot_y, pdot_z]])
+        states = np.vstack((theta.T, p.T, omega.T, pdot.T))  # state vector x
         n_states = len(states)  # number of states
 
         f1_x = SX.sym('f1_x')  # controls
         f1_y = SX.sym('f1_y')  # controls
         f1_z = SX.sym('f1_z')  # controls
-        f1 = np.array([f1_x, f1_y, f1_z])
+        f1 = np.array([[f1_x, f1_y, f1_z]])
         f2_x = SX.sym('f2_x')  # controls
         f2_y = SX.sym('f2_y')  # controls
         f2_z = SX.sym('f2_z')  # controls
-        f2 = np.array([f2_x, f2_y, f2_z])
-        controls = np.array([f1.T, f2.T]).T
+        f2 = np.array([[f2_x, f2_y, f2_z]])
+        controls = np.vstack([f1.T, f2.T])
         n_controls = len(controls)  # number of controls
 
-        g = np.zeros((3, 4))
-        g[0:4, 3:] = self.gravity.T
-        g = g.T
-        print(g)
-        A = np.array([[np.ones((3, 3)), np.zeros((3, 3)), np.ones((3, 3)), np.zeros((3, 3))],
-                      [np.zeros((3, 3)), np.ones((3, 3)), np.zeros((3, 3)), np.ones((3, 3))],
-                      [np.zeros((3, 3)), np.zeros((3, 3)), np.ones((3, 3)), np.zeros((3, 3))],
-                      [np.zeros((3, 3)), np.zeros((3, 3)), np.zeros((3, 3)), np.ones((3, 3))]])
-        A[0, 2] *= rz_phi * self.dt  # define
-        A[1, 3] *= self.dt
+        g = np.zeros((12, 1))
+        g[11] = -9.807
 
-        B = np.array([[np.zeros((3, 3)), np.zeros((3, 3))],
-                      [np.zeros((3, 3)), np.zeros((3, 3))],
-                      [np.zeros((3, 3)), np.zeros((3, 3))],
-                      [np.ones((3, 3)), np.ones((3, 3))]])
-        B[2, 0] = i_inv * r1 * self.dt
-        B[2, 1] = i_inv * r2 * self.dt
-        B[3, 0] *= self.dt / self.mass
-        B[3, 1] *= self.dt / self.mass
+        A = np.zeros((12, 12))
+        A[0:3, 0:3] = np.ones((3, 3))
+        A[3:6, 3:6] = np.ones((3, 3))
+        A[6:9, 6:9] = np.ones((3, 3))
+        A[9:12, 9:12] = np.ones((3, 3))
+
+        A[0:3, 6:9] = rz_phi * self.dt  # define
+        A[3:6, 9:12] = self.dt
+
+        B = np.zeros((12, 6))
+        B[6:9, 0:3] = i_inv * r1 * self.dt
+        B[6:9, 3:6] = i_inv * r2 * self.dt
+        B[9:12, 0:3] = self.dt / self.mass
+        B[9:12, 3:6] = self.dt / self.mass
 
         x_next = np.dot(A, states) + np.dot(B, controls) + g  # the discrete dynamics of the system
-
+        print(x_next)
         fn = Function('fn', [states, controls], x_next)  # nonlinear mapping of function f(x,u)
         u = SX.sym('u', n_controls, self.N)  # decision variables, control action matrix
         st_ref = SX.sym('st_ref', n_states + n_states)  # initial and reference states
