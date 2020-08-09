@@ -66,99 +66,157 @@ class Mpc:
     def mpcontrol(self, rz_phi, r1, r2, x):
         i_global = np.dot(np.dot(rz_phi, self.inertia), rz_phi.T)
         i_inv = np.linalg.inv(i_global)
-        # r1 = foot position
-        theta_x = SX.sym('theta_x')
-        theta_y = SX.sym('theta_y')
-        theta_z = SX.sym('theta_z')
-        theta = np.array([[theta_x, theta_y, theta_z]])
-        p_x = SX.sym('p_x')
-        p_y = SX.sym('p_y')
-        p_z = SX.sym('p_z')
-        p = np.array([[p_x, p_y, p_z]])
-        omega_x = SX.sym('omega_x')
-        omega_y = SX.sym('omega_y')
-        omega_z = SX.sym('omega_z')
-        omega = np.array([[omega_x, omega_y, omega_z]])
-        pdot_x = SX.sym('pdot_x')
-        pdot_y = SX.sym('pdot_y')
-        pdot_z = SX.sym('pdot_z')
-        pdot = np.array([[pdot_x, pdot_y, pdot_z]])
-        states = np.vstack((theta.T, p.T, omega.T, pdot.T))  # state vector x
+        i11 = i_inv[0, 0]
+        i12 = i_inv[0, 1]
+        i13 = i_inv[0, 2]
+        i21 = i_inv[1, 0]
+        i22 = i_inv[1, 1]
+        i23 = i_inv[1, 2]
+        i31 = i_inv[2, 0]
+        i32 = i_inv[2, 1]
+        i33 = i_inv[2, 2]
+
+        rz11 = rz_phi[0, 0]
+        rz12 = rz_phi[0, 1]
+        rz13 = rz_phi[0, 2]
+        rz21 = rz_phi[1, 0]
+        rz22 = rz_phi[1, 1]
+        rz23 = rz_phi[1, 2]
+        rz31 = rz_phi[2, 0]
+        rz32 = rz_phi[2, 1]
+        rz33 = rz_phi[2, 2]
+
+        r1x = r1[0]
+        r1y = r1[1]
+        r1z = r1[2]
+        r2x = r2[0]
+        r2y = r2[1]
+        r2z = r2[2]
+        # r = foot position
+
+        theta_x = MX.sym('theta_x')
+        theta_y = MX.sym('theta_y')
+        theta_z = MX.sym('theta_z')
+        p_x = MX.sym('p_x')
+        p_y = MX.sym('p_y')
+        p_z = MX.sym('p_z')
+        omega_x = MX.sym('omega_x')
+        omega_y = MX.sym('omega_y')
+        omega_z = MX.sym('omega_z')
+        pdot_x = MX.sym('pdot_x')
+        pdot_y = MX.sym('pdot_y')
+        pdot_z = MX.sym('pdot_z')
+        states = [theta_x, theta_y, theta_z,
+                  p_x, p_y, p_z,
+                  omega_x, omega_y, omega_z,
+                  pdot_x, pdot_y, pdot_z]  # state vector x
         n_states = len(states)  # number of states
 
-        f1_x = SX.sym('f1_x')  # controls
-        f1_y = SX.sym('f1_y')  # controls
-        f1_z = SX.sym('f1_z')  # controls
-        f1 = np.array([[f1_x, f1_y, f1_z]])
-        f2_x = SX.sym('f2_x')  # controls
-        f2_y = SX.sym('f2_y')  # controls
-        f2_z = SX.sym('f2_z')  # controls
-        f2 = np.array([[f2_x, f2_y, f2_z]])
-        controls = np.vstack([f1.T, f2.T])
+        f1_x = MX.sym('f1_x')  # controls
+        f1_y = MX.sym('f1_y')  # controls
+        f1_z = MX.sym('f1_z')  # controls
+        f2_x = MX.sym('f2_x')  # controls
+        f2_y = MX.sym('f2_y')  # controls
+        f2_z = MX.sym('f2_z')  # controls
+        controls = [f1_x, f1_y, f1_z, f2_x, f2_y, f2_z]
         n_controls = len(controls)  # number of controls
 
-        g = np.zeros((12, 1))
-        g[11] = -9.807
+        gravity = -9.807
+        dt = self.dt
+        mass = self.mass
 
-        A = np.zeros((12, 12))
-        A[0:3, 0:3] = np.ones((3, 3))
-        A[3:6, 3:6] = np.ones((3, 3))
-        A[6:9, 6:9] = np.ones((3, 3))
-        A[9:12, 9:12] = np.ones((3, 3))
+        # x_next = np.dot(A, states) + np.dot(B, controls) + g  # the discrete dynamics of the system
+        x_next = [(dt * omega_x * rz11 + dt * omega_y * rz12 + dt * omega_z * rz13 + theta_x + theta_y + theta_z),
+                  (dt * omega_x * rz21 + dt * omega_y * rz22 + dt * omega_z * rz23 + theta_x + theta_y + theta_z),
+                  (dt * omega_x * rz31 + dt * omega_y * rz32 + dt * omega_z * rz33 + theta_x + theta_y + theta_z),
+                  (dt * pdot_x + dt * pdot_y + dt * pdot_z + p_x + p_y + p_z),
+                  (dt * pdot_x + dt * pdot_y + dt * pdot_z + p_x + p_y + p_z),
+                  (dt * pdot_x + dt * pdot_y + dt * pdot_z + p_x + p_y + p_z),
+                  (dt * f1_x * (i12 * r1z - i13 * r1y) + dt * f1_y * (-i11 * r1z + i13 * r1x)
+                   + dt * f1_z * (i11 * r1y - i12 * r1x)
+                   + dt * f2_x * (i12 * r2z - i13 * r2y) + dt * f2_y * (-i11 * r2z + i13 * r2x)
+                   + dt * f2_z * (i11 * r2y - i12 * r2x)
+                   + omega_x + omega_y + omega_z),
+                  (dt * f1_x * (i22 * r1z - i23 * r1y) + dt * f1_y * (-i21 * r1z + i23 * r1x)
+                   + dt * f1_z * (i21 * r1y - i22 * r1x)
+                   + dt * f2_x * (i22 * r2z - i23 * r2y) + dt * f2_y * (-i21 * r2z + i23 * r2x)
+                   + dt * f2_z * (i21 * r2y - i22 * r2x)
+                   + omega_x + omega_y + omega_z),
+                  (dt * f1_x * (i32 * r1z - i33 * r1y) + dt * f1_y * (-i31 * r1z + i33 * r1x)
+                   + dt * f1_z * (i31 * r1y - i32 * r1x)
+                   + dt * f2_x * (i32 * r2z - i33 * r2y) + dt * f2_y * (-i31 * r2z + i33 * r2x)
+                   + dt * f2_z * (i31 * r2y - i32 * r2x)
+                   + omega_x + omega_y + omega_z),
+                  (dt * f1_x / mass + dt * f1_y / mass + dt * f1_z / mass + dt * f2_x / mass
+                   + dt * f2_y / mass + dt * f2_z / mass + pdot_x + pdot_y + pdot_z),
+                  (dt * f1_x / mass + dt * f1_y / mass + dt * f1_z / mass + dt * f2_x / mass
+                   + dt * f2_y / mass + dt * f2_z / mass + pdot_x + pdot_y + pdot_z),
+                  (dt * f1_x / mass + dt * f1_y / mass + dt * f1_z / mass + dt * f2_x / mass
+                   + dt * f2_y / mass + dt * f2_z / mass + gravity + pdot_x + pdot_y + pdot_z)]
 
-        A[0:3, 6:9] = rz_phi * self.dt  # define
-        A[3:6, 9:12] = self.dt
+        fn = Function('fn', [theta_x, theta_y, theta_z,
+                             p_x, p_y, p_z,
+                             omega_x, omega_y, omega_z,
+                             pdot_x, pdot_y, pdot_z,
+                             f1_x, f1_y, f1_z,
+                             f2_x, f2_y, f2_z],
+                      x_next)  # nonlinear mapping of function f(x,u)
+        u = MX.sym('u', n_controls, self.N)  # decision variables, control action matrix
+        st_ref = MX.sym('st_ref', n_states + n_states)  # initial and reference states
 
-        B = np.zeros((12, 6))
-        B[6:9, 0:3] = i_inv * r1 * self.dt
-        B[6:9, 3:6] = i_inv * r2 * self.dt
-        B[9:12, 0:3] = self.dt / self.mass
-        B[9:12, 3:6] = self.dt / self.mass
-
-        x_next = np.dot(A, states) + np.dot(B, controls) + g  # the discrete dynamics of the system
-        print(x_next)
-        fn = Function('fn', [states, controls], x_next)  # nonlinear mapping of function f(x,u)
-        u = SX.sym('u', n_controls, self.N)  # decision variables, control action matrix
-        st_ref = SX.sym('st_ref', n_states + n_states)  # initial and reference states
-
-        x = SX.sym('x', n_states, (self.N + 1))  # represents the states over the opt problem.
+        x = MX.sym('x', n_states, (self.N + 1))  # represents the states over the opt problem.
 
         # compute solution symbolically
-        x[:, 0] = st_ref[0:3]  # initial state
-        'In Python, slicing is left inclusive and right exclusive, '
-        'whereas in MATLAB slicing is inclusive at both.'
-        'Matlab uses one based indexing while python uses zero based indexing.'
+        x[:, 0] = st_ref[0:12]  # initial state
+        # In Python, slicing is left inclusive and right exclusive,
+        # whereas in MATLAB slicing is inclusive at both.
+        # Matlab uses one based indexing while python uses zero based indexing.
         for k in range(0, self.N - 1):  # N-1 because of python zero based indexing
             st = x[:, k]  # extract the previous state from x
             con = u[:, k]  # extract controls from control matrix
             # st_next = fn(st, con)  # pass states and controls through function
-            f_value = fn(st, con)
-            st_next = st + (self.dt * f_value)
-            x[:, k + 1] = st_next
+            for j in range(0, 11):
+                x[j, k + 1] = fn(st[0], st[1], st[2], st[3], st[4], st[5], st[6], st[7], st[8], st[9], st[10],
+                                 st[11], con[0], con[1], con[2], con[3], con[4], con[5])[j]  # because CasADI is dumb
+
+            # st_next = [st + element * self.dt for element in f_value]
+            # ^n/a here. Already x(k+1). Mehrez used xdot as rhs
 
         # function for optimal traj knowing optimal sol
-        ff = Function('ff', [u, st_ref], x)
+        ff = Function('ff', [u, st_ref], [x])
 
         obj = 0  # objective function
         constr = []  # constraints vector
 
-        Q = zeros(4, 4)  # state weighing matrix
+        Q = np.zeros((12, 12))  # state weighing matrix
         Q[0, 0] = 1
         Q[1, 1] = 1
         Q[2, 2] = 1
         Q[3, 3] = 1
+        Q[4, 4] = 1
+        Q[5, 5] = 1
+        Q[6, 6] = 1
+        Q[7, 7] = 1
+        Q[8, 8] = 1
+        Q[9, 9] = 1
+        Q[10, 10] = 1
+        Q[11, 11] = 1
 
-        R = zeros(2, 2)  # control weighing matrix
+        R = np.zeros((6, 6))  # control weighing matrix
         R[0, 0] = 1
         R[1, 1] = 1
+        R[2, 2] = 1
+        R[3, 3] = 1
+        R[4, 4] = 1
+        R[5, 5] = 1
 
         # compute objective
         for k in range(0, self.N - 1):  # 0 and N-1 because of python zero based indexing
             st = x[:, k + 1]
             con = u[:, k]  # control action
             # calculate objective
-            obj = obj + dot(dot((st - st_ref[3:6]).T, Q), st - st_ref[3:6]) \
-                  + dot(dot(con.T, R), con)
+            obj = obj + np.dot(np.dot((st - st_ref[3:6]).T, Q), st - st_ref[3:6]) \
+                + np.dot(np.dot(con.T, R), con)
 
         # compute constraints
         for k in range(0, self.N):  # would be N+1 in matlab
