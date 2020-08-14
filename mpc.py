@@ -13,6 +13,14 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+Reference Material:
+
+Highly Dynamic Quadruped Locomotion via Whole-Body Impulse Control and Model Predictive Control
+Donghyun Kim et al.
+
+https://www.youtube.com/watch?v=RrnkPrcpyEA
+https://github.com/MMehrez/ ...Sim_1_MPC_Robot_PS_sing_shooting.m
 """
 
 import numpy as np
@@ -161,6 +169,7 @@ class Mpc:
                              f1_x, f1_y, f1_z,
                              f2_x, f2_y, f2_z],
                       x_next)  # nonlinear mapping of function f(x,u)
+
         u = MX.sym('u', n_controls, self.N)  # decision variables, control action matrix
         st_ref = MX.sym('st_ref', n_states + n_states)  # initial and reference states
 
@@ -177,8 +186,8 @@ class Mpc:
             # st_next = fn(st, con)  # pass states and controls through function
             for j in range(0, 11):
                 x[j, k + 1] = fn(st[0], st[1], st[2], st[3], st[4], st[5], st[6], st[7], st[8], st[9], st[10],
-                                 st[11], con[0], con[1], con[2], con[3], con[4], con[5])[j]  # because CasADI is dumb
-
+                                 st[11], con[0], con[1], con[2], con[3], con[4], con[5])[j]
+                # because CasADI is dumb
             # st_next = [st + element * self.dt for element in f_value]
             # ^n/a here. Already x(k+1). Mehrez used xdot as rhs
 
@@ -211,25 +220,24 @@ class Mpc:
         R[5, 5] = 1
 
         # compute objective
-        for k in range(0, self.N - 1):  # 0 and N-1 because of python zero based indexing
+        for k in range(0, self.N-1):  # 0 and N-1 because of python zero based indexing
             st = x[:, k + 1]
             con = u[:, k]  # control action
             # calculate objective
-            obj = obj + np.dot(np.dot((st - st_ref[3:6]).T, Q), st - st_ref[3:6]) \
-                + np.dot(np.dot(con.T, R), con)
+            obj = obj + mtimes(mtimes((st - st_ref[11:23]).T, Q), st - st_ref[11:23]) \
+                + mtimes(mtimes(con.T, R), con)
 
         # compute constraints
         for k in range(0, self.N):  # would be N+1 in matlab
-            constr = np.vstack(constr, x(0, k))
-            constr = np.vstack(constr, x(1, k))
-            constr = np.vstack(constr, x(2, k))
-            constr = np.vstack(constr, x(3, k))
+            for j in range(0, 11):
+                constr = vertcat(constr, x[j, k])  # f1x
 
         # make decision variables one column vector
-        opt_variables = reshape(u, 2 * self.N, 1)
-        qp = {'f', obj, 'x', opt_variables, 'constr', constr, 'st_ref', st_ref}
+        opt_variables = reshape(u, 18, 1)
 
-        solver = qpsol('S', 'qpoases', qp)
+        qp = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
+        opts = {'max_iter': 100}
+        solver = qpsol('S', 'qpoases', qp, opts)
 
         args = {lbg: -2,  # inequality constraints: lower bound
                 ubg: 2,  # inequality constraints: upper bound
@@ -239,7 +247,7 @@ class Mpc:
 
         # -------------Starting Simulation Loop Now------------------------------------- #
         t0 = 0
-        x0 = array([0, 0, 0, 0]).T  # initial condition, gets updated every iteration (input)
+        x0 = array([0, 0, 0, 0]).T  # initial condition of the bot, gets updated every iteration (input)
         xs = array([0, 0, 0, 0]).T  # reference posture (desired)
 
         xx[:, 0] = x0  # contains history of states
