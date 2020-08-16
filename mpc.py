@@ -27,7 +27,7 @@ import numpy as np
 import scipy
 import csv
 
-from casadi import *
+import casadi as cs
 
 import control
 
@@ -102,30 +102,30 @@ class Mpc:
         r2z = r2[2]
         # r = foot position
 
-        theta_x = MX.sym('theta_x')
-        theta_y = MX.sym('theta_y')
-        theta_z = MX.sym('theta_z')
-        p_x = MX.sym('p_x')
-        p_y = MX.sym('p_y')
-        p_z = MX.sym('p_z')
-        omega_x = MX.sym('omega_x')
-        omega_y = MX.sym('omega_y')
-        omega_z = MX.sym('omega_z')
-        pdot_x = MX.sym('pdot_x')
-        pdot_y = MX.sym('pdot_y')
-        pdot_z = MX.sym('pdot_z')
+        theta_x = cs.SX.sym('theta_x')
+        theta_y = cs.SX.sym('theta_y')
+        theta_z = cs.SX.sym('theta_z')
+        p_x = cs.SX.sym('p_x')
+        p_y = cs.SX.sym('p_y')
+        p_z = cs.SX.sym('p_z')
+        omega_x = cs.SX.sym('omega_x')
+        omega_y = cs.SX.sym('omega_y')
+        omega_z = cs.SX.sym('omega_z')
+        pdot_x = cs.SX.sym('pdot_x')
+        pdot_y = cs.SX.sym('pdot_y')
+        pdot_z = cs.SX.sym('pdot_z')
         states = [theta_x, theta_y, theta_z,
                   p_x, p_y, p_z,
                   omega_x, omega_y, omega_z,
                   pdot_x, pdot_y, pdot_z]  # state vector x
         n_states = len(states)  # number of states
 
-        f1_x = MX.sym('f1_x')  # controls
-        f1_y = MX.sym('f1_y')  # controls
-        f1_z = MX.sym('f1_z')  # controls
-        f2_x = MX.sym('f2_x')  # controls
-        f2_y = MX.sym('f2_y')  # controls
-        f2_z = MX.sym('f2_z')  # controls
+        f1_x = cs.SX.sym('f1_x')  # controls
+        f1_y = cs.SX.sym('f1_y')  # controls
+        f1_z = cs.SX.sym('f1_z')  # controls
+        f2_x = cs.SX.sym('f2_x')  # controls
+        f2_y = cs.SX.sym('f2_y')  # controls
+        f2_z = cs.SX.sym('f2_z')  # controls
         controls = [f1_x, f1_y, f1_z, f2_x, f2_y, f2_z]
         n_controls = len(controls)  # number of controls
 
@@ -162,7 +162,7 @@ class Mpc:
                   (dt * f1_x / mass + dt * f1_y / mass + dt * f1_z / mass + dt * f2_x / mass
                    + dt * f2_y / mass + dt * f2_z / mass + gravity + pdot_x + pdot_y + pdot_z)]
 
-        fn = Function('fn', [theta_x, theta_y, theta_z,
+        fn = cs.Function('fn', [theta_x, theta_y, theta_z,
                              p_x, p_y, p_z,
                              omega_x, omega_y, omega_z,
                              pdot_x, pdot_y, pdot_z,
@@ -170,10 +170,10 @@ class Mpc:
                              f2_x, f2_y, f2_z],
                       x_next)  # nonlinear mapping of function f(x,u)
 
-        u = MX.sym('u', n_controls, self.N)  # decision variables, control action matrix
-        st_ref = MX.sym('st_ref', n_states + n_states)  # initial and reference states
+        u = cs.SX.sym('u', n_controls, self.N)  # decision variables, control action matrix
+        st_ref = cs.SX.sym('st_ref', n_states + n_states)  # initial and reference states
 
-        x = MX.sym('x', n_states, (self.N + 1))  # represents the states over the opt problem.
+        x = cs.SX.sym('x', n_states, (self.N + 1))  # represents the states over the opt problem.
 
         # compute solution symbolically
         x[:, 0] = st_ref[0:12]  # initial state
@@ -192,7 +192,7 @@ class Mpc:
             # ^n/a here. Already x(k+1). Mehrez used xdot as rhs
 
         # function for optimal traj knowing optimal sol
-        ff = Function('ff', [u, st_ref], [x])
+        ff = cs.Function('ff', [u, st_ref], [x])
 
         obj = 0  # objective function
         constr = []  # constraints vector
@@ -224,20 +224,20 @@ class Mpc:
             st = x[:, k + 1]
             con = u[:, k]  # control action
             # calculate objective
-            obj = obj + mtimes(mtimes((st - st_ref[11:23]).T, Q), st - st_ref[11:23]) \
-                + mtimes(mtimes(con.T, R), con)
+            obj = obj + cs.mtimes(cs.mtimes((st - st_ref[11:23]).T, Q), st - st_ref[11:23]) \
+                + cs.mtimes(cs.mtimes(con.T, R), con)
 
         # compute constraints
         for k in range(0, self.N):  # would be N+1 in matlab
             for j in range(0, 11):
-                constr = vertcat(constr, x[j, k])  # f1x
+                constr = cs.vertcat(constr, x[j, k])  # f1x
 
         # make decision variables one column vector
-        opt_variables = reshape(u, 18, 1)
+        opt_variables = cs.vertcat(cs.reshape(x, n_states*(self.N + 1), 1), cs.reshape(u, n_controls*self.N, 1))
 
         qp = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
         opts = {'max_iter': 100}
-        solver = qpsol('S', 'qpoases', qp, opts)
+        solver = cs.qpsol('S', 'qpoases', qp, opts)
 
         args = {lbg: -2,  # inequality constraints: lower bound
                 ubg: 2,  # inequality constraints: upper bound
