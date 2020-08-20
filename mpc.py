@@ -74,6 +74,7 @@ class Mpc:
     def mpcontrol(self, rz_phi, r1, r2, x):
         i_global = np.dot(np.dot(rz_phi, self.inertia), rz_phi.T)
         i_inv = np.linalg.inv(i_global)
+        '''
         i11 = i_inv[0, 0]
         i12 = i_inv[0, 1]
         i13 = i_inv[0, 2]
@@ -93,14 +94,41 @@ class Mpc:
         rz31 = rz_phi[2, 0]
         rz32 = rz_phi[2, 1]
         rz33 = rz_phi[2, 2]
-
+        
+        # r = foot position
         r1x = r1[0]
         r1y = r1[1]
         r1z = r1[2]
         r2x = r2[0]
         r2y = r2[1]
         r2z = r2[2]
-        # r = foot position
+        '''
+        i11 = cs.SX.sym("i11")
+        i12 = cs.SX.sym("i12")
+        i13 = cs.SX.sym("i13")
+        i21 = cs.SX.sym("i21")
+        i22 = cs.SX.sym("i22")
+        i23 = cs.SX.sym("i23")
+        i31 = cs.SX.sym("i31")
+        i32 = cs.SX.sym("i32")
+        i33 = cs.SX.sym("i33")
+
+        rz11 = cs.SX.sym("rz11")
+        rz12 = cs.SX.sym("rz12")
+        rz13 = cs.SX.sym("rz13")
+        rz21 = cs.SX.sym("rz21")
+        rz22 = cs.SX.sym("rz22")
+        rz23 = cs.SX.sym("rz23")
+        rz31 = cs.SX.sym("rz31")
+        rz32 = cs.SX.sym("rz32")
+        rz33 = cs.SX.sym("rz33")
+
+        r1x = cs.SX.sym("r1x")
+        r1y = cs.SX.sym("r1y")
+        r1z = cs.SX.sym("r1z")
+        r2x = cs.SX.sym("r2x")
+        r2y = cs.SX.sym("r2y")
+        r2z = cs.SX.sym("r2z")
 
         theta_x = cs.SX.sym('theta_x')
         theta_y = cs.SX.sym('theta_y')
@@ -129,10 +157,12 @@ class Mpc:
         controls = [f1_x, f1_y, f1_z, f2_x, f2_y, f2_z]
         n_controls = len(controls)  # number of controls
 
-        gravity = -9.807
-        dt = self.dt
-        mass = self.mass
-
+        # gravity = -9.807
+        # dt = self.dt
+        # mass = self.mass
+        gravity = cs.SX.sym("gravity")
+        dt = cs.SX.sym("dt")
+        mass = cs.SX.sym("mass")
         # x_next = np.dot(A, states) + np.dot(B, controls) + g  # the discrete dynamics of the system
         x_next = [(dt * omega_x * rz11 + dt * omega_y * rz12 + dt * omega_z * rz13 + theta_x + theta_y + theta_z),
                   (dt * omega_x * rz21 + dt * omega_y * rz22 + dt * omega_z * rz23 + theta_x + theta_y + theta_z),
@@ -163,38 +193,42 @@ class Mpc:
                    + dt * f2_y / mass + dt * f2_z / mass + gravity + pdot_x + pdot_y + pdot_z)]
 
         fn = cs.Function('fn', [theta_x, theta_y, theta_z,
-                             p_x, p_y, p_z,
-                             omega_x, omega_y, omega_z,
-                             pdot_x, pdot_y, pdot_z,
-                             f1_x, f1_y, f1_z,
-                             f2_x, f2_y, f2_z],
-                      x_next)  # nonlinear mapping of function f(x,u)
+                                p_x, p_y, p_z,
+                                omega_x, omega_y, omega_z,
+                                pdot_x, pdot_y, pdot_z,
+                                f1_x, f1_y, f1_z,
+                                f2_x, f2_y, f2_z],
+                         x_next)  # nonlinear mapping of function f(x,u)
 
         u = cs.SX.sym('u', n_controls, self.N)  # decision variables, control action matrix
         st_ref = cs.SX.sym('st_ref', n_states + n_states)  # initial and reference states
-
+        # st_ref = cs.SX.sym('st_ref', n_states)  # initial and reference states
         x = cs.SX.sym('x', n_states, (self.N + 1))  # represents the states over the opt problem.
+        st_n_e = cs.SX.sym('st_n_e', n_states, (self.N + 1))  # represents the left hand side of the dynamics equation
 
+        '''
         # compute solution symbolically
         x[:, 0] = st_ref[0:12]  # initial state
+        # st_ref = cs.vertcat(x[:, 0], st_ref)
         # In Python, slicing is left inclusive and right exclusive,
         # whereas in MATLAB slicing is inclusive at both.
         # Matlab uses one based indexing while python uses zero based indexing.
-        for k in range(0, self.N - 1):  # N-1 because of python zero based indexing
+        for k in range(0, self.N - 1):  # 0 and N-1 because of python zero based indexing
             st = x[:, k]  # extract the previous state from x
             con = u[:, k]  # extract controls from control matrix
             # st_next = fn(st, con)  # pass states and controls through function
-            for j in range(0, 11):
+            for j in range(0, 12):
                 x[j, k + 1] = fn(st[0], st[1], st[2], st[3], st[4], st[5], st[6], st[7], st[8], st[9], st[10],
                                  st[11], con[0], con[1], con[2], con[3], con[4], con[5])[j]
+
                 # because CasADI is dumb
             # st_next = [st + element * self.dt for element in f_value]
             # ^n/a here. Already x(k+1). Mehrez used xdot as rhs
 
         # function for optimal traj knowing optimal sol
         ff = cs.Function('ff', [u, st_ref], [x])
-
-        obj = 0  # objective function
+        '''
+        obj = cs.SX(0)  # objective function
         constr = []  # constraints vector
 
         Q = np.zeros((12, 12))  # state weighing matrix
@@ -219,23 +253,33 @@ class Mpc:
         R[4, 4] = 1
         R[5, 5] = 1
 
-        # compute objective
-        for k in range(0, self.N-1):  # 0 and N-1 because of python zero based indexing
-            st = x[:, k + 1]
+        st = x[:, 0]  # initial state
+        constr = cs.vertcat(constr, st - st_ref[0:12])  # initial condition constraints
+
+        # compute objective and constraints
+        for k in range(0, self.N - 1):  # 0 and N-1 because of python zero based indexing
+            st = x[:, k]  # state
             con = u[:, k]  # control action
             # calculate objective
             obj = obj + cs.mtimes(cs.mtimes((st - st_ref[11:23]).T, Q), st - st_ref[11:23]) \
                 + cs.mtimes(cs.mtimes(con.T, R), con)
-
+            st_next = x[:, k + 1]
+            for j in range(0, 11):
+                st_n_e[j, k] = fn(st[0], st[1], st[2], st[3], st[4], st[5],
+                                  st[6], st[7], st[8], st[9], st[10], st[11],
+                                  con[0], con[1], con[2], con[3], con[4], con[5])[j]
+            print(np.shape(st_n_e))
+            constr = cs.vertcat(constr, st_next - st_n_e[:, k])  # compute constraints
+        '''
         # compute constraints
         for k in range(0, self.N):  # would be N+1 in matlab
             for j in range(0, 11):
                 constr = cs.vertcat(constr, x[j, k])  # f1x
-
         # make decision variables one column vector
-        opt_variables = cs.vertcat(cs.reshape(x, n_states*(self.N + 1), 1), cs.reshape(u, n_controls*self.N, 1))
+        '''
+        opt_variables = cs.vertcat(cs.reshape(x, n_states * (self.N + 1), 1), cs.reshape(u, n_controls * self.N, 1))
 
-        qp = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
+        qp = {'x': opt_variables, 'f': obj, 'p': st_ref, 'g': constr}
         opts = {'max_iter': 100}
         solver = cs.qpsol('S', 'qpoases', qp, opts)
 
