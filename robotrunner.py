@@ -163,8 +163,9 @@ class Runner:
 
             omega = np.array(self.simulator.omega_xyz)
             p_dot = v
-            x = np.array([theta.T, self.p.T, omega.T, p_dot.T])
-            forces = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x=x)
+            x_in = np.hstack([theta, self.p, omega, p_dot])  # array of the states for MPC
+
+            forces = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x_in=x_in)
             print("forces = ", forces)
 
             # calculate wbc control signal
