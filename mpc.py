@@ -40,9 +40,7 @@ class Mpc:
         self.dt = dt  # sampling time (s)
         self.N = 3  # prediction horizon
         self.mass = float(12.12427)  # kg
-
-        self.f_max = 5
-        self.f_min = -self.f_max
+        self.mu = 0.7  # coefficient of friction
 
         with open('spryped_urdf_rev06/spryped_data_body.csv', 'r') as csvfile:
             data = csv.reader(csvfile, delimiter=',')
@@ -208,12 +206,12 @@ class Mpc:
         st = x[:, 0]  # initial state
         constr = cs.vertcat(constr, st - st_ref[0:12])  # initial condition constraints
         # compute objective and constraints
-        for k in range(0, self.N - 1):  # 0 and N-1 because of python zero based indexing
+        for k in range(0, self.N-1):  # 0 because of python zero based indexing
             st = x[:, k]  # state
             con = u[:, k]  # control action
             # calculate objective
             obj = obj + cs.mtimes(cs.mtimes((st - st_ref[11:23]).T, Q), st - st_ref[11:23]) \
-                  + cs.mtimes(cs.mtimes(con.T, R), con)
+                + cs.mtimes(cs.mtimes(con.T, R), con)
             st_next = x[:, k + 1]
             for j in range(0, 11):
                 st_n_e[j, k] = fn(st[0], st[1], st[2], st[3], st[4], st[5],
@@ -221,26 +219,44 @@ class Mpc:
                                   con[0], con[1], con[2], con[3], con[4], con[5])[j]
 
             constr = cs.vertcat(constr, st_next - st_n_e[:, k])  # compute constraints
-        '''
-        # compute constraints
-        for k in range(0, self.N):  # would be N+1 in matlab
-            for j in range(0, 11):
-                constr = cs.vertcat(constr, x[j, k])  # f1x
+
+        # add additional constraints
+        for k in range(0, self.N):
+            constr = cs.vertcat(constr, u[0, k] - self.mu*u[2, k])  # f1x - mu*f1z
+
+        for k in range(0, self.N):
+            constr = cs.vertcat(constr, u[1, k] - self.mu*u[2, k])  # f1y - mu*f1z
+
+        for k in range(0, self.N):
+            constr = cs.vertcat(constr, -u[2, k])  # -f1z
+
+        for k in range(0, self.N):
+            constr = cs.vertcat(constr, u[3, k] - self.mu * u[5, k])  # f2x - mu*f2z
+
+        for k in range(0, self.N):
+            constr = cs.vertcat(constr, u[4, k] - self.mu * u[5, k])  # f2y - mu*f2z
+
+        for k in range(0, self.N):
+            constr = cs.vertcat(constr, -u[5, k])  # -f2z
         # make decision variables one column vector
-        '''
+
         opt_variables = cs.vertcat(cs.reshape(x, n_states * (self.N + 1), 1), cs.reshape(u, n_controls * self.N, 1))
 
-        qp = {'x': opt_variables, 'f': obj, 'p': st_ref, 'g': constr}
+        qp = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
         # opts = {'max_iter': 100}
         solver = cs.qpsol('S', 'qpoases', qp)
 
-        args = {'lbg': -2,  # inequality constraints: lower bound
-                'ubg': 2,  # inequality constraints: upper bound
-                'lbx': self.f_min,  # input constraints: lower bound
-                'ubx': self.f_max,  # input constraints: upper bound
-                }
+        # lbg = np.array()
+        lbg = -cs.inf,  # inequality constraints: lower bound
+        ubg = 0,  # inequality constraints: upper bound
+        lbx = -cs.inf,  # input constraints: lower bound
+        ubx = cs.inf,  # input constraints: upper bound
 
         # -------------Starting Simulation Loop Now------------------------------------- #
+        # DM is very similar to SX, but with the difference that the nonzero elements are numerical values and
+        # not symbolic expressions.
+        # DM is mainly used for storing matrices in CasADi and as inputs and outputs of functions.
+        # It is not intended to be used for computationally intensive calculations.
         t0 = 0
         # initial condition of the bot, gets updated every iteration (input)
         x_init = x_in.T
@@ -249,7 +265,6 @@ class Mpc:
 
         xx = np.zeros((12, self.N))
         xx[:, 0] = x_init  # contains history of states
-        # t = t0
 
         u0 = np.zeros((self.N, 6))  # six control inputs
         X0 = np.matlib.repmat(x_init, 1, self.N + 1).T  # initialization of the state's decision variables
@@ -261,20 +276,19 @@ class Mpc:
         u_cl = []
 
         while np.linalg.norm(x_init - x_ref) > 1e-2 and mpciter < (sim_t / self.dt):
-            parameters = np.array([x_init, x_ref]).T  # set values of parameters vector
+            parameters = cs.vertcat(x_init, x_ref)  # set values of parameters vector
             # init value of optimization variables
-            x0 = np.append(np.reshape(X0.T, n_states * (self.N + 1), 1), np.reshape(u0.T, (n_controls * self.N, 1)))
+            x0 = cs.vertcat(np.reshape(X0.T, n_states * (self.N + 1), 1), np.reshape(u0.T, (n_controls * self.N, 1)))
 
-            sol = solver('x0', x0, 'lbx', args['lbx'], 'ubx', args['ubx'],
-                         'lbg', args['lbg'], 'ubg', args['ubg'], 'p', parameters)
-            print("wtf")
-            # print("sol = ", sol)
+            sol = solver(x0=x0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg, p=parameters)
+
+            print("sol = ", sol)
             u = np.reshape(np.full(sol.x[n_states * (self.N + 1):]).T, (n_controls, self.N)).T
             # ff_value = ff(u.T, args[p])  # compute optimal solution trajectory
             xx1[:, 0:3, mpciter + 1] = np.reshape(np.full(sol.x[0:n_states * (self.N + 1)]).T,
                                                   (n_states, self.N + 1)).T  # store the "predictions" here
             u_cl = np.append(u_cl, u)  # control actions.
-            print(u)
+
             # Apply the control and shift the solution
             # t[mpciter + 1] = t0
             t0, x0, u0 = self.shift(t0, x0, u)
