@@ -24,8 +24,10 @@ https://github.com/MMehrez/ ...Sim_1_MPC_Robot_PS_sing_shooting.m
 """
 
 import numpy as np
+import numpy.matlib
 import scipy
 import csv
+import itertools
 
 import casadi as cs
 
@@ -246,11 +248,13 @@ class Mpc:
         # opts = {'max_iter': 100}
         solver = cs.qpsol('S', 'qpoases', qp)
 
-        # lbg = np.array()
-        lbg = -cs.inf,  # inequality constraints: lower bound
-        ubg = 0,  # inequality constraints: upper bound
-        lbx = -cs.inf,  # input constraints: lower bound
-        ubx = cs.inf,  # input constraints: upper bound
+        length = np.shape(constr)[0]
+        o_length = np.shape(opt_variables)[0]
+        lbg = list(itertools.repeat(-cs.inf, length))  # inequality constraints
+        ubg = list(itertools.repeat(0, length))  # inequality constraints
+        lbg[0:self.N] = itertools.repeat(0, self.N)  # equality constraint
+        lbx = list(itertools.repeat(-cs.inf, o_length))  # input inequality constraints
+        ubx = list(itertools.repeat(cs.inf, o_length))  # input inequality constraints
 
         # -------------Starting Simulation Loop Now------------------------------------- #
         # DM is very similar to SX, but with the difference that the nonzero elements are numerical values and
@@ -278,7 +282,7 @@ class Mpc:
         while np.linalg.norm(x_init - x_ref) > 1e-2 and mpciter < (sim_t / self.dt):
             parameters = cs.vertcat(x_init, x_ref)  # set values of parameters vector
             # init value of optimization variables
-            x0 = cs.vertcat(np.reshape(X0.T, n_states * (self.N + 1), 1), np.reshape(u0.T, (n_controls * self.N, 1)))
+            x0 = cs.vertcat(np.reshape(X0.T, (n_states * (self.N + 1), 1)), np.reshape(u0.T, (n_controls * self.N, 1)))
 
             sol = solver(x0=x0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg, p=parameters)
 
