@@ -20,7 +20,7 @@ Highly Dynamic Quadruped Locomotion via Whole-Body Impulse Control and Model Pre
 Donghyun Kim et al.
 
 https://www.youtube.com/watch?v=RrnkPrcpyEA
-https://github.com/MMehrez/ ...Sim_1_MPC_Robot_PS_sing_shooting.m
+https://github.com/MMehrez/ ...Sim_3_MPC_Robot_PS_obs_avoid_mul_sh.m
 """
 
 import numpy as np
@@ -43,6 +43,7 @@ class Mpc:
         self.N = 3  # prediction horizon
         self.mass = float(12.12427)  # kg
         self.mu = 0.7  # coefficient of friction
+        self.b = 40*np.pi/180  # maximum kinematic leg angle
 
         with open('spryped_urdf_rev06/spryped_data_body.csv', 'r') as csvfile:
             data = csv.reader(csvfile, delimiter=',')
@@ -71,10 +72,22 @@ class Mpc:
         i[2, 2] = izz
         self.inertia = i  # inertia tensor in local frame
 
-    def mpcontrol(self, rz_phi, r1, r2, x_in):
+        self.rh_r = np.array([.14397, .13519, .03581])  # vector from CoM to hip
+        self.rh_l = np.array([-.14397, .13519, .03581])  # vector from CoM to hip
+
+    def mpcontrol(self, rz_phi, r1, r2, x_in, c_l, c_r):  # p_l, p_r, c_l, c_r):
         i_global = np.dot(np.dot(rz_phi, self.inertia), rz_phi.T)
         i_inv = np.linalg.inv(i_global)
+        '''
+        # vector from CoM to hip in global frame (should just use body frame?)
+        rh_l_g = np.dot(rz_phi, self.rh_l)
+        rh_r_g = np.dot(rz_phi, self.rh_r)
 
+        # desired footstep position in global coords
+        pf_l = x_in[1] + r1
+        pf_r = x_in[1] + r2
+        print(pf_r)
+        '''
         i11 = i_inv[0, 0]
         i12 = i_inv[0, 1]
         i13 = i_inv[0, 2]
@@ -208,7 +221,7 @@ class Mpc:
         st = x[:, 0]  # initial state
         constr = cs.vertcat(constr, st - st_ref[0:12])  # initial condition constraints
         # compute objective and constraints
-        for k in range(0, self.N-1):  # 0 because of python zero based indexing
+        for k in range(0, self.N):  # 0 because of python zero based indexing
             st = x[:, k]  # state
             con = u[:, k]  # control action
             # calculate objective
@@ -219,31 +232,29 @@ class Mpc:
                 st_n_e[j, k] = fn(st[0], st[1], st[2], st[3], st[4], st[5],
                                   st[6], st[7], st[8], st[9], st[10], st[11],
                                   con[0], con[1], con[2], con[3], con[4], con[5])[j]
-
             constr = cs.vertcat(constr, st_next - st_n_e[:, k])  # compute constraints
 
         # add additional constraints
-        for k in range(0, self.N):
+        for k in range(0, self.N+1):
             constr = cs.vertcat(constr, u[0, k] - self.mu*u[2, k])  # f1x - mu*f1z
 
-        for k in range(0, self.N):
+        for k in range(0, self.N+1):
             constr = cs.vertcat(constr, u[1, k] - self.mu*u[2, k])  # f1y - mu*f1z
 
-        for k in range(0, self.N):
+        for k in range(0, self.N+1):
             constr = cs.vertcat(constr, -u[2, k])  # -f1z
 
-        for k in range(0, self.N):
+        for k in range(0, self.N+1):
             constr = cs.vertcat(constr, u[3, k] - self.mu * u[5, k])  # f2x - mu*f2z
 
-        for k in range(0, self.N):
+        for k in range(0, self.N+1):
             constr = cs.vertcat(constr, u[4, k] - self.mu * u[5, k])  # f2y - mu*f2z
 
-        for k in range(0, self.N):
+        for k in range(0, self.N+1):
             constr = cs.vertcat(constr, -u[5, k])  # -f2z
         # make decision variables one column vector
 
         opt_variables = cs.vertcat(cs.reshape(x, n_states * (self.N + 1), 1), cs.reshape(u, n_controls * self.N, 1))
-
         qp = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
         # opts = {'max_iter': 100}
         solver = cs.qpsol('S', 'qpoases', qp)
@@ -255,6 +266,7 @@ class Mpc:
         lbg[0:self.N] = itertools.repeat(0, self.N)  # equality constraint
         lbx = list(itertools.repeat(-cs.inf, o_length))  # input inequality constraints
         ubx = list(itertools.repeat(cs.inf, o_length))  # input inequality constraints
+        ubx[(n_states*(self.N+1)+2)::3] = [0 for i in range(6)]
 
         # -------------Starting Simulation Loop Now------------------------------------- #
         # DM is very similar to SX, but with the difference that the nonzero elements are numerical values and
@@ -263,15 +275,14 @@ class Mpc:
         # It is not intended to be used for computationally intensive calculations.
         t0 = 0
         # initial condition of the bot, gets updated every iteration (input)
-        x_init = x_in.T
+        x0 = x_in.T
         x_ref = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).T  # reference posture (desired)
-        x0 = x_init
 
-        xx = np.zeros((12, self.N))
-        xx[:, 0] = x_init  # contains history of states
+        xx = np.zeros((12, self.N))  # why 12? shouldn't it be n_states?
+        xx[:, 0] = x0  # contains history of states
 
         u0 = np.zeros((self.N, 6))  # six control inputs
-        X0 = np.matlib.repmat(x_init, 1, self.N + 1).T  # initialization of the state's decision variables
+        X0 = np.matlib.repmat(x0, 1, self.N + 1).T  # initialization of the state's decision variables
         sim_t = 4  # max simulation time
 
         # start MPC
@@ -279,17 +290,18 @@ class Mpc:
         xx1 = []
         u_cl = []
 
-        while np.linalg.norm(x_init - x_ref) > 1e-2 and mpciter < (sim_t / self.dt):
-            parameters = cs.vertcat(x_init, x_ref)  # set values of parameters vector
+        while np.linalg.norm(x0 - x_ref) > 1e-2 and mpciter < (sim_t / self.dt):
+            # parameters and x0 must be changed every timestep
+            parameters = cs.vertcat(x0, x_ref)  # set values of parameters vector
             # init value of optimization variables
             x0 = cs.vertcat(np.reshape(X0.T, (n_states * (self.N + 1), 1)), np.reshape(u0.T, (n_controls * self.N, 1)))
 
             sol = solver(x0=x0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg, p=parameters)
 
             print("sol = ", sol)
-            u = np.reshape(np.full(sol.x[n_states * (self.N + 1):]).T, (n_controls, self.N)).T
+            u = np.reshape(scipy.sparse.csr_matrix.todense(sol.x[n_states * (self.N + 1):]).T, (n_controls, self.N)).T
             # ff_value = ff(u.T, args[p])  # compute optimal solution trajectory
-            xx1[:, 0:3, mpciter + 1] = np.reshape(np.full(sol.x[0:n_states * (self.N + 1)]).T,
+            xx1[:, 0:3, mpciter + 1] = np.reshape(scipy.sparse.csr_matrix.todense(sol.x[0:n_states * (self.N + 1)]).T,
                                                   (n_states, self.N + 1)).T  # store the "predictions" here
             u_cl = np.append(u_cl, u)  # control actions.
 
@@ -299,13 +311,13 @@ class Mpc:
 
             xx[:, mpciter + 1] = x0
             # Get the solution trajectory
-            X0 = np.reshape(np.full(sol.x[0:n_states*(self.N+1)]).T, (n_states, self.N+1)).T
+            X0 = np.reshape(scipy.sparse.csr_matrix.todense(sol.x[0:n_states*(self.N+1)]).T, (n_states, self.N+1)).T
             # Shift trajectory to initialize the next step
             X0 = np.append(X0[2:, :], X0)
             mpciter = mpciter + 1
 
         ss_error = np.linalg.norm(x0 - x_ref)  # defaults to Euclidean norm
-
+        # print("ss_error = ", ss_error)
         return u_cl
 
     def shift(self, t0, x0, u):

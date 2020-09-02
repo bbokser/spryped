@@ -81,11 +81,13 @@ class Runner:
         self.r_r = np.array([0, 0, 0])  # initial footstep planning position
 
         self.p = np.array([0, 0, 0])  # initial body position
+        self.pdot_des = 0  # desired body velocity in world coords
 
     def run(self):
 
         steps = 0
         t = 0  # time
+        p = np.array([0, 0, 0])  # initialize body position
 
         t0_l = t  # starting time, left leg
         t0_r = t0_l + self.t_p / 2  # starting time, right leg. Half a period out of phase with left
@@ -130,7 +132,8 @@ class Runner:
             pos_l = np.dot(b_orient, self.leg_left.position()[:, -1])
             pos_r = np.dot(b_orient, self.leg_right.position()[:, -1])
 
-            v = np.array(self.simulator.v)  # base linear velocity in global Cartesian coordinates
+            pdot = np.array(self.simulator.v)  # base linear velocity in global Cartesian coordinates
+            p = p + pdot*self.dt  # body position in world coordinates
 
             theta = np.array(transforms3d.euler.mat2euler(b_orient, axes='sxyz'))
 
@@ -156,16 +159,20 @@ class Runner:
                 contact_r = False
 
             if contact_l is True and prev_contact_l is False:
-                self.r_l = self.footstep(robotleg=1, rz_phi=rz_phi, v=v, v_d=0)
+                self.r_l = self.footstep(robotleg=1, rz_phi=rz_phi, pdot=pdot, pdot_des=0)
 
             if contact_r is True and prev_contact_r is False:
-                self.r_r = self.footstep(robotleg=0, rz_phi=rz_phi, v=v, v_d=0)
+                self.r_r = self.footstep(robotleg=0, rz_phi=rz_phi, pdot=pdot, pdot_des=0)
 
             omega = np.array(self.simulator.omega_xyz)
-            p_dot = v
-            x_in = np.hstack([theta, self.p, omega, p_dot])  # array of the states for MPC
+            x_in = np.hstack([theta, self.p, omega, pdot])  # array of the states for MPC
 
-            forces = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x_in=x_in)
+            forces = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x_in=x_in,
+                                          c_l=contact_l, c_r=contact_r)
+
+            # forces = self.force.mpcontrol(b_orient=b_orient, rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x_in=x_in,
+            #                               p_l=pos_l, p_r=pos_r, c_l=contact_l, c_r=contact_r)
+
             print("forces = ", forces)
 
             # calculate wbc control signal
@@ -240,8 +247,8 @@ class Runner:
 
         return sh
 
-    def footstep(self, robotleg, rz_phi, v, v_d):
-        # plans next footstep locatleg, ion
+    def footstep(self, robotleg, rz_phi, pdot, pdot_des):
+        # plans next footstep location
         if robotleg == 1:
             l_i = 0.144  # left hip length
         else:
@@ -249,8 +256,8 @@ class Runner:
 
         p_hip = np.dot(rz_phi, np.array([0, l_i, 0]))
         t_stance = self.t_p * self.phi_switch
-        p_symmetry = t_stance * 0.5 * v + self.k_f * (v - v_d)
-        p_cent = 0.5 * np.sqrt(self.h / 9.807) * np.cross(v, self.omega_d)
+        p_symmetry = t_stance * 0.5 * pdot + self.k_f * (pdot - pdot_des)
+        p_cent = 0.5 * np.sqrt(self.h / 9.807) * np.cross(pdot, self.omega_d)
 
         return p_hip + p_symmetry + p_cent
 
