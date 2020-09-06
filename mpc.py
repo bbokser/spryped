@@ -43,7 +43,7 @@ class Mpc:
         self.N = 3  # prediction horizon
         self.mass = float(12.12427)  # kg
         self.mu = 0.7  # coefficient of friction
-        self.b = 40*np.pi/180  # maximum kinematic leg angle
+        self.b = 40 * np.pi / 180  # maximum kinematic leg angle
 
         with open('spryped_urdf_rev06/spryped_data_body.csv', 'r') as csvfile:
             data = csv.reader(csvfile, delimiter=',')
@@ -219,54 +219,58 @@ class Mpc:
         R[5, 5] = 1
 
         st = x[:, 0]  # initial state
-        constr = cs.vertcat(constr, st - st_ref[0:12])  # initial condition constraints
+        constr = cs.vertcat(constr, st - st_ref[0:n_states])  # initial condition constraints
         # compute objective and constraints
         for k in range(0, self.N):  # 0 because of python zero based indexing
             st = x[:, k]  # state
             con = u[:, k]  # control action
             # calculate objective
-            obj = obj + cs.mtimes(cs.mtimes((st - st_ref[11:23]).T, Q), st - st_ref[11:23]) \
-                + cs.mtimes(cs.mtimes(con.T, R), con)
+            obj = obj + cs.mtimes(cs.mtimes((st - st_ref[n_states:(n_states * 2)]).T, Q),
+                                  st - st_ref[n_states:(n_states * 2)]) + cs.mtimes(cs.mtimes(con.T, R), con)
             st_next = x[:, k + 1]
-            for j in range(0, 11):
-                st_n_e[j, k] = fn(st[0], st[1], st[2], st[3], st[4], st[5],
-                                  st[6], st[7], st[8], st[9], st[10], st[11],
-                                  con[0], con[1], con[2], con[3], con[4], con[5])[j]
-            constr = cs.vertcat(constr, st_next - st_n_e[:, k])  # compute constraints
+            f_value = fn(st[0], st[1], st[2], st[3], st[4], st[5],
+                         st[6], st[7], st[8], st[9], st[10], st[11],
+                         con[0], con[1], con[2], con[3], con[4], con[5])
+            st_n_e = np.array(f_value)
+            constr = cs.vertcat(constr, st_next - st_n_e)  # compute constraints
 
         # add additional constraints
-        for k in range(0, self.N+1):
-            constr = cs.vertcat(constr, u[0, k] - self.mu*u[2, k])  # f1x - mu*f1z
+        for k in range(0, self.N):
+            constr = cs.vertcat(constr, u[0, k] - self.mu * u[2, k])  # f1x - mu*f1z
 
-        for k in range(0, self.N+1):
-            constr = cs.vertcat(constr, u[1, k] - self.mu*u[2, k])  # f1y - mu*f1z
+        for k in range(0, self.N):
+            constr = cs.vertcat(constr, u[1, k] - self.mu * u[2, k])  # f1y - mu*f1z
 
-        for k in range(0, self.N+1):
+        for k in range(0, self.N):
             constr = cs.vertcat(constr, -u[2, k])  # -f1z
 
-        for k in range(0, self.N+1):
+        for k in range(0, self.N):
             constr = cs.vertcat(constr, u[3, k] - self.mu * u[5, k])  # f2x - mu*f2z
 
-        for k in range(0, self.N+1):
+        for k in range(0, self.N):
             constr = cs.vertcat(constr, u[4, k] - self.mu * u[5, k])  # f2y - mu*f2z
 
-        for k in range(0, self.N+1):
+        for k in range(0, self.N):
             constr = cs.vertcat(constr, -u[5, k])  # -f2z
         # make decision variables one column vector
 
-        opt_variables = cs.vertcat(cs.reshape(x, n_states * (self.N + 1), 1), cs.reshape(u, n_controls * self.N, 1))
+        opt_variables = cs.vertcat(cs.reshape(x, n_states * (self.N + 1), 1),
+                                   cs.reshape(u, n_controls * self.N, 1))
         qp = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
-        # opts = {'max_iter': 100}
-        solver = cs.qpsol('S', 'qpoases', qp)
+        opts = {'print_time': 0}
+        solver = cs.qpsol('S', 'qpoases', qp, opts)
 
-        length = np.shape(constr)[0]
+        # check this since we changed horizon length
+        c_length = np.shape(constr)[0]
         o_length = np.shape(opt_variables)[0]
-        lbg = list(itertools.repeat(-cs.inf, length))  # inequality constraints
-        ubg = list(itertools.repeat(0, length))  # inequality constraints
+
+        lbg = list(itertools.repeat(-cs.inf, c_length))  # inequality constraints
         lbg[0:self.N] = itertools.repeat(0, self.N)  # equality constraint
+        ubg = list(itertools.repeat(0, c_length))  # inequality constraints
+
         lbx = list(itertools.repeat(-cs.inf, o_length))  # input inequality constraints
         ubx = list(itertools.repeat(cs.inf, o_length))  # input inequality constraints
-        ubx[(n_states*(self.N+1)+2)::3] = [0 for i in range(6)]
+        ubx[(n_states * (self.N + 1) + 2)::3] = [0 for i in range(6)]
 
         # -------------Starting Simulation Loop Now------------------------------------- #
         # DM is very similar to SX, but with the difference that the nonzero elements are numerical values and
@@ -278,10 +282,10 @@ class Mpc:
         x0 = x_in.T
         x_ref = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).T  # reference posture (desired)
 
-        xx = np.zeros((12, self.N))  # why 12? shouldn't it be n_states?
+        xx = np.zeros((n_states, self.N))  # why 12? shouldn't it be n_states?
         xx[:, 0] = x0  # contains history of states
 
-        u0 = np.zeros((self.N, 6))  # six control inputs
+        u0 = np.zeros((self.N, n_controls))  # six control inputs
         X0 = np.matlib.repmat(x0, 1, self.N + 1).T  # initialization of the state's decision variables
         sim_t = 4  # max simulation time
 
@@ -294,40 +298,45 @@ class Mpc:
             # parameters and x0 must be changed every timestep
             parameters = cs.vertcat(x0, x_ref)  # set values of parameters vector
             # init value of optimization variables
-            x0 = cs.vertcat(np.reshape(X0.T, (n_states * (self.N + 1), 1)), np.reshape(u0.T, (n_controls * self.N, 1)))
+            x0 = cs.vertcat(np.reshape(X0.T, (n_states * (self.N + 1), 1)),
+                            np.reshape(u0.T, (n_controls * self.N, 1)))
 
             sol = solver(x0=x0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg, p=parameters)
 
-            print("sol = ", sol)
-            u = np.reshape(scipy.sparse.csr_matrix.todense(sol.x[n_states * (self.N + 1):]).T, (n_controls, self.N)).T
-            # ff_value = ff(u.T, args[p])  # compute optimal solution trajectory
-            xx1[:, 0:3, mpciter + 1] = np.reshape(scipy.sparse.csr_matrix.todense(sol.x[0:n_states * (self.N + 1)]).T,
-                                                  (n_states, self.N + 1)).T  # store the "predictions" here
+            solu = np.array(sol['x'][self.n_states * (self.N + 1):])
+            u = np.reshape(solu.T, (self.n_controls, self.N)).T  # get controls from the solution
+
+            solx = np.array(sol['x'][0:self.n_states * (self.N + 1)])
+            # store the "predictions" here
+            xx1 = np.append(xx1, np.reshape(solx.T, (self.n_states, self.N + 1)).T[0:self.n_states])
+
             u_cl = np.append(u_cl, u)  # control actions.
 
             # Apply the control and shift the solution
-            # t[mpciter + 1] = t0
             t0, x0, u0 = self.shift(t0, x0, u)
 
-            xx[:, mpciter + 1] = x0
+            xx = np.append(xx, x0)
             # Get the solution trajectory
-            X0 = np.reshape(scipy.sparse.csr_matrix.todense(sol.x[0:n_states*(self.N+1)]).T, (n_states, self.N+1)).T
+            X0 = np.reshape(solx.T, (self.n_states, self.N + 1)).T
             # Shift trajectory to initialize the next step
-            X0 = np.append(X0[2:, :], X0)
+            X0 = np.append(X0[1:, :], X0[-1, :])
             mpciter = mpciter + 1
 
         ss_error = np.linalg.norm(x0 - x_ref)  # defaults to Euclidean norm
         # print("ss_error = ", ss_error)
+        print(np.shape(u_cl))
         return u_cl
 
     def shift(self, t0, x0, u):
         st = x0
-        con = u.T  # propagate control action
+        con = u[0, :].T  # propagate control action
         st = fn(st[0], st[1], st[2], st[3], st[4], st[5],
                 st[6], st[7], st[8], st[9], st[10], st[11],
                 con[0], con[1], con[2], con[3], con[4], con[5])
-        x0 = scipy.sparse.csr_matrix.todense(st)  # convert sparse matrix to dense
+        x0 = np.array(st)  # convert sparse matrix to dense
 
         t0 = t0 + self.dt
-        u0 = [u[1:size(u, 0), :], u[size(u, 0), :]]
+        u_size = np.shape(u)[0]
+        u0 = np.append(u[1:u_size, :], u[u_size - 1, :])  # trim the first entry and repeat the last entry (best guess)
+
         return t0, x0, u0
