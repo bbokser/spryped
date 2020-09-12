@@ -61,27 +61,31 @@ class Control(control.Control):
         self.kn[2, 2] = 0
         self.kn[3, 3] = 10
 
+        self.kf = np.zeros((3, 3))
+        self.kf[0, 0] = 0.01
+        self.kf[1, 1] = 0.01
+        self.kf[2, 2] = 0.01
+
         self.Mq = None
         self.x = None
         self.grav = None
         self.velocity = None
         self.q_e = None
+        self.ctrlr_dof = np.array([True, True, True, False, False, False])
 
-    def control(self, leg, target, b_orient, x_dd_des=None):
+    def p_control(self, leg, target, b_orient, x_dd_des=None):
         """
-        Generates a control signal to move the
-        joints to the specified target.
+        Generates a control signal to apply a specified force vector.
 
         leg Leg: the leg model being controlled
         des list: the desired system position
-        x_dd_des np.array: desired acceleration
         """
+        self.leveler = False
         self.target = target
         self.b_orient = np.array(b_orient)
 
         # which dim to control of [x, y, z, alpha, beta, gamma]
-        ctrlr_dof = np.array([True, True, True, False, False, False])
-        # ctrlr_dof = np.array([False, False, False, True, True, True])
+        ctrlr_dof = self.ctrlr_dof
 
         # calculate the Jacobian
         JEE = leg.gen_jacEE()[ctrlr_dof]  # print(np.linalg.matrix_rank(JEE))
@@ -93,7 +97,8 @@ class Control(control.Control):
 
         x_dd_des = np.zeros(6)  # [x, y, z, alpha, beta, gamma]
 
-        self.x = np.dot(b_orient, leg.position()[:, -1])  # multiply with rotation matrix for base to world
+        # multiply with rotation matrix for base to world
+        self.x = np.dot(b_orient, leg.position()[:, -1])  # select last position value to get EE xyz
         # self.x = leg.position()[:, -1]
 
         # calculate operational space velocity vector
@@ -127,6 +132,77 @@ class Control(control.Control):
 
         # calculate force
         Fx = np.dot(Mx, x_dd_des)
+
+        self.grav = leg.gen_grav(b_orient=b_orient)
+
+        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - self.grav
+
+        # add in velocity compensation in GC space for stability
+        # self.u = np.dot(JEE.T, Fx).reshape(-1, ) \
+        #     - np.dot(Mq, np.dot(self.kd, leg.dq)).flatten() - self.grav
+
+        # if null_control is selected, add a control signal in the
+        # null space to try to move the leg to selected position
+        if self.null_control:
+            # calculate our secondary control signal
+            # calculated desired joint angle acceleration
+            prop_val = ((leg.ee_angle() - leg.q) + np.pi) % (np.pi * 2) - np.pi
+            q_des = (np.dot(self.kn, prop_val))
+            #        + np.dot(self.knd, -leg.dq.reshape(-1, )))
+
+            Fq_null = np.dot(Mq, q_des)
+
+            # calculate the null space filter
+            Jdyn_inv = np.dot(Mx, np.dot(JEE, np.linalg.inv(Mq)))
+
+            null_filter = np.eye(len(leg.L)) - np.dot(JEE.T, Jdyn_inv)
+
+            null_signal = np.dot(null_filter, Fq_null).reshape(-1, )
+
+            self.u += null_signal
+
+        if self.leveler:
+            # keeps ee pitch level
+            base_y = transforms3d.euler.mat2euler(b_orient, axes='ryxz')[0]  # get y axis rotation of base
+            q1 = leg.q[1]
+            q2 = leg.q[2]
+            # keep ee level
+            ee_target = -(q1 + q2)
+            angles = np.array([0, np.pi * 32 / 180, 0, ee_target])
+            u_level = np.dot(self.kn, -base_y + angles - leg.q)
+            self.u += u_level
+
+        # add in any additional signals
+        for addition in self.additions:
+            self.u += addition.generate(self.u, leg)
+
+        return self.u
+
+    def f_control(self, leg, force, b_orient):
+        """
+        Generates a control signal to move the
+        joints to the specified target.
+
+        leg Leg: the leg model being controlled
+        des list: the desired system position
+        x_dd_des np.array: desired acceleration
+        """
+        self.b_orient = np.array(b_orient)
+
+        # which dim to control of [x, y, z, alpha, beta, gamma]
+        ctrlr_dof = self.ctrlr_dof
+
+        # calculate the Jacobian
+        JEE = leg.gen_jacEE()[ctrlr_dof]  # print(np.linalg.matrix_rank(JEE))
+        # rank of matrix is 3, can only control 3 DOF with one OSC
+
+        # generate the mass matrix in end-effector space
+        self.Mq = leg.gen_Mq()
+        Mx = leg.gen_Mx(Mq=self.Mq, JEE=JEE)
+
+        Fx = np.dot(b_orient, force)  # multiply with rotation matrix for base to world
+
+        Fx = np.dot(self.kf, Fx)
 
         self.grav = leg.gen_grav(b_orient=b_orient)
 

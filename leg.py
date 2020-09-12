@@ -314,7 +314,8 @@ class Leg(LegBase):
 
     def position(self, q=None):
         """forward kinematics
-        Compute x,y,z position of end effector relative to base
+        Compute x,y,z position of end effector relative to base.
+        This outputs four sets of xyz values, one for each joint including the end effector.
 
         q np.array: a set of angles to return positions for
         """

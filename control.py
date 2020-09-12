@@ -38,7 +38,12 @@ class Control(object):
 
         self.target = None
         self.b_orient = None
+        self.force = None
 
-    def control(self, leg, target, x_dd_des):
-        """Generates a control signal to apply to the leg"""
+    def p_control(self, leg, target, x_dd_des):
+        """Generates a position control signal to apply to the leg"""
+        raise NotImplementedError
+
+    def f_control(self, leg, target, x_dd_des):
+        """Generates a force control signal to apply to the leg"""
         raise NotImplementedError
