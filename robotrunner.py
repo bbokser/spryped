@@ -97,11 +97,10 @@ class Runner:
         prev_contact_l = False
         prev_contact_r = False
 
-        forces = None
-        horz_length = 0.25  # mpc horizon length, seconds
-        mpc_factor = horz_length/self.dt
+        mpc_force = None
+        mpc_dt = 0.025  # mpc period
+        mpc_factor = mpc_dt / self.dt  # repeat mpc every x seconds
         mpc_counter = mpc_factor
-        force_counter = mpc_factor/25
 
         while 1:
             time.sleep(self.dt)
@@ -139,7 +138,7 @@ class Runner:
             pos_r = np.dot(b_orient, self.leg_right.position()[:, -1])
 
             pdot = np.array(self.simulator.v)  # base linear velocity in global Cartesian coordinates
-            p = p + pdot*self.dt  # body position in world coordinates
+            p = p + pdot * self.dt  # body position in world coordinates
 
             theta = np.array(transforms3d.euler.mat2euler(b_orient, axes='sxyz'))
 
@@ -175,22 +174,17 @@ class Runner:
             x_in = np.hstack([theta, self.p, omega, pdot]).T  # array of the states for MPC
             x_ref = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).T  # reference pose (desired)
 
-            if mpc_counter == mpc_factor: # check if it's time to restart the mpc
+            if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
-                    forces = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x_in=x_in, x_ref = x_ref,
-                                                  c_l=contact_l, c_r=contact_r)
+                    mpc_force = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x_in=x_in, x_ref=x_ref,
+                                                     c_l=contact_l, c_r=contact_r)
                 else:
-                    forces = None  # makes mpc_force none, which tells gait ctrlr to default to position control.
+                    mpc_force = None  # tells gait ctrlr to default to position control.
 
                 mpc_counter = 0
-            if force_counter == mpc_factor/25:
-                force_counter = 0
-            if forces is None:
-                mpc_force = None
-            else:
-                mpc_force = forces[force_counter, :]  # step through force values for each timestep in prediction horiz.
+
             mpc_counter += 1
-            force_counter += 1
+
             # calculate wbc control signal
 
             self.u_l = self.gait_left.u(state=state_l, prev_state=prev_state_l, r_in=pos_l, r_d=self.r_l,
@@ -290,8 +284,12 @@ class Gait:
         self.init_gamma = 0
         self.controller = controller
         self.robotleg = robotleg
+        self.x_last = None
 
     def u(self, state, prev_state, r_in, r_d, b_orient, mpc_force):
+
+        if self.x_last is None:  # last position
+            self.x_last = np.array([0, 0, -0.8235, self.init_alpha, self.init_beta, self.init_gamma])
 
         if state == 'swing':
             if prev_state != state:
@@ -307,13 +305,15 @@ class Gait:
             # calculate wbc control signal
             u = -self.controller.p_control(leg=self.robotleg, target=target, b_orient=b_orient)
 
+            self.x_last = np.append(np.dot(b_orient, self.robotleg.position()[:, -1]),
+                                    np.array([self.init_alpha, self.init_beta, self.init_gamma]))
+
         elif state == 'stance' or state == 'early':
             # calculate wbc control signal
             force = None
             if mpc_force is None:
-                target = np.array([0, 0, -0.8235, self.init_alpha, self.init_beta, self.init_gamma])
                 # calculate wbc control signal
-                u = -self.controller.p_control(leg=self.robotleg, target=target, b_orient=b_orient)
+                u = -self.controller.p_control(leg=self.robotleg, target=self.x_last, b_orient=b_orient)
             else:
                 if self.robotleg.leg == 1:  # left
                     force = mpc_force[0:3]
@@ -322,9 +322,8 @@ class Gait:
                 u = -self.controller.f_control(leg=self.robotleg, force=force, b_orient=b_orient)
 
         elif state == 'late':  # position command should freeze at last target position
-            target = np.array([0, 0, -0.8235, self.init_alpha, self.init_beta, self.init_gamma])
             # calculate wbc control signal
-            u = -self.controller.p_control(leg=self.robotleg, target=target, b_orient=b_orient)
+            u = -self.controller.p_control(leg=self.robotleg, target=self.x_last, b_orient=b_orient)
 
         else:
             u = None  # this'll throw an error if state machine is haywire or something

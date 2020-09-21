@@ -33,6 +33,7 @@ class LegBase:
 
         self.q = None
         self.dq = None
+        self.d2q = None
 
     def apply_torque(self, u, dt):
         # Takes in a torque and timestep and updates the arm simulation accordingly.

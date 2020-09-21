@@ -118,6 +118,7 @@ class Leg(LegBase):
         self.angles = init_q
         self.q_previous = init_q
         self.dq_previous = init_dq
+        self.d2q_previous = init_dq
         self.kv = 0.05
         self.leg = leg
         self.reset()
@@ -355,10 +356,10 @@ class Leg(LegBase):
 
         return np.array([x, y, z], dtype=float)
 
-    def velocity(self, dq=None):
+    def velocity(self):  # dq=None
         # Calculate operational space linear velocity vector
-        if dq is None:
-            dq = self.dq
+        # if dq is None:
+        #     dq = self.dq
         JEE = self.gen_jacEE(q=q)
         return np.dot(JEE, self.dq).flatten()
 
@@ -408,13 +409,13 @@ class Leg(LegBase):
 
     def update_state(self, q_in):
         # Update the local variables
-        # Pull values in from simulator
-        self.q = q_in
-
-        # Calibrate encoders
-        self.q = np.add(self.q.flatten(), self.q_calibration)
+        # Pull values in from simulator and calibrate encoders
+        self.q = np.add(q_in.flatten(), self.q_calibration)
         # self.dq = np.reshape([j[1] for j in p.getJointStates(1, range(0, 4))], (-1, 1))
         self.dq = [i * self.kv for i in self.dq_previous] + (self.q - self.q_previous) / self.dt
         # Make sure this only happens once per time step
-        self.dq_previous = self.dq
+        self.d2q = [i * self.kv for i in self.d2q_previous] + (self.dq - self.dq_previous) / self.dt
+
         self.q_previous = self.q
+        self.dq_previous = self.dq
+        self.d2q_previous = self.d2q

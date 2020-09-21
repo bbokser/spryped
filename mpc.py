@@ -243,18 +243,11 @@ class Mpc:
         for k in range(0, self.N):
             constr = cs.vertcat(constr, u[1, k] - self.mu * u[2, k])  # f1y - mu*f1z
 
-        # for k in range(0, self.N):
-        #     constr = cs.vertcat(constr, -u[2, k])  # -f1z
-
         for k in range(0, self.N):
             constr = cs.vertcat(constr, u[3, k] - self.mu * u[5, k])  # f2x - mu*f2z
 
         for k in range(0, self.N):
             constr = cs.vertcat(constr, u[4, k] - self.mu * u[5, k])  # f2y - mu*f2z
-
-        # for k in range(0, self.N):
-        #     constr = cs.vertcat(constr, -u[5, k])  # -f2z
-        # make decision variables one column vector
 
         opt_variables = cs.vertcat(cs.reshape(x, self.n_states * (self.N + 1), 1),
                                    cs.reshape(u, self.n_controls * self.N, 1))
@@ -270,9 +263,9 @@ class Mpc:
         lbg[0:self.N] = itertools.repeat(0, self.N)  # dynamics equality constraint
         ubg = list(itertools.repeat(0, c_length))  # inequality constraints
 
-        lbx = list(itertools.repeat(-5000, o_length))  # input inequality constraints
-        ubx = list(itertools.repeat(5000, o_length))  # input inequality constraints
-        # ubx[(self.n_states * (self.N + 1) + 2)::3] = [0 for i in range(6)]
+        lbx = list(itertools.repeat(-500, o_length))  # input inequality constraints
+        ubx = list(itertools.repeat(500, o_length))  # input inequality constraints
+        ubx[(self.n_states * (self.N + 1) + 2)::3] = [0 for i in range(20)]  # upper bound on all f1z and f2z
 
         # -------------Starting Simulation Loop Now------------------------------------- #
         # DM is very similar to SX, but with the difference that the nonzero elements are numerical values and
@@ -282,48 +275,36 @@ class Mpc:
         # initial condition of the bot, gets updated every iteration (input)
         x0 = x_in
 
-        xx = np.zeros((self.n_states, self.N))  # why 12? shouldn't it be n_states?
-        xx[:, 0] = x0  # contains history of states
-
         u0 = np.zeros((self.N, self.n_controls))  # six control inputs
         X0 = np.matlib.repmat(x0, 1, self.N + 1).T  # initialization of the state's decision variables
-        sim_t = 0.025  # max simulation time
 
-        # start MPC
-        mpciter = 0
         xx1 = []
         u_cl = np.zeros([1, 6])
-        # while np.linalg.norm(x0 - x_ref) > 1e-2 and mpciter < (sim_t / self.dt):
-        while mpciter < (sim_t / self.dt):
-            # parameters and x0 must be changed every timestep
-            parameters = cs.vertcat(x0, x_ref)  # set values of parameters vector
-            # init value of optimization variables
-            x0 = cs.vertcat(np.reshape(X0.T, (self.n_states * (self.N + 1), 1)),
-                            np.reshape(u0.T, (self.n_controls * self.N, 1)))
 
-            sol = solver(x0=x0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg, p=parameters)
+        # parameters and x0 must be changed every timestep
+        parameters = cs.vertcat(x0, x_ref)  # set values of parameters vector
+        # init value of optimization variables
+        x0 = cs.vertcat(np.reshape(X0.T, (self.n_states * (self.N + 1), 1)),
+                        np.reshape(u0.T, (self.n_controls * self.N, 1)))
 
-            solu = np.array(sol['x'][self.n_states * (self.N + 1):])
-            u = np.reshape(solu.T, (self.n_controls, self.N)).T  # get controls from the solution
+        sol = solver(x0=x0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg, p=parameters)
 
-            solx = np.array(sol['x'][0:self.n_states * (self.N + 1)])
-            # store the "predictions" here
-            xx1 = np.append(xx1, np.reshape(solx.T, (self.n_states, self.N + 1)).T[0:self.n_states])
+        solu = np.array(sol['x'][self.n_states * (self.N + 1):])
+        u = np.reshape(solu.T, (self.n_controls, self.N)).T  # get controls from the solution
 
-            u_cl = np.vstack([u_cl, u])  # control actions.
+        solx = np.array(sol['x'][0:self.n_states * (self.N + 1)])
+        # store the "predictions" here
+        xx1 = np.append(xx1, np.reshape(solx.T, (self.n_states, self.N + 1)).T[0:self.n_states])
 
-            # Apply the control and shift the solution
-            x0, u0 = self.shift(x0, u)
+        u_cl = np.vstack([u_cl, u])  # control actions.
 
-            xx = np.append(xx, x0)
-            # Get the solution trajectory
-            X0 = np.reshape(solx.T, (self.n_states, self.N + 1)).T
-            # Shift trajectory to initialize the next step
-            X0 = np.append(X0[1:, :], X0[-1, :])
-            mpciter = mpciter + 1
+        # Get the solution trajectory
+        X0 = np.reshape(solx.T, (self.n_states, self.N + 1)).T
+        # Shift trajectory to initialize the next step
+        X0 = np.append(X0[1:, :], X0[-1, :])
 
-        u_cl = np.delete(u_cl, 0, axis=0)
-
+        u_cl = np.delete(u_cl, 0, axis=0)  # delete first row because it's just zeros for construction
+        u_cl = u_cl[0, :]  # ignore rows other than new first row
         # ss_error = np.linalg.norm(x0 - x_ref)  # defaults to Euclidean norm
         # print("ss_error = ", ss_error)
 
@@ -332,16 +313,3 @@ class Mpc:
 
         return u_cl
 
-    def shift(self, x0, u):
-        st = x0
-        con = u[0, :].T  # propagate control action
-        st = self.fn(st[0], st[1], st[2], st[3], st[4], st[5],
-                     st[6], st[7], st[8], st[9], st[10], st[11],
-                     con[0], con[1], con[2], con[3], con[4], con[5])
-        x0 = np.array(st)  # convert sparse matrix to dense
-
-        # t0 = t0 + self.dt
-        u_size = np.shape(u)[0]
-        u0 = np.append(u[1:u_size, :], u[u_size - 1, :])  # trim the first entry and repeat the last entry (best guess)
-
-        return x0, u0

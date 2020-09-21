@@ -198,15 +198,13 @@ class Control(control.Control):
 
         # generate the mass matrix in end-effector space
         self.Mq = leg.gen_Mq()
-        Mx = leg.gen_Mx(Mq=self.Mq, JEE=JEE)
+        a_qdd = np.dot(self.Mq, leg.d2q)  # mass matrix term
 
-        Fx = np.dot(b_orient, force)  # multiply with rotation matrix for base to world
-
-        Fx = np.dot(self.kf, Fx)
+        Fx = np.dot(self.kf, np.dot(b_orient, force))  # multiply with rotation matrix for base to world
 
         self.grav = leg.gen_grav(b_orient=b_orient)
 
-        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - self.grav
+        self.u = - self.grav + (np.dot(JEE.T, Fx).reshape(-1, ))  # + a_qdd
 
         # add in velocity compensation in GC space for stability
         # self.u = np.dot(JEE.T, Fx).reshape(-1, ) \
@@ -220,7 +218,7 @@ class Control(control.Control):
             prop_val = ((leg.ee_angle() - leg.q) + np.pi) % (np.pi * 2) - np.pi
             q_des = (np.dot(self.kn, prop_val))
             #        + np.dot(self.knd, -leg.dq.reshape(-1, )))
-
+            Mx = leg.gen_Mx(Mq=self.Mq, JEE=JEE)
             Fq_null = np.dot(Mq, q_des)
 
             # calculate the null space filter
