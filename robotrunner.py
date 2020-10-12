@@ -77,11 +77,12 @@ class Runner:
         self.omega_d = np.array([0, 0, 0])  # desired angular acceleration for footstep planner
         self.k_f = 0.5  # Raibert heuristic gain
         self.h = np.array([0, 0, 0.8325])  # height, assumed to be constant
-        self.r_l = np.array([0, 0, 0])  # initial footstep planning position
-        self.r_r = np.array([0, 0, 0])  # initial footstep planning position
+        self.r_l = np.array([0, 0, -0.8325])  # initial footstep planning position
+        self.r_r = np.array([0, 0, -0.8325])  # initial footstep planning position
 
         self.p = np.array([0, 0, 0])  # initial body position
         self.pdot_des = 0  # desired body velocity in world coords
+        self.force_control_test = True
 
     def run(self):
 
@@ -101,8 +102,14 @@ class Runner:
         mpc_dt = 0.025  # mpc period
         mpc_factor = mpc_dt / self.dt  # repeat mpc every x seconds
         mpc_counter = mpc_factor
+        t_prev = time.clock()
+        time.sleep(self.dt)
 
         while 1:
+            # t_diff = time.clock() - t_prev
+            # t_prev = time.clock()
+            # print(t_diff)
+
             time.sleep(self.dt)
             # update target after specified period of time passes
             steps += 1
@@ -182,10 +189,14 @@ class Runner:
                     mpc_force = None  # tells gait ctrlr to default to position control.
 
                 mpc_counter = 0
-
+                # print(mpc_force)
             mpc_counter += 1
 
             # calculate wbc control signal
+            if self.force_control_test is True:
+                state_l = 'stance'
+                state_r = 'stance'
+                mpc_force = np.zeros(6)
 
             self.u_l = self.gait_left.u(state=state_l, prev_state=prev_state_l, r_in=pos_l, r_d=self.r_l,
                                         b_orient=b_orient, mpc_force=mpc_force)  # just standing for now
@@ -268,7 +279,7 @@ class Runner:
         p_symmetry = t_stance * 0.5 * pdot + self.k_f * (pdot - pdot_des)
         p_cent = 0.5 * np.sqrt(self.h / 9.807) * np.cross(pdot, self.omega_d)
 
-        return p_hip + p_symmetry + p_cent
+        return p_hip + p_symmetry + p_cent + np.array([0, 0, -0.8325])
 
 
 class Gait:
@@ -288,8 +299,7 @@ class Gait:
 
     def u(self, state, prev_state, r_in, r_d, b_orient, mpc_force):
 
-        if self.x_last is None:  # last position
-            self.x_last = np.array([0, 0, -0.8235, self.init_alpha, self.init_beta, self.init_gamma])
+        target_default = np.hstack(np.append(r_d, np.array([self.init_alpha, self.init_beta, self.init_gamma])))
 
         if state == 'swing':
             if prev_state != state:
@@ -303,30 +313,30 @@ class Gait:
 
             self.swing_steps += 1
             # calculate wbc control signal
-            u = -self.controller.p_control(leg=self.robotleg, target=target, b_orient=b_orient)
-
-            self.x_last = np.append(np.dot(b_orient, self.robotleg.position()[:, -1]),
-                                    np.array([self.init_alpha, self.init_beta, self.init_gamma]))
+            u = -self.controller.wb_control(leg=self.robotleg, target=target, b_orient=b_orient, force=None)
 
         elif state == 'stance' or state == 'early':
             # calculate wbc control signal
+
             force = None
             if mpc_force is None:
                 # calculate wbc control signal
-                u = -self.controller.p_control(leg=self.robotleg, target=self.x_last, b_orient=b_orient)
+                u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient,
+                                                force=None)
             else:
                 if self.robotleg.leg == 1:  # left
                     force = mpc_force[0:3]
                 elif self.robotleg.leg == 0:  # right
                     force = mpc_force[3:]
-                u = -self.controller.f_control(leg=self.robotleg, force=force, b_orient=b_orient)
+                u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient,
+                                                force=force)
 
-        elif state == 'late':  # position command should freeze at last target position
+        elif state == 'late':
             # calculate wbc control signal
-            u = -self.controller.p_control(leg=self.robotleg, target=self.x_last, b_orient=b_orient)
+            u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient, force=None)
 
         else:
-            u = None  # this'll throw an error if state machine is haywire or something
+            u = None
 
         return u
 
@@ -334,18 +344,18 @@ class Gait:
         # Generates cubic spline curve trajectory for foot swing
 
         # number of time steps allotted for swing trajectory
-
         timesteps = self.t_p * (1 - self.phi_switch) / self.dt
         if not timesteps.is_integer():
             print("Error: period and timesteps are not divisible")  # if t_p is variable
-        path = np.zeros(int(timesteps))
+        timesteps = int(timesteps)
+        path = np.zeros(timesteps)
 
         horizontal = np.array([0.0, timesteps / 2, timesteps])
-        vertical = np.array([-0.8325, -0.7, -0.8325])  # z position assumed constant body height and flat floor
+        vertical = np.array([-0.8325, -0.7, -0.8325])  # z traj assumed constant body height & flat floor
         cs = CubicSpline(horizontal, vertical)
 
         # create evenly spaced sample points of desired trajectory
-        for t in range(int(timesteps)):
+        for t in range(timesteps):
             path[t] = cs(t)
         z_traj = path
         x_traj = np.linspace(x_prev, x_d, timesteps)

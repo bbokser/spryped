@@ -26,18 +26,16 @@ https://github.com/MMehrez/ ...Sim_3_MPC_Robot_PS_obs_avoid_mul_sh.m
 import time
 import numpy as np
 import numpy.matlib
-import scipy
+
 import csv
 import itertools
 
 import casadi as cs
 
-import control
-
 
 class Mpc:
 
-    def __init__(self, dt=1e-3, **kwargs):
+    def __init__(self, **kwargs):
 
         self.u = np.zeros((4, 1))  # control signal
         self.dt = 0.025  # sampling time (s)
@@ -47,6 +45,9 @@ class Mpc:
         self.mu = 0.7  # coefficient of friction
         self.b = 40 * np.pi / 180  # maximum kinematic leg angle
         self.fn = None
+        self.n_states = None
+        self.n_controls = None
+
         with open('spryped_urdf_rev06/spryped_data_body.csv', 'r') as csvfile:
             data = csv.reader(csvfile, delimiter=',')
             next(data)  # skip headers
@@ -78,7 +79,6 @@ class Mpc:
         self.rh_l = np.array([-.14397, .13519, .03581])  # vector from CoM to hip
 
     def mpcontrol(self, rz_phi, r1, r2, x_in, x_ref, c_l, c_r):  # p_l, p_r, c_l, c_r):
-        t0 = time.clock()
 
         i_global = np.dot(np.dot(rz_phi, self.inertia), rz_phi.T)
         i_inv = np.linalg.inv(i_global)
@@ -267,22 +267,34 @@ class Mpc:
         ubx = list(itertools.repeat(500, o_length))  # input inequality constraints
         ubx[(self.n_states * (self.N + 1) + 2)::3] = [0 for i in range(20)]  # upper bound on all f1z and f2z
 
+        if c_l == 0:  # if left leg is not in contact... don't calculate output forces for that leg.
+            ubx[(self.n_states * (self.N + 1))::6] = [0 for i in range(10)]  # upper bound on all f1x
+            ubx[(self.n_states * (self.N + 1) + 1)::6] = [0 for i in range(10)]  # upper bound on all f1y
+            lbx[(self.n_states * (self.N + 1))::6] = [0 for i in range(10)]  # lower bound on all f1x
+            lbx[(self.n_states * (self.N + 1) + 1)::6] = [0 for i in range(10)]  # lower bound on all f1y
+            lbx[(self.n_states * (self.N + 1) + 2)::6] = [0 for i in range(10)]  # lower bound on all f1z
+        if c_r == 0:  # if right leg is not in contact... don't calculate output forces for that leg.
+            ubx[(self.n_states * (self.N + 1) + 3)::6] = [0 for i in range(10)]  # upper bound on all f2x
+            ubx[(self.n_states * (self.N + 1) + 4)::6] = [0 for i in range(10)]  # upper bound on all f2y
+            lbx[(self.n_states * (self.N + 1) + 3)::6] = [0 for i in range(10)]  # lower bound on all f2x
+            lbx[(self.n_states * (self.N + 1) + 4)::6] = [0 for i in range(10)]  # lower bound on all f2y
+            lbx[(self.n_states * (self.N + 1) + 5)::6] = [0 for i in range(10)]  # lower bound on all f2z
+
         # -------------Starting Simulation Loop Now------------------------------------- #
         # DM is very similar to SX, but with the difference that the nonzero elements are numerical values and
         # not symbolic expressions.
         # DM is mainly used for storing matrices in CasADi and as inputs and outputs of functions.
         # It is not intended to be used for computationally intensive calculations.
         # initial condition of the bot, gets updated every iteration (input)
-        x0 = x_in
 
         u0 = np.zeros((self.N, self.n_controls))  # six control inputs
-        X0 = np.matlib.repmat(x0, 1, self.N + 1).T  # initialization of the state's decision variables
+        X0 = np.matlib.repmat(x_in, 1, self.N + 1).T  # initialization of the state's decision variables
 
         xx1 = []
         u_cl = np.zeros([1, 6])
 
-        # parameters and x0 must be changed every timestep
-        parameters = cs.vertcat(x0, x_ref)  # set values of parameters vector
+        # parameters and xin must be changed every timestep
+        parameters = cs.vertcat(x_in, x_ref)  # set values of parameters vector
         # init value of optimization variables
         x0 = cs.vertcat(np.reshape(X0.T, (self.n_states * (self.N + 1), 1)),
                         np.reshape(u0.T, (self.n_controls * self.N, 1)))
@@ -308,7 +320,6 @@ class Mpc:
         # ss_error = np.linalg.norm(x0 - x_ref)  # defaults to Euclidean norm
         # print("ss_error = ", ss_error)
 
-        # t1 = time.clock()
         # print("Time elapsed for MPC: ", t1 - t0)
 
         return u_cl

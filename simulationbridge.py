@@ -58,10 +58,12 @@ class Sim:
         self.omega_xyz = None
         self.omega = None
         self.v = None
+        self.record = False
         # print(p.getJointInfo(bot, 3))
 
         # Record Video
-        # p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "file1.mp4")
+        if self.record is True:
+            p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "file1.mp4")
 
         p.setTimeStep(self.dt)
 

@@ -412,9 +412,11 @@ class Leg(LegBase):
         # Pull values in from simulator and calibrate encoders
         self.q = np.add(q_in.flatten(), self.q_calibration)
         # self.dq = np.reshape([j[1] for j in p.getJointStates(1, range(0, 4))], (-1, 1))
-        self.dq = [i * self.kv for i in self.dq_previous] + (self.q - self.q_previous) / self.dt
+        # self.dq = [i * self.kv for i in self.dq_previous] + (self.q - self.q_previous) / self.dt
+        self.dq = (self.q - self.q_previous) / self.dt
         # Make sure this only happens once per time step
-        self.d2q = [i * self.kv for i in self.d2q_previous] + (self.dq - self.dq_previous) / self.dt
+        # self.d2q = [i * self.kv for i in self.d2q_previous] + (self.dq - self.dq_previous) / self.dt
+        self.d2q = (self.dq - self.dq_previous) / self.dt
 
         self.q_previous = self.q
         self.dq_previous = self.dq
