@@ -20,11 +20,11 @@ import leg
 import wbc
 import mpc
 import statemachine
-import qvis
+# import qvis
 
 import time
-import sys
-import curses
+# import sys
+# import curses
 
 import transforms3d
 import numpy as np
@@ -82,7 +82,7 @@ class Runner:
 
         self.p = np.array([0, 0, 0])  # initial body position
         self.pdot_des = 0  # desired body velocity in world coords
-        self.force_control_test = True
+        self.force_control_test = False
 
     def run(self):
 
@@ -187,17 +187,17 @@ class Runner:
                                                      c_l=contact_l, c_r=contact_r)
                 else:
                     mpc_force = None  # tells gait ctrlr to default to position control.
-
+                    print("skipping mpc")
                 mpc_counter = 0
                 # print(mpc_force)
             mpc_counter += 1
 
-            # calculate wbc control signal
             if self.force_control_test is True:
                 state_l = 'stance'
                 state_r = 'stance'
                 mpc_force = np.zeros(6)
 
+            # calculate wbc control signal
             self.u_l = self.gait_left.u(state=state_l, prev_state=prev_state_l, r_in=pos_l, r_d=self.r_l,
                                         b_orient=b_orient, mpc_force=mpc_force)  # just standing for now
 
@@ -316,9 +316,8 @@ class Gait:
             u = -self.controller.wb_control(leg=self.robotleg, target=target, b_orient=b_orient, force=None)
 
         elif state == 'stance' or state == 'early':
-            # calculate wbc control signal
-
             force = None
+
             if mpc_force is None:
                 # calculate wbc control signal
                 u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient,

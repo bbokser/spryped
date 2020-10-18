@@ -42,7 +42,7 @@ class Mpc:
         self.N = 10  # prediction horizon
         # horizon length = self.dt*self.N = .25 seconds
         self.mass = float(12.12427)  # kg
-        self.mu = 0.7  # coefficient of friction
+        self.mu = 0.5  # coefficient of friction
         self.b = 40 * np.pi / 180  # maximum kinematic leg angle
         self.fn = None
         self.n_states = None
@@ -277,14 +277,14 @@ class Mpc:
             ubx[(self.n_states * (self.N + 1) + 1)::6] = [0 for i in range(10)]  # upper bound on all f1y
             lbx[(self.n_states * (self.N + 1))::6] = [0 for i in range(10)]  # lower bound on all f1x
             lbx[(self.n_states * (self.N + 1) + 1)::6] = [0 for i in range(10)]  # lower bound on all f1y
-            lbx[(self.n_states * (self.N + 1) + 2)::6] = [0 for i in range(10)]  # lower bound on all f1z
+            ubx[(self.n_states * (self.N + 1) + 2)::6] = [0 for i in range(10)]  # upper bound on all f1z
 
         if c_r == 0:  # if right leg is not in contact... don't calculate output forces for that leg.
             ubx[(self.n_states * (self.N + 1) + 3)::6] = [0 for i in range(10)]  # upper bound on all f2x
             ubx[(self.n_states * (self.N + 1) + 4)::6] = [0 for i in range(10)]  # upper bound on all f2y
             lbx[(self.n_states * (self.N + 1) + 3)::6] = [0 for i in range(10)]  # lower bound on all f2x
             lbx[(self.n_states * (self.N + 1) + 4)::6] = [0 for i in range(10)]  # lower bound on all f2y
-            lbx[(self.n_states * (self.N + 1) + 5)::6] = [0 for i in range(10)]  # lower bound on all f2z
+            ubx[(self.n_states * (self.N + 1) + 5)::6] = [0 for i in range(10)]  # upper bound on all f2z
 
         # setup is finished, now solve-------------------------------------------------------------------------------- #
 

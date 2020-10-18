@@ -136,11 +136,10 @@ class Control(control.Control):
         self.grav = leg.gen_grav(b_orient=b_orient)
 
         if force is None:
-            Fr = 0
+            self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - self.grav
         else:
             Fr = np.dot(b_orient, force)  # multiply with rotation matrix for base to world
-
-        self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - self.grav + (np.dot(JEE.T, Fr).reshape(-1, ))
+            self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - self.grav + (np.dot(JEE.T, Fr).reshape(-1, ))
 
         # add in velocity compensation in GC space for stability
         # self.u = np.dot(JEE.T, Fx).reshape(-1, ) \
