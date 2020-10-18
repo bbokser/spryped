@@ -227,8 +227,9 @@ class Mpc:
             st = x[:, k]  # state
             con = u[:, k]  # control action
             # calculate objective
-            obj = obj + cs.mtimes(cs.mtimes((st - st_ref[self.n_states:(self.n_states * 2)]).T, Q),
-                                  st - st_ref[self.n_states:(self.n_states * 2)]) + cs.mtimes(cs.mtimes(con.T, R), con)
+            obj = obj + cs.sqrt(cs.mtimes(cs.mtimes((st - st_ref[self.n_states:(self.n_states * 2)]).T, Q),
+                                          st - st_ref[self.n_states:(self.n_states * 2)])) \
+                + cs.sqrt(cs.mtimes(cs.mtimes(con.T, R), con))
             st_next = x[:, k + 1]
             f_value = self.fn(st[0], st[1], st[2], st[3], st[4], st[5],
                               st[6], st[7], st[8], st[9], st[10], st[11],
@@ -239,15 +240,16 @@ class Mpc:
         # add additional constraints
         for k in range(0, self.N):
             constr = cs.vertcat(constr, u[0, k] - self.mu * u[2, k])  # f1x - mu*f1z
+            constr = cs.vertcat(constr, -u[0, k] - self.mu * u[2, k])  # -f1x - mu*f1z
 
-        for k in range(0, self.N):
             constr = cs.vertcat(constr, u[1, k] - self.mu * u[2, k])  # f1y - mu*f1z
+            constr = cs.vertcat(constr, -u[1, k] - self.mu * u[2, k])  # -f1y - mu*f1z
 
-        for k in range(0, self.N):
             constr = cs.vertcat(constr, u[3, k] - self.mu * u[5, k])  # f2x - mu*f2z
+            constr = cs.vertcat(constr, -u[3, k] - self.mu * u[5, k])  # -f2x - mu*f2z
 
-        for k in range(0, self.N):
             constr = cs.vertcat(constr, u[4, k] - self.mu * u[5, k])  # f2y - mu*f2z
+            constr = cs.vertcat(constr, -u[4, k] - self.mu * u[5, k])  # -f2y - mu*f2z
 
         opt_variables = cs.vertcat(cs.reshape(x, self.n_states * (self.N + 1), 1),
                                    cs.reshape(u, self.n_controls * self.N, 1))
@@ -255,17 +257,20 @@ class Mpc:
         opts = {'print_time': 0, 'error_on_fail': 0, 'verbose': 0, 'printLevel': "low"}
         solver = cs.qpsol('S', 'qpoases', qp, opts)
 
-        # check this since we changed horizon length
         c_length = np.shape(constr)[0]
         o_length = np.shape(opt_variables)[0]
 
-        lbg = list(itertools.repeat(-cs.inf, c_length))  # inequality constraints
+        lbg = list(itertools.repeat(-1e10, c_length))  # inequality constraints: big enough to act like infinity
         lbg[0:self.N] = itertools.repeat(0, self.N)  # dynamics equality constraint
         ubg = list(itertools.repeat(0, c_length))  # inequality constraints
 
-        lbx = list(itertools.repeat(-500, o_length))  # input inequality constraints
-        ubx = list(itertools.repeat(500, o_length))  # input inequality constraints
-        ubx[(self.n_states * (self.N + 1) + 2)::3] = [0 for i in range(20)]  # upper bound on all f1z and f2z
+        # constraints for optimization variables
+        lbx = list(itertools.repeat(-1e10, o_length))  # input inequality constraints
+        ubx = list(itertools.repeat(1e10, o_length))  # input inequality constraints
+
+        dyn_len = self.n_states * (self.N + 1)
+
+        lbx[(dyn_len + 2)::3] = [0 for i in range(20)]  # lower bound on all f1z and f2z
 
         if c_l == 0:  # if left leg is not in contact... don't calculate output forces for that leg.
             ubx[(self.n_states * (self.N + 1))::6] = [0 for i in range(10)]  # upper bound on all f1x
@@ -273,6 +278,7 @@ class Mpc:
             lbx[(self.n_states * (self.N + 1))::6] = [0 for i in range(10)]  # lower bound on all f1x
             lbx[(self.n_states * (self.N + 1) + 1)::6] = [0 for i in range(10)]  # lower bound on all f1y
             lbx[(self.n_states * (self.N + 1) + 2)::6] = [0 for i in range(10)]  # lower bound on all f1z
+
         if c_r == 0:  # if right leg is not in contact... don't calculate output forces for that leg.
             ubx[(self.n_states * (self.N + 1) + 3)::6] = [0 for i in range(10)]  # upper bound on all f2x
             ubx[(self.n_states * (self.N + 1) + 4)::6] = [0 for i in range(10)]  # upper bound on all f2y
@@ -280,18 +286,10 @@ class Mpc:
             lbx[(self.n_states * (self.N + 1) + 4)::6] = [0 for i in range(10)]  # lower bound on all f2y
             lbx[(self.n_states * (self.N + 1) + 5)::6] = [0 for i in range(10)]  # lower bound on all f2z
 
-        # -------------Starting Simulation Loop Now------------------------------------- #
-        # DM is very similar to SX, but with the difference that the nonzero elements are numerical values and
-        # not symbolic expressions.
-        # DM is mainly used for storing matrices in CasADi and as inputs and outputs of functions.
-        # It is not intended to be used for computationally intensive calculations.
-        # initial condition of the bot, gets updated every iteration (input)
+        # setup is finished, now solve-------------------------------------------------------------------------------- #
 
         u0 = np.zeros((self.N, self.n_controls))  # six control inputs
         X0 = np.matlib.repmat(x_in, 1, self.N + 1).T  # initialization of the state's decision variables
-
-        xx1 = []
-        u_cl = np.zeros([1, 6])
 
         # parameters and xin must be changed every timestep
         parameters = cs.vertcat(x_in, x_ref)  # set values of parameters vector
@@ -304,23 +302,10 @@ class Mpc:
         solu = np.array(sol['x'][self.n_states * (self.N + 1):])
         u = np.reshape(solu.T, (self.n_controls, self.N)).T  # get controls from the solution
 
-        solx = np.array(sol['x'][0:self.n_states * (self.N + 1)])
-        # store the "predictions" here
-        xx1 = np.append(xx1, np.reshape(solx.T, (self.n_states, self.N + 1)).T[0:self.n_states])
-
-        u_cl = np.vstack([u_cl, u])  # control actions.
-
-        # Get the solution trajectory
-        X0 = np.reshape(solx.T, (self.n_states, self.N + 1)).T
-        # Shift trajectory to initialize the next step
-        X0 = np.append(X0[1:, :], X0[-1, :])
-
-        u_cl = np.delete(u_cl, 0, axis=0)  # delete first row because it's just zeros for construction
-        u_cl = u_cl[0, :]  # ignore rows other than new first row
+        u_cl = u[0, :]  # ignore rows other than new first row
         # ss_error = np.linalg.norm(x0 - x_ref)  # defaults to Euclidean norm
         # print("ss_error = ", ss_error)
 
         # print("Time elapsed for MPC: ", t1 - t0)
 
         return u_cl
-

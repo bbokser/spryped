@@ -36,14 +36,15 @@ import wbc
 
 class Qp:
 
-    def __init__(self, **kwargs):
+    def __init__(self, controller, **kwargs):
 
         self.u = np.zeros((4, 1))  # control signal
         self.dt = 0.025  # sampling time (s)
+        self.controller = controller
         self.n_del_fr = None
         self.n_del_f = None
 
-    def qpcontrol(self, rz_phi, r1, r2, x_in, x_ref, c_l, c_r):
+    def qpcontrol(self, ):
 
         del_fr_x = cs.SX.sym('del_fr_x')
         del_fr_y = cs.SX.sym('del_fr_y')
@@ -59,7 +60,7 @@ class Qp:
         del_f = [del_f_x, del_f_y, del_f_z]  # floating base acceleration relaxation vector
         self.n_del_f = len(del_f)  # number of controls
 
-        gravity = wbc.grav
+        gravity = self.controller.grav
         dt = self.dt
 
         x_next = []

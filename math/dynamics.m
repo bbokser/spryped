@@ -78,13 +78,7 @@ B = [[0, 0, 0, 0, 0, 0];
      [dt/mass, dt/mass, dt/mass, dt/mass, dt/mass, dt/mass];
      [dt/mass, dt/mass, dt/mass, dt/mass, dt/mass, dt/mass];
      [dt/mass, dt/mass, dt/mass, dt/mass, dt/mass, dt/mass]];
-%{   
-B = zeros(12, 6);
-B(7:9, 1:3) = i_inv * r1 * dt;
-B(7:9, 4:6) = i_inv * r2 * dt;
-B(10:12, 1:3) = dt / mass;
-B(10:12, 4:6) = dt / mass;
-%}
+
 x_next = mtimes(A, x) + mtimes(B, f) + g;
 
 for c=1:12
