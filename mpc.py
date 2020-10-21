@@ -191,11 +191,10 @@ class Mpc:
                               x_next)  # nonlinear mapping of function f(x,u)
 
         u = cs.SX.sym('u', self.n_controls, self.N)  # decision variables, control action matrix
-        st_ref = cs.SX.sym('st_ref', self.n_states + self.n_states)  # initial and reference states
+        st_ref = cs.SX.sym('st_ref', self.n_states + self.n_states)  # initial and reference states, x_ref(k+1)
         x = cs.SX.sym('x', self.n_states, (self.N + 1))  # represents the states over the opt problem.
-        # st_n_e = np.zeros((self.n_states, (self.N + 1)))  # represents left hand side of the dynamics eq
 
-        obj = 0  # cs.SX(0)  # objective function
+        obj = 0  # objective function
         constr = []  # constraints vector
 
         Q = np.zeros((12, 12))  # state weighing matrix
@@ -220,8 +219,7 @@ class Mpc:
         R[4, 4] = 1
         R[5, 5] = 1
 
-        st = x[:, 0]  # initial state
-        constr = cs.vertcat(constr, st - st_ref[0:self.n_states])  # initial condition constraints
+        constr = cs.vertcat(constr, x[:, 0] - st_ref[0:self.n_states])  # initial condition constraints
         # compute objective and constraints
         for k in range(0, self.N):  # 0 because of python zero based indexing
             st = x[:, k]  # state
@@ -255,22 +253,23 @@ class Mpc:
                                    cs.reshape(u, self.n_controls * self.N, 1))
         qp = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
         opts = {'print_time': 0, 'error_on_fail': 0, 'verbose': 0, 'printLevel': "low"}
-        solver = cs.qpsol('S', 'qpoases', qp, opts)
+        # solver = cs.qpsol('S', 'qpoases', qp, opts)
+        solver = cs.nlpsol('solver', 'ipopt', qp)
 
         c_length = np.shape(constr)[0]
         o_length = np.shape(opt_variables)[0]
 
         lbg = list(itertools.repeat(-1e10, c_length))  # inequality constraints: big enough to act like infinity
-        lbg[0:self.N] = itertools.repeat(0, self.N)  # dynamics equality constraint
+        lbg[1:(self.N+1)] = itertools.repeat(0, self.N)  # dynamics equality constraint
         ubg = list(itertools.repeat(0, c_length))  # inequality constraints
 
         # constraints for optimization variables
         lbx = list(itertools.repeat(-1e10, o_length))  # input inequality constraints
         ubx = list(itertools.repeat(1e10, o_length))  # input inequality constraints
 
-        dyn_len = self.n_states * (self.N + 1)
+        st_len = self.n_states * (self.N + 1)
 
-        lbx[(dyn_len + 2)::3] = [0 for i in range(20)]  # lower bound on all f1z and f2z
+        lbx[(st_len + 2)::3] = [0 for i in range(20)]  # lower bound on all f1z and f2z
 
         if c_l == 0:  # if left leg is not in contact... don't calculate output forces for that leg.
             ubx[(self.n_states * (self.N + 1))::6] = [0 for i in range(10)]  # upper bound on all f1x

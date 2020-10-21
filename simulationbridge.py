@@ -20,6 +20,10 @@ import transforms3d
 import pybullet as p
 import pybullet_data
 
+import cv2
+import pyautogui
+
+
 GRAVITY = -9.807
 # physicsClient = p.connect(p.GUI)
 p.connect(p.GUI)
@@ -38,6 +42,23 @@ p.setGravity(0, 0, GRAVITY)
 jointArray = range(p.getNumJoints(bot))
 
 useRealTime = 0
+
+# record stepped ------------------------------------------------------------------------------------------------------#
+output = "video.avi"
+img = pyautogui.screenshot()
+img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+# get info from img
+height, width, channels = img.shape
+# Define the codec and create VideoWriter object
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+out = cv2.VideoWriter(output, fourcc, 20.0, (width, height))
+
+
+def record_stepped():
+    img = pyautogui.screenshot()
+    image = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+    out.write(image)
+# record stepped ------------------------------------------------------------------------------------------------------#
 
 
 def reaction_torques():
@@ -58,11 +79,12 @@ class Sim:
         self.omega_xyz = None
         self.omega = None
         self.v = None
-        self.record = False
+        self.record_rt = False  # record video in real time
+        self.record_stepped = True  # record video in sim steps
         # print(p.getJointInfo(bot, 3))
 
-        # Record Video
-        if self.record is True:
+        # Record Video in real time
+        if self.record_rt is True:
             p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "file1.mp4")
 
         p.setTimeStep(self.dt)
@@ -105,6 +127,9 @@ class Sim:
 
         # Pull values in from simulator, select relevant ones, reshape to 2D array
         q = np.reshape([j[0] for j in p.getJointStates(1, range(0, 8))], (-1, 1))
+
+        if record_stepped is True:
+            record_stepped()
 
         if useRealTime == 0:
             p.stepSimulation()
