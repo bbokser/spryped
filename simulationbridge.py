@@ -80,7 +80,7 @@ class Sim:
         self.omega = None
         self.v = None
         self.record_rt = False  # record video in real time
-        self.record_stepped = True  # record video in sim steps
+        self.record_stepped = False  # record video in sim steps
         # print(p.getJointInfo(bot, 3))
 
         # Record Video in real time

@@ -67,6 +67,9 @@ class Control(control.Control):
         self.kf[2, 2] = 0.01
 
         self.Mq = None
+        self.Mx = None
+        self.x_dd_des = None
+        self.J = None
         self.x = None
         self.grav = None
         self.velocity = None
@@ -132,14 +135,22 @@ class Control(control.Control):
 
         # calculate force
         Fx = np.dot(Mx, x_dd_des)
+        Aq_dd = (np.dot(JEE.T, Fx).reshape(-1, ))
 
         self.grav = leg.gen_grav(b_orient=b_orient)
 
         if force is None:
-            self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - self.grav
+            force_control = 0
         else:
-            Fr = np.dot(b_orient, force)  # multiply with rotation matrix for base to world
-            self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - self.grav + (np.dot(JEE.T, Fr).reshape(-1, ))
+            Fr = np.dot(b_orient, force)
+            force_control = (np.dot(JEE.T, Fr).reshape(-1, ))
+
+        self.u = Aq_dd - self.grav + force_control
+
+        self.x_dd_des = x_dd_des
+        self.Mx = Mx
+        self.J = JEE
+        # self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - self.grav + (np.dot(JEE.T, Fr).reshape(-1, ))
 
         # add in velocity compensation in GC space for stability
         # self.u = np.dot(JEE.T, Fx).reshape(-1, ) \

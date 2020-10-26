@@ -191,7 +191,7 @@ class Mpc:
                               x_next)  # nonlinear mapping of function f(x,u)
 
         u = cs.SX.sym('u', self.n_controls, self.N)  # decision variables, control action matrix
-        st_ref = cs.SX.sym('st_ref', self.n_states + self.n_states)  # initial and reference states, x_ref(k+1)
+        st_ref = cs.SX.sym('st_ref', self.n_states + self.n_states)  # initial and reference states
         x = cs.SX.sym('x', self.n_states, (self.N + 1))  # represents the states over the opt problem.
 
         obj = 0  # objective function

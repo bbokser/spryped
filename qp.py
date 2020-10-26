@@ -39,44 +39,22 @@ class Qp:
     def __init__(self, controller, **kwargs):
 
         self.u = np.zeros((4, 1))  # control signal
-        self.dt = 0.025  # sampling time (s)
         self.controller = controller
-        self.n_del_fr = None
-        self.n_del_f = None
 
-    def qpcontrol(self, ):
+    def qpcontrol(self, fr_mpc):
 
-        del_fr_x = cs.SX.sym('del_fr_x')
-        del_fr_y = cs.SX.sym('del_fr_y')
-        del_fr_z = cs.SX.sym('del_fr_z')
+        n_del_fr = 3  # reaction force relaxation vector (del_f_x, y, z)
+        n_del_f = 4  # floating base acceleration relaxation vector (q1, q2, q3, q4)
 
-        del_fr = [del_fr_x, del_fr_y, del_fr_z]  # reaction force relaxation vector
-        self.n_del_fr = len(del_fr)
-
-        del_f_x = cs.SX.sym('del_f_x')
-        del_f_y = cs.SX.sym('del_f_y')
-        del_f_z = cs.SX.sym('del_f_z')
-
-        del_f = [del_f_x, del_f_y, del_f_z]  # floating base acceleration relaxation vector
-        self.n_del_f = len(del_f)  # number of controls
-
-        gravity = self.controller.grav
-        dt = self.dt
-
-        x_next = []
-
-        self.fn = cs.Function('fn', [q_dd, gravity, A, J, S, f_r], x_next)  # nonlinear mapping of function f(x,u)
-
-        obj = 0  # objective function
-        constr = []  # constraints vector
+        g = self.controller.grav  # joint space gravity-induced torque
 
         Q1 = np.zeros((6, 6))  # state weighing matrix
-        Q[0, 0] = 1
-        Q[1, 1] = 1
-        Q[2, 2] = 1
-        Q[3, 3] = 1
-        Q[4, 4] = 1
-        Q[5, 5] = 1
+        Q1[0, 0] = 1
+        Q1[1, 1] = 1
+        Q1[2, 2] = 1
+        Q1[3, 3] = 1
+        Q1[4, 4] = 1
+        Q1[5, 5] = 1
 
         Q2 = np.zeros((6, 6))  # control weighing matrix
         Q2[0, 0] = 1
@@ -86,22 +64,26 @@ class Qp:
         Q2[4, 4] = 1
         Q2[5, 5] = 1
 
-        st = x[:, 0]  # initial state
-        constr = cs.vertcat(constr, st - st_ref[0:self.n_states])  # initial condition constraints
-        # compute objective and constraints
+        # compute objective
+        del_fr = cs.SX.sym('del_fr', n_del_fr)  # decision variables, control action matrix
+        del_f = cs.SX.sym('del_f', n_del_f)  # represents the states over the opt problem.
 
-        obj = obj + cs.mtimes(cs.mtimes(del_fr.T, Q1), del_fr) + cs.mtimes(cs.mtimes(del_f.T, Q2), del_f)
+        obj = cs.mtimes(cs.mtimes(del_fr.T, Q1), del_fr) + cs.mtimes(cs.mtimes(del_f.T, Q2), del_f)
 
-        f_value = self.fn(st[0], st[1], st[2], st[3], st[4], st[5],
-                          st[6], st[7], st[8], st[9], st[10], st[11],
-                          con[0], con[1], con[2], con[3], con[4], con[5])
-        st_n_e = np.array(f_value)
-        constr = cs.vertcat(constr, st_next - st_n_e)  # compute constraints
-
-        # TODO: add additional constraints
+        # compute constraints
+        A = np.dot(self.controller.J.T, self.controller.Mx).reshape(-1, )
+        q_dd_des = np.dot(self.controller.J.T, self.controller.x_dd_des).reshape(-1, )
+        fr = cs.SX.sym('fr', 3)  # ground reaction force
+        q_dd = cs.SX.sym('q_dd', 4)  # resultant joint acceleration
+        constr = []  # constraints vector
+        constr = cs.vertcat(constr, cs.mtimes(A, q_dd) - g - cs.mtimes(self.controller.J.T, fr))  # Aq + g = J.T*fr
+        constr = cs.vertcat(constr, q_dd - q_dd_des - del_f)  # q_dd = q_dd_cmd + del_f
+        constr = cs.vertcat(constr, fr - fr_mpc - del_fr)  # fr = fr_mpc + del_fr
+        constr = cs.vertcat(constr, fr)  # fr >= 0
 
         opt_variables = cs.vertcat(del_fr, del_f)
-        qp = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
+        # param = cs.SX.sym('param', )  # contains initial and reference states
+        qp = {'x': opt_variables, 'f': obj, 'g': constr}
         opts = {'print_time': 0, 'error_on_fail': 0, 'verbose': 0, 'printLevel': "low"}
         solver = cs.qpsol('S', 'qpoases', qp, opts)
 
@@ -109,68 +91,24 @@ class Qp:
         c_length = np.shape(constr)[0]
         o_length = np.shape(opt_variables)[0]
 
-        lbg = list(itertools.repeat(-cs.inf, c_length))  # inequality constraints
-        lbg[0:self.N] = itertools.repeat(0, self.N)  # dynamics equality constraint
-        ubg = list(itertools.repeat(0, c_length))  # inequality constraints
+        lbg = list(itertools.repeat(0, c_length))  # equality constraints
+        ubg = list(itertools.repeat(0, c_length))  # equality constraints
+        ubg[3] = 1e10  # fr >= 0
 
+        # opt variable constraints
         lbx = list(itertools.repeat(-500, o_length))  # input inequality constraints
         ubx = list(itertools.repeat(500, o_length))  # input inequality constraints
-        ubx[(self.n_states * (self.N + 1) + 2)::3] = [0 for i in range(20)]  # upper bound on all f1z and f2z
 
-        if c_l == 0:  # if left leg is not in contact... don't calculate output forces for that leg.
-            ubx[(self.n_states * (self.N + 1))::6] = [0 for i in range(10)]  # upper bound on all f1x
-            ubx[(self.n_states * (self.N + 1) + 1)::6] = [0 for i in range(10)]  # upper bound on all f1y
-            lbx[(self.n_states * (self.N + 1))::6] = [0 for i in range(10)]  # lower bound on all f1x
-            lbx[(self.n_states * (self.N + 1) + 1)::6] = [0 for i in range(10)]  # lower bound on all f1y
-            lbx[(self.n_states * (self.N + 1) + 2)::6] = [0 for i in range(10)]  # lower bound on all f1z
-        if c_r == 0:  # if right leg is not in contact... don't calculate output forces for that leg.
-            ubx[(self.n_states * (self.N + 1) + 3)::6] = [0 for i in range(10)]  # upper bound on all f2x
-            ubx[(self.n_states * (self.N + 1) + 4)::6] = [0 for i in range(10)]  # upper bound on all f2y
-            lbx[(self.n_states * (self.N + 1) + 3)::6] = [0 for i in range(10)]  # lower bound on all f2x
-            lbx[(self.n_states * (self.N + 1) + 4)::6] = [0 for i in range(10)]  # lower bound on all f2y
-            lbx[(self.n_states * (self.N + 1) + 5)::6] = [0 for i in range(10)]  # lower bound on all f2z
-
-        # -------------Starting Simulation Loop Now------------------------------------- #
-        # DM is very similar to SX, but with the difference that the nonzero elements are numerical values and
-        # not symbolic expressions.
-        # DM is mainly used for storing matrices in CasADi and as inputs and outputs of functions.
-        # It is not intended to be used for computationally intensive calculations.
-        # initial condition of the bot, gets updated every iteration (input)
-
-        u0 = np.zeros((self.N, self.n_controls))  # six control inputs
-        X0 = np.matlib.repmat(x_in, 1, self.N + 1).T  # initialization of the state's decision variables
-
-        xx1 = []
-        u_cl = np.zeros([1, 6])
-
-        # parameters and xin must be changed every timestep
-        parameters = cs.vertcat(x_in, x_ref)  # set values of parameters vector
+        # setup is finished, now solve-------------------------------------------------------------------------------- #
+        # parameters = cs.vertcat(x_in, x_ref)  # set values of parameters vector
         # init value of optimization variables
-        x0 = cs.vertcat(np.reshape(X0.T, (self.n_states * (self.N + 1), 1)),
-                        np.reshape(u0.T, (self.n_controls * self.N, 1)))
+        x0 = cs.vertcat(np.zeros(n_del_fr), np.zeros(n_del_f))  # can't do vertcat, inconsistent sizing?
 
-        sol = solver(x0=x0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg, p=parameters)
+        sol = solver(x0=x0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg)
 
-        solu = np.array(sol['x'][self.n_states * (self.N + 1):])
-        u = np.reshape(solu.T, (self.n_controls, self.N)).T  # get controls from the solution
+        sol_del_f = np.array(sol['x'][n_del_fr:])
 
-        solx = np.array(sol['x'][0:self.n_states * (self.N + 1)])
-        # store the "predictions" here
-        xx1 = np.append(xx1, np.reshape(solx.T, (self.n_states, self.N + 1)).T[0:self.n_states])
+        sol_del_fr = np.array(sol['x'][0:n_del_fr])
 
-        u_cl = np.vstack([u_cl, u])  # control actions.
-
-        # Get the solution trajectory
-        X0 = np.reshape(solx.T, (self.n_states, self.N + 1)).T
-        # Shift trajectory to initialize the next step
-        X0 = np.append(X0[1:, :], X0[-1, :])
-
-        u_cl = np.delete(u_cl, 0, axis=0)  # delete first row because it's just zeros for construction
-        u_cl = u_cl[0, :]  # ignore rows other than new first row
-        # ss_error = np.linalg.norm(x0 - x_ref)  # defaults to Euclidean norm
-        # print("ss_error = ", ss_error)
-
-        # print("Time elapsed: ", t1 - t0)
-
-        return u_cl
+        return sol_del_fr, sol_del_f
 
