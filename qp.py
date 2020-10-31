@@ -26,12 +26,9 @@ https://github.com/MMehrez/ ...Sim_3_MPC_Robot_PS_obs_avoid_mul_sh.m
 import numpy as np
 import numpy.matlib
 
-import csv
 import itertools
 
 import casadi as cs
-
-import wbc
 
 
 class Qp:

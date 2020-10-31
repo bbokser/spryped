@@ -185,6 +185,7 @@ class Runner:
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
                     mpc_force = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x_in=x_in, x_ref=x_ref,
                                                      c_l=contact_l, c_r=contact_r)
+                    print(mpc_force)
                 else:
                     mpc_force = None  # tells gait ctrlr to default to position control.
                     print("skipping mpc")

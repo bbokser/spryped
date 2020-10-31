@@ -154,33 +154,24 @@ class Mpc:
         # dt = cs.SX.sym("dt")
         # mass = cs.SX.sym("mass")
         # x_next = np.dot(A, states) + np.dot(B, controls) + g  # the discrete dynamics of the system
-        x_next = [(dt * omega_x * rz11 + dt * omega_y * rz12 + dt * omega_z * rz13 + theta_x + theta_y + theta_z),
-                  (dt * omega_x * rz21 + dt * omega_y * rz22 + dt * omega_z * rz23 + theta_x + theta_y + theta_z),
-                  (dt * omega_x * rz31 + dt * omega_y * rz32 + dt * omega_z * rz33 + theta_x + theta_y + theta_z),
-                  (dt * pdot_x + dt * pdot_y + dt * pdot_z + p_x + p_y + p_z),
-                  (dt * pdot_x + dt * pdot_y + dt * pdot_z + p_x + p_y + p_z),
-                  (dt * pdot_x + dt * pdot_y + dt * pdot_z + p_x + p_y + p_z),
-                  (dt * f1_x * (i12 * r1z - i13 * r1y) + dt * f1_y * (-i11 * r1z + i13 * r1x)
-                   + dt * f1_z * (i11 * r1y - i12 * r1x)
-                   + dt * f2_x * (i12 * r2z - i13 * r2y) + dt * f2_y * (-i11 * r2z + i13 * r2x)
-                   + dt * f2_z * (i11 * r2y - i12 * r2x)
-                   + omega_x + omega_y + omega_z),
-                  (dt * f1_x * (i22 * r1z - i23 * r1y) + dt * f1_y * (-i21 * r1z + i23 * r1x)
-                   + dt * f1_z * (i21 * r1y - i22 * r1x)
-                   + dt * f2_x * (i22 * r2z - i23 * r2y) + dt * f2_y * (-i21 * r2z + i23 * r2x)
-                   + dt * f2_z * (i21 * r2y - i22 * r2x)
-                   + omega_x + omega_y + omega_z),
-                  (dt * f1_x * (i32 * r1z - i33 * r1y) + dt * f1_y * (-i31 * r1z + i33 * r1x)
-                   + dt * f1_z * (i31 * r1y - i32 * r1x)
-                   + dt * f2_x * (i32 * r2z - i33 * r2y) + dt * f2_y * (-i31 * r2z + i33 * r2x)
-                   + dt * f2_z * (i31 * r2y - i32 * r2x)
-                   + omega_x + omega_y + omega_z),
-                  (dt * f1_x / mass + dt * f1_y / mass + dt * f1_z / mass + dt * f2_x / mass
-                   + dt * f2_y / mass + dt * f2_z / mass + pdot_x + pdot_y + pdot_z),
-                  (dt * f1_x / mass + dt * f1_y / mass + dt * f1_z / mass + dt * f2_x / mass
-                   + dt * f2_y / mass + dt * f2_z / mass + pdot_x + pdot_y + pdot_z),
-                  (dt * f1_x / mass + dt * f1_y / mass + dt * f1_z / mass + dt * f2_x / mass
-                   + dt * f2_y / mass + dt * f2_z / mass + gravity + pdot_x + pdot_y + pdot_z)]
+        x_next = [dt*omega_x*rz11 + dt*omega_y*rz12 + dt*omega_z*rz13 + theta_x,
+                  dt*omega_x*rz21 + dt*omega_y*rz22 + dt*omega_z*rz23 + theta_y,
+                  dt*omega_x*rz31 + dt*omega_y*rz32 + dt*omega_z*rz33 + theta_z,
+                  dt*pdot_x + p_x,
+                  dt*pdot_y + p_y,
+                  dt*pdot_z + p_z,
+                  dt*f1_x*(i12*r1z - i13*r1y) + dt*f1_y*(-i11*r1z + i13*r1x)
+                  + dt*f1_z*(i11*r1y - i12*r1x) + dt*f2_x*(i12*r2z - i13*r2y)
+                  + dt*f2_y*(-i11*r2z + i13*r2x) + dt*f2_z*(i11*r2y - i12*r2x) + omega_x,
+                  dt * f1_x * (i22 * r1z - i23 * r1y) + dt * f1_y * (-i21 * r1z + i23 * r1x)
+                  + dt * f1_z * (i21 * r1y - i22 * r1x) + dt * f2_x * (i22 * r2z - i23 * r2y)
+                  + dt * f2_y * (-i21 * r2z + i23 * r2x) + dt * f2_z * (i21 * r2y - i22 * r2x) + omega_y,
+                  dt * f1_x * (i32 * r1z - i33 * r1y) + dt * f1_y * (-i31 * r1z + i33 * r1x)
+                  + dt * f1_z * (i31 * r1y - i32 * r1x) + dt * f2_x * (i32 * r2z - i33 * r2y)
+                  + dt * f2_y * (-i31 * r2z + i33 * r2x) + dt * f2_z * (i31 * r2y - i32 * r2x) + omega_z,
+                  dt * f1_x / mass + dt * f2_x / mass + pdot_x,
+                  dt * f1_y / mass + dt * f2_y / mass + pdot_y,
+                  dt * f1_z / mass + dt * f2_z / mass + gravity + pdot_z]
 
         self.fn = cs.Function('fn', [theta_x, theta_y, theta_z,
                                      p_x, p_y, p_z,
@@ -221,7 +212,7 @@ class Mpc:
 
         constr = cs.vertcat(constr, x[:, 0] - st_ref[0:self.n_states])  # initial condition constraints
         # compute objective and constraints
-        for k in range(0, self.N):  # 0 because of python zero based indexing
+        for k in range(0, self.N):
             st = x[:, k]  # state
             con = u[:, k]  # control action
             # calculate objective
@@ -252,9 +243,10 @@ class Mpc:
         opt_variables = cs.vertcat(cs.reshape(x, self.n_states * (self.N + 1), 1),
                                    cs.reshape(u, self.n_controls * self.N, 1))
         qp = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
-        opts = {'print_time': 0, 'error_on_fail': 0, 'verbose': 0, 'printLevel': "low"}
-        # solver = cs.qpsol('S', 'qpoases', qp, opts)
-        solver = cs.nlpsol('solver', 'ipopt', qp)
+        opts = {'print_time': 0, 'error_on_fail': 0, 'printLevel': "high"}
+        solver = cs.qpsol('S', 'qpoases', qp, opts)
+        # opts = {'print_time': 0, 'error_on_fail': 0, 'ipopt.print_level': 0}
+        # solver = cs.nlpsol('solver', 'ipopt', qp, opts)
 
         c_length = np.shape(constr)[0]
         o_length = np.shape(opt_variables)[0]

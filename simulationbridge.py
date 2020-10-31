@@ -43,22 +43,11 @@ jointArray = range(p.getNumJoints(bot))
 
 useRealTime = 0
 
-# record stepped ------------------------------------------------------------------------------------------------------#
-output = "video.avi"
-img = pyautogui.screenshot()
-img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-# get info from img
-height, width, channels = img.shape
-# Define the codec and create VideoWriter object
-fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-out = cv2.VideoWriter(output, fourcc, 20.0, (width, height))
 
-
-def record_stepped():
+def record_stepped(out):
     img = pyautogui.screenshot()
     image = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
     out.write(image)
-# record stepped ------------------------------------------------------------------------------------------------------#
 
 
 def reaction_torques():
@@ -86,6 +75,16 @@ class Sim:
         # Record Video in real time
         if self.record_rt is True:
             p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "file1.mp4")
+
+        if self.record_stepped is True:
+            output = "video.avi"
+            img = pyautogui.screenshot()
+            img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+            # get info from img
+            height, width, channels = img.shape
+            # Define the codec and create VideoWriter object
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            self.out = cv2.VideoWriter(output, fourcc, 20.0, (width, height))
 
         p.setTimeStep(self.dt)
 
@@ -129,7 +128,7 @@ class Sim:
         q = np.reshape([j[0] for j in p.getJointStates(1, range(0, 8))], (-1, 1))
 
         if record_stepped is True:
-            record_stepped()
+            record_stepped(self.out)
 
         if useRealTime == 0:
             p.stepSimulation()
