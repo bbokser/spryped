@@ -75,7 +75,7 @@ class Runner:
 
         # footstep planner values
         self.omega_d = np.array([0, 0, 0])  # desired angular acceleration for footstep planner
-        self.k_f = 0.5  # Raibert heuristic gain
+        self.k_f = 0.03  # Raibert heuristic gain
         self.h = np.array([0, 0, 0.8325])  # height, assumed to be constant
         self.r_l = np.array([0, 0, -0.8325])  # initial footstep planning position
         self.r_r = np.array([0, 0, -0.8325])  # initial footstep planning position
@@ -178,14 +178,15 @@ class Runner:
 
             omega = np.array(self.simulator.omega_xyz)
 
-            x_in = np.hstack([theta, self.p, omega, pdot]).T  # array of the states for MPC
+            x_in = np.hstack([theta, p, omega, pdot]).T  # array of the states for MPC
+
             x_ref = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).T  # reference pose (desired)
 
             if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
                     mpc_force = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x_in=x_in, x_ref=x_ref,
                                                      c_l=contact_l, c_r=contact_r)
-                    print(mpc_force)
+                    print("force = ", mpc_force)
                 else:
                     mpc_force = None  # tells gait ctrlr to default to position control.
                     print("skipping mpc")
@@ -279,8 +280,10 @@ class Runner:
         t_stance = self.t_p * self.phi_switch
         p_symmetry = t_stance * 0.5 * pdot + self.k_f * (pdot - pdot_des)
         p_cent = 0.5 * np.sqrt(self.h / 9.807) * np.cross(pdot, self.omega_d)
-
-        return p_hip + p_symmetry + p_cent + np.array([0, 0, -0.8325])
+        p = p_hip + p_symmetry + p_cent
+        print("p_symmetry = ", p_symmetry)
+        p[2] = -0.8325  # assume constant height for now. TODO: height changes?
+        return p
 
 
 class Gait:
@@ -301,7 +304,7 @@ class Gait:
     def u(self, state, prev_state, r_in, r_d, b_orient, mpc_force):
 
         target_default = np.hstack(np.append(r_d, np.array([self.init_alpha, self.init_beta, self.init_gamma])))
-
+        print("t_default = ", target_default, self.robotleg.leg)
         if state == 'swing':
             if prev_state != state:
                 self.swing_steps = 0
