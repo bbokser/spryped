@@ -186,7 +186,7 @@ class Runner:
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
                     mpc_force = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x_in=x_in, x_ref=x_ref,
                                                      c_l=contact_l, c_r=contact_r)
-                    print("force = ", mpc_force)
+                    # print("force = ", mpc_force)
                 else:
                     mpc_force = None  # tells gait ctrlr to default to position control.
                     print("skipping mpc")
@@ -281,7 +281,8 @@ class Runner:
         p_symmetry = t_stance * 0.5 * pdot + self.k_f * (pdot - pdot_des)
         p_cent = 0.5 * np.sqrt(self.h / 9.807) * np.cross(pdot, self.omega_d)
         p = p_hip + p_symmetry + p_cent
-        print("p_symmetry = ", p_symmetry)
+        # print("p_symmetry = ", p_symmetry, robotleg)
+        # print("p = ", p, robotleg)
         p[2] = -0.8325  # assume constant height for now. TODO: height changes?
         return p
 
@@ -303,8 +304,10 @@ class Gait:
 
     def u(self, state, prev_state, r_in, r_d, b_orient, mpc_force):
 
-        target_default = np.hstack(np.append(r_d, np.array([self.init_alpha, self.init_beta, self.init_gamma])))
-        print("t_default = ", target_default, self.robotleg.leg)
+        target_default = np.hstack(np.append(np.array([0, 0, -0.8325]),
+                                             np.array([self.init_alpha, self.init_beta, self.init_gamma])))
+        # print("t_default = ", target_default, self.robotleg.leg)
+
         if state == 'swing':
             if prev_state != state:
                 self.swing_steps = 0
