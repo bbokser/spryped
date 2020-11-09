@@ -241,14 +241,13 @@ class Mpc:
         opt_variables = cs.vertcat(cs.reshape(x, n_states * (self.N + 1), 1),
                                    cs.reshape(u, n_controls * self.N, 1))
         qp = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
-        opts = {'print_time': 0, 'error_on_fail': 0, 'printLevel': "low"}
+        opts = {'print_time': 0, 'error_on_fail': 0, 'printLevel': "low", 'boundTolerance': 1e-3,
+                'terminationTolerance': 1e-3}
         solver = cs.qpsol('S', 'qpoases', qp, opts)
-        # opts = {'print_time': 0, 'error_on_fail': 0, 'ipopt.print_level': 0}
-        # solver = cs.nlpsol('solver', 'ipopt', qp, opts)
 
         c_length = np.shape(constr)[0]
         o_length = np.shape(opt_variables)[0]
-        print(c_length, o_length)
+
         lbg = list(itertools.repeat(-1e10, c_length))  # inequality constraints: big enough to act like infinity
         lbg[1:(self.N + 1)] = itertools.repeat(0, self.N)  # dynamics equality constraint
         ubg = list(itertools.repeat(0, c_length))  # inequality constraints

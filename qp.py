@@ -45,21 +45,16 @@ class Qp:
 
         g = self.controller.grav  # joint space gravity-induced torque
 
-        Q1 = np.zeros((6, 6))  # state weighing matrix
+        Q1 = np.zeros((3, 3))  # state weighing matrix
         Q1[0, 0] = 1
         Q1[1, 1] = 1
         Q1[2, 2] = 1
-        Q1[3, 3] = 1
-        Q1[4, 4] = 1
-        Q1[5, 5] = 1
 
-        Q2 = np.zeros((6, 6))  # control weighing matrix
+        Q2 = np.zeros((4, 4))  # control weighing matrix
         Q2[0, 0] = 1
         Q2[1, 1] = 1
         Q2[2, 2] = 1
         Q2[3, 3] = 1
-        Q2[4, 4] = 1
-        Q2[5, 5] = 1
 
         # compute objective
         del_fr = cs.SX.sym('del_fr', n_del_fr)  # decision variables, control action matrix
@@ -68,7 +63,8 @@ class Qp:
         obj = cs.mtimes(cs.mtimes(del_fr.T, Q1), del_fr) + cs.mtimes(cs.mtimes(del_f.T, Q2), del_f)
 
         # compute constraints
-        A = np.dot(self.controller.J.T, self.controller.Mx).reshape(-1, )
+        A = np.dot(self.controller.J.T, self.controller.Mx)  # .reshape(-1, )
+        print(np.shape(self.controller.Mx))
         q_dd_des = np.dot(self.controller.J.T, self.controller.x_dd_des).reshape(-1, )
         fr = cs.SX.sym('fr', 3)  # ground reaction force
         q_dd = cs.SX.sym('q_dd', 4)  # resultant joint acceleration
@@ -81,7 +77,8 @@ class Qp:
         opt_variables = cs.vertcat(del_fr, del_f)
         # param = cs.SX.sym('param', )  # contains initial and reference states
         qp = {'x': opt_variables, 'f': obj, 'g': constr}
-        opts = {'print_time': 0, 'error_on_fail': 0, 'verbose': 0, 'printLevel': "low"}
+        opts = {'print_time': 0, 'error_on_fail': 0, 'printLevel': "low", 'boundTolerance': 1e-2,
+                'terminationTolerance': 1e-2}
         solver = cs.qpsol('S', 'qpoases', qp, opts)
 
         # check this since we changed horizon length

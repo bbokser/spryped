@@ -20,6 +20,7 @@ import leg
 import wbc
 import mpc
 import statemachine
+import qp
 # import qvis
 
 import time
@@ -55,6 +56,8 @@ class Runner:
         self.simulator = simulationbridge.Sim(dt=dt)
         self.state_left = statemachine.Char()
         self.state_right = statemachine.Char()
+        self.qp_l = qp.Qp(controller=self.controller_left)
+        self.qp_r = qp.Qp(controller=self.controller_right)
 
         # gait scheduler values
         self.target_init = np.array([0, 0, -0.8325])  # , self.init_alpha, self.init_beta, self.init_gamma])
@@ -66,9 +69,9 @@ class Runner:
         self.dist_force_r = np.array([0, 0, 0])
         self.t_p = 0.5  # gait period, seconds
         self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Percentage of gait spent in contact.
-        self.gait_left = Gait(controller=self.controller_left, robotleg=self.leg_left,
+        self.gait_left = Gait(controller=self.controller_left, robotleg=self.leg_left, qp=self.qp_l,
                               t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
-        self.gait_right = Gait(controller=self.controller_right, robotleg=self.leg_right,
+        self.gait_right = Gait(controller=self.controller_right, robotleg=self.leg_right, qp=self.qp_r,
                                t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
 
         self.target = None
@@ -98,7 +101,7 @@ class Runner:
         prev_contact_l = False
         prev_contact_r = False
 
-        mpc_force = None
+        mpc_force = np.zeros(6)
         mpc_dt = 0.025  # mpc period
         mpc_factor = mpc_dt / self.dt  # repeat mpc every x seconds
         mpc_counter = mpc_factor
@@ -187,8 +190,9 @@ class Runner:
                     mpc_force = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x_in=x_in, x_ref=x_ref,
                                                      c_l=contact_l, c_r=contact_r)
                     # print("force = ", mpc_force)
+                    skip = False
                 else:
-                    mpc_force = None  # tells gait ctrlr to default to position control.
+                    skip = True  # tells gait ctrlr to default to position control.
                     print("skipping mpc")
                 mpc_counter = 0
                 # print(mpc_force)
@@ -201,10 +205,10 @@ class Runner:
 
             # calculate wbc control signal
             self.u_l = self.gait_left.u(state=state_l, prev_state=prev_state_l, r_in=pos_l, r_d=self.r_l,
-                                        b_orient=b_orient, mpc_force=mpc_force)  # just standing for now
+                                        b_orient=b_orient, fr_mpc=mpc_force[0:3], skip=skip)  # just standing for now
 
             self.u_r = self.gait_right.u(state=state_r, prev_state=prev_state_r, r_in=pos_r, r_d=self.r_r,
-                                         b_orient=b_orient, mpc_force=mpc_force)  # just standing for now
+                                         b_orient=b_orient, fr_mpc=mpc_force[3:], skip=skip)  # just standing for now
 
             # receive disturbance torques
             dist_tau_l = self.contact_left.disturbance_torque(Mq=self.controller_left.Mq,
@@ -288,7 +292,7 @@ class Runner:
 
 
 class Gait:
-    def __init__(self, controller, robotleg, t_p, phi_switch, dt=1e-3, **kwargs):
+    def __init__(self, controller, robotleg, qp, t_p, phi_switch, dt=1e-3, **kwargs):
 
         self.swing_steps = 0
         self.trajectory = None
@@ -299,10 +303,11 @@ class Gait:
         self.init_beta = 0  # can't control, ee Jacobian is zeros in that row
         self.init_gamma = 0
         self.controller = controller
+        self.qp = qp
         self.robotleg = robotleg
         self.x_last = None
 
-    def u(self, state, prev_state, r_in, r_d, b_orient, mpc_force):
+    def u(self, state, prev_state, r_in, r_d, b_orient, fr_mpc, skip):
 
         target_default = np.hstack(np.append(np.array([0, 0, -0.8325]),
                                              np.array([self.init_alpha, self.init_beta, self.init_gamma])))
@@ -323,17 +328,13 @@ class Gait:
             u = -self.controller.wb_control(leg=self.robotleg, target=target, b_orient=b_orient, force=None)
 
         elif state == 'stance' or state == 'early':
-            force = None
 
-            if mpc_force is None:
+            if skip is True:  # skip force control this time because robot is already in correct pose
                 # calculate wbc control signal
                 u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient,
                                                 force=None)
             else:
-                if self.robotleg.leg == 1:  # left
-                    force = mpc_force[0:3]
-                elif self.robotleg.leg == 0:  # right
-                    force = mpc_force[3:]
+                force = self.qp.qpcontrol(fr_mpc=fr_mpc)
                 u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient,
                                                 force=force)
 
