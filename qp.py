@@ -38,7 +38,7 @@ class Qp:
         self.u = np.zeros((4, 1))  # control signal
         self.controller = controller
 
-    def qpcontrol(self, fr_mpc):
+    def qpcontrol(self, fr_mpc, fr, q):
 
         n_del_fr = 3  # reaction force relaxation vector (del_f_x, y, z)
         n_del_f = 4  # floating base acceleration relaxation vector (q1, q2, q3, q4)
@@ -63,16 +63,18 @@ class Qp:
         obj = cs.mtimes(cs.mtimes(del_fr.T, Q1), del_fr) + cs.mtimes(cs.mtimes(del_f.T, Q2), del_f)
 
         # compute constraints
-        A = np.dot(self.controller.J.T, self.controller.Mx)  # .reshape(-1, )
-        print(np.shape(self.controller.Mx))
+        A = np.dot(np.dot(self.controller.J.T, self.controller.Mx), self.controller.J)  # A = Mq = J.T*Mx*J
         q_dd_des = np.dot(self.controller.J.T, self.controller.x_dd_des).reshape(-1, )
-        fr = cs.SX.sym('fr', 3)  # ground reaction force
-        q_dd = cs.SX.sym('q_dd', 4)  # resultant joint acceleration
-        constr = []  # constraints vector
-        constr = cs.vertcat(constr, cs.mtimes(A, q_dd) - g - cs.mtimes(self.controller.J.T, fr))  # Aq + g = J.T*fr
-        constr = cs.vertcat(constr, q_dd - q_dd_des - del_f)  # q_dd = q_dd_cmd + del_f
-        constr = cs.vertcat(constr, fr - fr_mpc - del_fr)  # fr = fr_mpc + del_fr
-        constr = cs.vertcat(constr, fr)  # fr >= 0
+        # q_dd_des = self.controller.x_dd_des
+        # fr = cs.SX.sym('fr', 3)  # GRF, I think this is calculated from contact estimator
+        q_dd = q  # cs.SX.sym('q_dd', 4)  # resultant joint acceleration
+
+        constr = (cs.mtimes(A, q_dd) - g - cs.mtimes(self.controller.J.T, fr)).T  # Aq + g = J.T*fr
+        constr = cs.vertcat(constr, (q_dd - q_dd_des - del_f).T)  # q_dd = q_dd_cmd + del_f
+        print(constr)
+        constr = cs.vertcat(constr, (fr - fr_mpc - del_fr).T)  # fr = fr_mpc + del_fr
+
+        constr = cs.vertcat(constr, fr.T)  # fr >= 0
 
         opt_variables = cs.vertcat(del_fr, del_f)
         # param = cs.SX.sym('param', )  # contains initial and reference states
@@ -94,7 +96,6 @@ class Qp:
         ubx = list(itertools.repeat(500, o_length))  # input inequality constraints
 
         # setup is finished, now solve-------------------------------------------------------------------------------- #
-        # parameters = cs.vertcat(x_in, x_ref)  # set values of parameters vector
         # init value of optimization variables
         x0 = cs.vertcat(np.zeros(n_del_fr), np.zeros(n_del_f))  # can't do vertcat, inconsistent sizing?
 
@@ -104,5 +105,5 @@ class Qp:
 
         sol_del_fr = np.array(sol['x'][0:n_del_fr])
 
-        return sol_del_fr, sol_del_f
+        return sol_del_fr
 
