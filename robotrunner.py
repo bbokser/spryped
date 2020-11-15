@@ -206,12 +206,10 @@ class Runner:
 
             # calculate wbc control signal
             self.u_l = self.gait_left.u(state=state_l, prev_state=prev_state_l, r_in=pos_l, r_d=self.r_l,
-                                        b_orient=b_orient, fr_mpc=mpc_force[0:3], q=self.leg_left.d2q,
-                                        fr=self.dist_force_l, skip=skip)
+                                        b_orient=b_orient, fr_mpc=mpc_force[0:3], skip=skip)
             # just standing for now
             self.u_r = self.gait_right.u(state=state_r, prev_state=prev_state_r, r_in=pos_r, r_d=self.r_r,
-                                         b_orient=b_orient, fr_mpc=mpc_force[3:], q=self.leg_right.d2q,
-                                         fr=self.dist_force_r, skip=skip)
+                                         b_orient=b_orient, fr_mpc=mpc_force[3:], skip=skip)
             # just standing for now
 
             # receive disturbance torques
@@ -311,7 +309,7 @@ class Gait:
         self.robotleg = robotleg
         self.x_last = None
 
-    def u(self, state, prev_state, r_in, r_d, b_orient, fr_mpc, q, fr, skip):
+    def u(self, state, prev_state, r_in, r_d, b_orient, fr_mpc, skip):
 
         target_default = np.hstack(np.append(np.array([0, 0, -0.8325]),
                                              np.array([self.init_alpha, self.init_beta, self.init_gamma])))
@@ -338,7 +336,7 @@ class Gait:
                 u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient,
                                                 force=None)
             else:
-                del_fr = self.qp.qpcontrol(fr_mpc=fr_mpc, fr=fr, q=q)
+                del_fr = self.qp.qpcontrol(fr_mpc=fr_mpc)
                 force = (fr_mpc + del_fr.T).reshape(-1, )
                 u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient,
                                                 force=force)

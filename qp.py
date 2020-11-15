@@ -38,7 +38,7 @@ class Qp:
         self.u = np.zeros((4, 1))  # control signal
         self.controller = controller
 
-    def qpcontrol(self, fr_mpc, fr, q):
+    def qpcontrol(self, fr_mpc):
 
         n_del_fr = 3  # reaction force relaxation vector (del_f_x, y, z)
         n_del_f = 4  # floating base acceleration relaxation vector (q1, q2, q3, q4)
@@ -61,26 +61,29 @@ class Qp:
         del_f = cs.SX.sym('del_f', n_del_f)  # represents the states over the opt problem.
 
         obj = cs.mtimes(cs.mtimes(del_fr.T, Q1), del_fr) + cs.mtimes(cs.mtimes(del_f.T, Q2), del_f)
-
+        # are the transposes actually working correctly? TODO: Check.
         # compute constraints
+
         A = np.dot(np.dot(self.controller.J.T, self.controller.Mx), self.controller.J)  # A = Mq = J.T*Mx*J
         q_dd_des = np.dot(self.controller.J.T, self.controller.x_dd_des).reshape(-1, )
         # q_dd_des = self.controller.x_dd_des
-        # fr = cs.SX.sym('fr', 3)  # GRF, I think this is calculated from contact estimator
-        q_dd = q  # cs.SX.sym('q_dd', 4)  # resultant joint acceleration
+        fr = fr_mpc + del_fr  # GRF
+        q_dd = q_dd_des + del_f  # cs.SX.sym('q_dd', 4)  # resultant joint acceleration
+        Aqdd = cs.mtimes(A, q_dd)
+        Jfr = cs.mtimes(self.controller.J.T, fr)
 
-        constr = (cs.mtimes(A, q_dd) - g - cs.mtimes(self.controller.J.T, fr)).T  # Aq + g = J.T*fr
-        constr = cs.vertcat(constr, (q_dd - q_dd_des - del_f).T)  # q_dd = q_dd_cmd + del_f
-        print(constr)
-        constr = cs.vertcat(constr, (fr - fr_mpc - del_fr).T)  # fr = fr_mpc + del_fr
+        constr = []
+        for k in range(0, n_del_f):
+            constr = cs.vertcat(constr, Aqdd[k] - g[k] - Jfr[k])  # Aq + g = J.T*fr
 
-        constr = cs.vertcat(constr, fr.T)  # fr >= 0
+        for k in range(0, n_del_fr):
+            constr = cs.vertcat(constr, fr[k])  # fr >= 0
 
         opt_variables = cs.vertcat(del_fr, del_f)
-        # param = cs.SX.sym('param', )  # contains initial and reference states
+
         qp = {'x': opt_variables, 'f': obj, 'g': constr}
-        opts = {'print_time': 0, 'error_on_fail': 0, 'printLevel': "low", 'boundTolerance': 1e-2,
-                'terminationTolerance': 1e-2}
+        opts = {'print_time': 0, 'error_on_fail': 0, 'printLevel': "high", 'boundTolerance': 1e-6,
+                'terminationTolerance': 1e-6}
         solver = cs.qpsol('S', 'qpoases', qp, opts)
 
         # check this since we changed horizon length
@@ -89,15 +92,15 @@ class Qp:
 
         lbg = list(itertools.repeat(0, c_length))  # equality constraints
         ubg = list(itertools.repeat(0, c_length))  # equality constraints
-        ubg[3] = 1e10  # fr >= 0
+        ubg[4:7] = list(itertools.repeat(1e10, n_del_fr))   # fr >= 0
 
         # opt variable constraints
-        lbx = list(itertools.repeat(-500, o_length))  # input inequality constraints
-        ubx = list(itertools.repeat(500, o_length))  # input inequality constraints
+        lbx = list(itertools.repeat(-1e10, o_length))  # input inequality constraints
+        ubx = list(itertools.repeat(1e10, o_length))  # input inequality constraints
 
         # setup is finished, now solve-------------------------------------------------------------------------------- #
         # init value of optimization variables
-        x0 = cs.vertcat(np.zeros(n_del_fr), np.zeros(n_del_f))  # can't do vertcat, inconsistent sizing?
+        x0 = cs.vertcat(np.zeros(n_del_fr), np.zeros(n_del_f))
 
         sol = solver(x0=x0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg)
 

@@ -214,6 +214,7 @@ class Mpc:
             st = x[:, k]  # state
             con = u[:, k]  # control action
             # calculate objective
+            # why not just plug x_in and x_ref directly into st_ref??
             obj = obj + cs.mtimes(cs.mtimes((st - st_ref[n_states:(n_states * 2)]).T, Q),
                                   st - st_ref[n_states:(n_states * 2)]) \
                 + cs.mtimes(cs.mtimes(con.T, R), con)
@@ -241,15 +242,15 @@ class Mpc:
         opt_variables = cs.vertcat(cs.reshape(x, n_states * (self.N + 1), 1),
                                    cs.reshape(u, n_controls * self.N, 1))
         qp = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
-        opts = {'print_time': 0, 'error_on_fail': 0, 'printLevel': "low", 'boundTolerance': 1e-3,
-                'terminationTolerance': 1e-3}
+        opts = {'print_time': 0, 'error_on_fail': 0, 'printLevel': "none", 'boundTolerance': 1e-6,
+                'terminationTolerance': 1e-6}
         solver = cs.qpsol('S', 'qpoases', qp, opts)
 
         c_length = np.shape(constr)[0]
         o_length = np.shape(opt_variables)[0]
 
         lbg = list(itertools.repeat(-1e10, c_length))  # inequality constraints: big enough to act like infinity
-        lbg[1:(self.N + 1)] = itertools.repeat(0, self.N)  # dynamics equality constraint
+        lbg[0:(self.N + 1)] = itertools.repeat(0, self.N + 1)  # IC + dynamics equality constraint
         ubg = list(itertools.repeat(0, c_length))  # inequality constraints
 
         # constraints for optimization variables
