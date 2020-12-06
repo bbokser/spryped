@@ -20,8 +20,6 @@ import leg
 import wbc
 import mpc
 import statemachine
-import qp
-# import qvis
 
 import time
 # import sys
@@ -36,7 +34,13 @@ np.set_printoptions(suppress=True, linewidth=np.nan)
 
 class Runner:
 
-    def __init__(self, dt=1e-3):
+    def __init__(self, dt=1e-3, qvis_en=False, freeze_imu=True):
+
+        self.qvis_en = qvis_en
+        if qvis_en is True:
+            import qvis
+
+        self.freeze_imu = freeze_imu
 
         self.dt = dt
         self.u_l = np.zeros(4)
@@ -56,8 +60,6 @@ class Runner:
         self.simulator = simulationbridge.Sim(dt=dt)
         self.state_left = statemachine.Char()
         self.state_right = statemachine.Char()
-        self.qp_l = qp.Qp(controller=self.controller_left)
-        self.qp_r = qp.Qp(controller=self.controller_right)
 
         # gait scheduler values
         self.target_init = np.array([0, 0, -0.8325])  # , self.init_alpha, self.init_beta, self.init_gamma])
@@ -69,9 +71,9 @@ class Runner:
         self.dist_force_r = np.array([0, 0, 0])
         self.t_p = 0.5  # gait period, seconds
         self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Percentage of gait spent in contact.
-        self.gait_left = Gait(controller=self.controller_left, robotleg=self.leg_left, qp=self.qp_l,
+        self.gait_left = Gait(controller=self.controller_left, robotleg=self.leg_left,
                               t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
-        self.gait_right = Gait(controller=self.controller_right, robotleg=self.leg_right, qp=self.qp_r,
+        self.gait_right = Gait(controller=self.controller_right, robotleg=self.leg_right,
                                t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
 
         self.target = None
@@ -123,6 +125,9 @@ class Runner:
             # put an if statement here once we have hardware bridge too
             q, b_orient = self.simulator.sim_run(u_l=self.u_l, u_r=self.u_r)
 
+            if self.freeze_imu is True:
+                b_orient = np.identity(3)
+
             q_left = q[0:4]
             q_left[1] *= -1
             q_left[2] *= -1
@@ -160,8 +165,8 @@ class Runner:
             rz_phi = np.zeros((3, 3))
             rz_phi[0, 0] = c_phi
             rz_phi[0, 1] = s_phi
-            rz_phi[1, 0] = -c_phi
-            rz_phi[1, 1] = s_phi
+            rz_phi[1, 0] = -s_phi
+            rz_phi[1, 1] = c_phi
             rz_phi[2, 2] = 1
 
             if state_l == ('stance' or 'early'):
@@ -203,6 +208,7 @@ class Runner:
                 state_l = 'stance'
                 state_r = 'stance'
                 mpc_force = np.zeros(6)
+            print(state_r, state_l)
 
             # calculate wbc control signal
             self.u_l = self.gait_left.u(state=state_l, prev_state=prev_state_l, r_in=pos_l, r_d=self.r_l,
@@ -234,8 +240,9 @@ class Runner:
             prev_contact_r = contact_r
 
             # -------------------------quaternion-visualizer-animation--------------------------------- #
-            # q_e = self.controller_left.q_e
-            # qvis.animate(q_e)
+            if self.qvis_en is True:
+                q_e = self.controller_left.q_e
+                qvis.animate(q_e)
             # ----------------------------------------------------------------------------------------- #
 
             # print(self.dist_force_l[2])
@@ -268,7 +275,7 @@ class Runner:
     def gait_estimator(self, dist_force):
         # Determines whether foot is actually in contact or not
         # This is very simple for now, but needs to be revamped later
-        if dist_force >= 50:
+        if dist_force >= 70:
             sh = 1  # stance
         else:
             sh = 0  # swing
@@ -294,7 +301,7 @@ class Runner:
 
 
 class Gait:
-    def __init__(self, controller, robotleg, qp, t_p, phi_switch, dt=1e-3, **kwargs):
+    def __init__(self, controller, robotleg, t_p, phi_switch, dt=1e-3, **kwargs):
 
         self.swing_steps = 0
         self.trajectory = None
@@ -305,15 +312,14 @@ class Gait:
         self.init_beta = 0  # can't control, ee Jacobian is zeros in that row
         self.init_gamma = 0
         self.controller = controller
-        self.qp = qp
         self.robotleg = robotleg
         self.x_last = None
+        self.target = None
 
     def u(self, state, prev_state, r_in, r_d, b_orient, fr_mpc, skip):
 
-        target_default = np.hstack(np.append(np.array([0, 0, -0.8325]),
+        self.target = np.hstack(np.append(np.array([0, 0, -0.8325]),
                                              np.array([self.init_alpha, self.init_beta, self.init_gamma])))
-        # print("t_default = ", target_default, self.robotleg.leg)
 
         if state == 'swing':
             if prev_state != state:
@@ -321,29 +327,33 @@ class Gait:
                 self.trajectory = self.traj(x_prev=r_in[0], x_d=r_d[0], y_prev=r_in[1], y_d=r_d[1])
 
             # set target position
-            target = self.trajectory[:, self.swing_steps]
-            target = np.hstack(np.append(target,
-                                         np.array([self.init_alpha, self.init_beta, self.init_gamma])))
+            self.target = self.trajectory[:, self.swing_steps]
+            self.target = np.hstack(np.append(self.target,
+                                              np.array([self.init_alpha, self.init_beta, self.init_gamma])))
 
             self.swing_steps += 1
             # calculate wbc control signal
-            u = -self.controller.wb_control(leg=self.robotleg, target=target, b_orient=b_orient, force=None)
+            u = -self.controller.wb_control(leg=self.robotleg, target=self.target, b_orient=b_orient, force=None)
 
         elif state == 'stance' or state == 'early':
+            if state == 'early' and prev_state != state:
+                # if contact has just been made early, save that contact point as the new target to stay at
+                # (stop following through with trajectory)
+                self.target = np.hstack(np.append(r_in,
+                                                  np.array([self.init_alpha, self.init_beta, self.init_gamma])))
 
             if skip is True:  # skip force control this time because robot is already in correct pose
                 # calculate wbc control signal
-                u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient,
+                u = -self.controller.wb_control(leg=self.robotleg, target=self.target, b_orient=b_orient,
                                                 force=None)
             else:
-                del_fr = self.qp.qpcontrol(fr_mpc=fr_mpc)
-                force = (fr_mpc + del_fr.T).reshape(-1, )
-                u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient,
+                force = fr_mpc
+                u = -self.controller.wb_control(leg=self.robotleg, target=self.target, b_orient=b_orient,
                                                 force=force)
 
         elif state == 'late':
             # calculate wbc control signal
-            u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient, force=None)
+            u = -self.controller.wb_control(leg=self.robotleg, target=self.target, b_orient=b_orient, force=None)
 
         else:
             u = None
