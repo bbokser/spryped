@@ -18,8 +18,10 @@ import contact
 import simulationbridge
 import leg
 import wbc
-import mpc
+# import mpc
+import rpc
 import statemachine
+import gait
 
 import time
 # import sys
@@ -27,14 +29,13 @@ import time
 
 import transforms3d
 import numpy as np
-from scipy.interpolate import CubicSpline
 
 np.set_printoptions(suppress=True, linewidth=np.nan)
 
 
 class Runner:
 
-    def __init__(self, dt=1e-3, qvis_en=False, freeze_imu=True):
+    def __init__(self, dt=1e-3, qvis_en=False, freeze_imu=False):
 
         self.qvis_en = qvis_en
         if qvis_en is True:
@@ -54,7 +55,7 @@ class Runner:
         controller_class = wbc
         self.controller_left = controller_class.Control(dt=dt)
         self.controller_right = controller_class.Control(dt=dt)
-        self.force = mpc.Mpc(dt=dt)
+        self.force = rpc.Rpc(dt=dt)
         self.contact_left = contact.Contact(leg=self.leg_left, dt=dt)
         self.contact_right = contact.Contact(leg=self.leg_right, dt=dt)
         self.simulator = simulationbridge.Sim(dt=dt)
@@ -71,9 +72,9 @@ class Runner:
         self.dist_force_r = np.array([0, 0, 0])
         self.t_p = 0.5  # gait period, seconds
         self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Percentage of gait spent in contact.
-        self.gait_left = Gait(controller=self.controller_left, robotleg=self.leg_left,
+        self.gait_left = gait.Gait(controller=self.controller_left, robotleg=self.leg_left,
                               t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
-        self.gait_right = Gait(controller=self.controller_right, robotleg=self.leg_right,
+        self.gait_right = gait.Gait(controller=self.controller_right, robotleg=self.leg_right,
                                t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
 
         self.target = None
@@ -179,6 +180,7 @@ class Runner:
             else:
                 contact_r = False
 
+            # this only activates when contact is initially made. Should it be?
             if contact_l is True and prev_contact_l is False:
                 self.r_l = self.footstep(robotleg=1, rz_phi=rz_phi, pdot=pdot, pdot_des=0)
 
@@ -193,15 +195,14 @@ class Runner:
 
             if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
-                    mpc_force = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x_in=x_in, x_ref=x_ref,
+                    mpc_force = self.force.rpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x_in=x_in, x_ref=x_ref,
                                                      c_l=contact_l, c_r=contact_r)
-                    # print("force = ", mpc_force)
                     skip = False
                 else:
                     skip = True  # tells gait ctrlr to default to position control.
                     print("skipping mpc")
                 mpc_counter = 0
-                # print(mpc_force)
+
             mpc_counter += 1
 
             if self.force_control_test is True:
@@ -300,85 +301,3 @@ class Runner:
         return p
 
 
-class Gait:
-    def __init__(self, controller, robotleg, t_p, phi_switch, dt=1e-3, **kwargs):
-
-        self.swing_steps = 0
-        self.trajectory = None
-        self.t_p = t_p
-        self.phi_switch = phi_switch
-        self.dt = dt
-        self.init_alpha = -np.pi / 2
-        self.init_beta = 0  # can't control, ee Jacobian is zeros in that row
-        self.init_gamma = 0
-        self.controller = controller
-        self.robotleg = robotleg
-        self.x_last = None
-        self.target = None
-
-    def u(self, state, prev_state, r_in, r_d, b_orient, fr_mpc, skip):
-
-        self.target = np.hstack(np.append(np.array([0, 0, -0.8325]),
-                                             np.array([self.init_alpha, self.init_beta, self.init_gamma])))
-
-        if state == 'swing':
-            if prev_state != state:
-                self.swing_steps = 0
-                self.trajectory = self.traj(x_prev=r_in[0], x_d=r_d[0], y_prev=r_in[1], y_d=r_d[1])
-
-            # set target position
-            self.target = self.trajectory[:, self.swing_steps]
-            self.target = np.hstack(np.append(self.target,
-                                              np.array([self.init_alpha, self.init_beta, self.init_gamma])))
-
-            self.swing_steps += 1
-            # calculate wbc control signal
-            u = -self.controller.wb_control(leg=self.robotleg, target=self.target, b_orient=b_orient, force=None)
-
-        elif state == 'stance' or state == 'early':
-            if state == 'early' and prev_state != state:
-                # if contact has just been made early, save that contact point as the new target to stay at
-                # (stop following through with trajectory)
-                self.target = np.hstack(np.append(r_in,
-                                                  np.array([self.init_alpha, self.init_beta, self.init_gamma])))
-
-            if skip is True:  # skip force control this time because robot is already in correct pose
-                # calculate wbc control signal
-                u = -self.controller.wb_control(leg=self.robotleg, target=self.target, b_orient=b_orient,
-                                                force=None)
-            else:
-                force = fr_mpc
-                u = -self.controller.wb_control(leg=self.robotleg, target=self.target, b_orient=b_orient,
-                                                force=force)
-
-        elif state == 'late':
-            # calculate wbc control signal
-            u = -self.controller.wb_control(leg=self.robotleg, target=self.target, b_orient=b_orient, force=None)
-
-        else:
-            u = None
-
-        return u
-
-    def traj(self, x_prev, x_d, y_prev, y_d):
-        # Generates cubic spline curve trajectory for foot swing
-
-        # number of time steps allotted for swing trajectory
-        timesteps = self.t_p * (1 - self.phi_switch) / self.dt
-        if not timesteps.is_integer():
-            print("Error: period and timesteps are not divisible")  # if t_p is variable
-        timesteps = int(timesteps)
-        path = np.zeros(timesteps)
-
-        horizontal = np.array([0.0, timesteps / 2, timesteps])
-        vertical = np.array([-0.8325, -0.7, -0.8325])  # z traj assumed constant body height & flat floor
-        cs = CubicSpline(horizontal, vertical)
-
-        # create evenly spaced sample points of desired trajectory
-        for t in range(timesteps):
-            path[t] = cs(t)
-        z_traj = path
-        x_traj = np.linspace(x_prev, x_d, timesteps)
-        y_traj = np.linspace(y_prev, y_d, timesteps)
-
-        return np.array([x_traj.T, y_traj.T, z_traj.T])
