@@ -21,6 +21,7 @@ import wbc
 import mpc
 import statemachine
 import qp
+import gait
 # import qvis
 
 import time
@@ -29,7 +30,6 @@ import time
 
 import transforms3d
 import numpy as np
-from scipy.interpolate import CubicSpline
 
 np.set_printoptions(suppress=True, linewidth=np.nan)
 
@@ -56,8 +56,8 @@ class Runner:
         self.simulator = simulationbridge.Sim(dt=dt)
         self.state_left = statemachine.Char()
         self.state_right = statemachine.Char()
-        self.qp_l = qp.Qp(controller=self.controller_left)
-        self.qp_r = qp.Qp(controller=self.controller_right)
+        # self.qp_l = qp.Qp(controller=self.controller_left)
+        # self.qp_r = qp.Qp(controller=self.controller_right)
 
         # gait scheduler values
         self.target_init = np.array([0, 0, -0.8325])  # , self.init_alpha, self.init_beta, self.init_gamma])
@@ -69,17 +69,17 @@ class Runner:
         self.dist_force_r = np.array([0, 0, 0])
         self.t_p = 0.5  # gait period, seconds
         self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Percentage of gait spent in contact.
-        self.gait_left = Gait(controller=self.controller_left, robotleg=self.leg_left, qp=self.qp_l,
-                              t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
-        self.gait_right = Gait(controller=self.controller_right, robotleg=self.leg_right, qp=self.qp_r,
-                               t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
+        self.gait_left = gait.Gait(controller=self.controller_left, robotleg=self.leg_left,
+                                   t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
+        self.gait_right = gait.Gait(controller=self.controller_right, robotleg=self.leg_right,
+                                    t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
 
         self.target = None
 
         # footstep planner values
         self.omega_d = np.array([0, 0, 0])  # desired angular acceleration for footstep planner
         self.k_f = 0.15  # Raibert heuristic gain
-        self.h = np.array([0, 0, 0.8325])  # height, assumed to be constant  TODO: Should this be negative?
+        self.h = np.array([0, 0, 0.8325])  # height, assumed to be constant
         self.r_l = np.array([0, 0, -0.8325])  # initial footstep planning position
         self.r_r = np.array([0, 0, -0.8325])  # initial footstep planning position
 
@@ -225,7 +225,7 @@ class Runner:
                                        np.array(dist_tau_l))
             self.dist_force_r = np.dot(np.linalg.pinv(np.transpose(self.leg_right.gen_jacEE()[0:3])),
                                        np.array(dist_tau_r))
-
+            # print(self.dist_force_l[2], self.dist_force_r[2])
             prev_state_l = state_l
             prev_state_r = state_r
 
@@ -284,90 +284,9 @@ class Runner:
         p_hip = np.dot(rz_phi, np.array([0, l_i, 0]))
         t_stance = self.t_p * self.phi_switch
         p_symmetry = t_stance * 0.5 * pdot + self.k_f * (pdot - pdot_des)
-        p_cent = 0.5 * np.sqrt(self.h / 9.807) * np.cross(pdot, self.omega_d)
+        p_cent = np.cross(0.5 * np.sqrt(self.h / 9.807)*pdot, self.omega_d)
         p = p_hip + p_symmetry + p_cent
         # print("p_symmetry = ", p_symmetry, robotleg)
         # print("p = ", p, robotleg)
         p[2] = -0.8325  # assume constant height for now. TODO: height changes?
         return p
-
-
-class Gait:
-    def __init__(self, controller, robotleg, qp, t_p, phi_switch, dt=1e-3, **kwargs):
-
-        self.swing_steps = 0
-        self.trajectory = None
-        self.t_p = t_p
-        self.phi_switch = phi_switch
-        self.dt = dt
-        self.init_alpha = -np.pi / 2
-        self.init_beta = 0  # can't control, ee Jacobian is zeros in that row
-        self.init_gamma = 0
-        self.controller = controller
-        self.qp = qp
-        self.robotleg = robotleg
-        self.x_last = None
-
-    def u(self, state, prev_state, r_in, r_d, b_orient, fr_mpc, skip):
-
-        target_default = np.hstack(np.append(np.array([0, 0, -0.8325]),
-                                             np.array([self.init_alpha, self.init_beta, self.init_gamma])))
-        # print("t_default = ", target_default, self.robotleg.leg)
-
-        if state == 'swing':
-            if prev_state != state:
-                self.swing_steps = 0
-                self.trajectory = self.traj(x_prev=r_in[0], x_d=r_d[0], y_prev=r_in[1], y_d=r_d[1])
-
-            # set target position
-            target = self.trajectory[:, self.swing_steps]
-            target = np.hstack(np.append(target,
-                                         np.array([self.init_alpha, self.init_beta, self.init_gamma])))
-
-            self.swing_steps += 1
-            # calculate wbc control signal
-            u = -self.controller.wb_control(leg=self.robotleg, target=target, b_orient=b_orient, force=None)
-
-        elif state == 'stance' or state == 'early':
-
-            if skip is True:  # skip force control this time because robot is already in correct pose
-                # calculate wbc control signal
-                u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient,
-                                                force=None)
-            else:
-                # del_fr = self.qp.qpcontrol(fr_mpc=fr_mpc)
-                force = fr_mpc  # (fr_mpc + del_fr.T).reshape(-1, )
-                u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient,
-                                                force=force)
-
-        elif state == 'late':
-            # calculate wbc control signal
-            u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient, force=None)
-
-        else:
-            u = None
-
-        return u
-
-    def traj(self, x_prev, x_d, y_prev, y_d):
-        # Generates cubic spline curve trajectory for foot swing
-
-        # number of time steps allotted for swing trajectory
-        timesteps = self.t_p * (1 - self.phi_switch) / self.dt
-        if not timesteps.is_integer():
-            print("Error: period and timesteps are not divisible")  # if t_p is variable
-        timesteps = int(timesteps)
-        path = np.zeros(timesteps)
-
-        horizontal = np.array([0.0, timesteps / 2, timesteps])
-        vertical = np.array([-0.8325, -0.70, -0.8325])  # z traj assumed constant body height & flat floor
-        cs = CubicSpline(horizontal, vertical)
-
-        # create evenly spaced sample points of desired trajectory
-        for t in range(timesteps):
-            path[t] = cs(t)
-        z_traj = path
-        x_traj = np.linspace(x_prev, x_d, timesteps)
-        y_traj = np.linspace(y_prev, y_d, timesteps)
-
-        return np.array([x_traj.T, y_traj.T, z_traj.T])

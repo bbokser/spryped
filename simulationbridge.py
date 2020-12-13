@@ -39,8 +39,8 @@ bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 0.8],
 
 p.setGravity(0, 0, GRAVITY)
 
-p.changeDynamics(bot, 3, lateralFriction=1)
-p.changeDynamics(bot, 7, lateralFriction=1)
+p.changeDynamics(bot, 3, lateralFriction=0.7)
+p.changeDynamics(bot, 7, lateralFriction=0.7)
 
 jointArray = range(p.getNumJoints(bot))
 
@@ -71,7 +71,7 @@ class Sim:
         self.omega_xyz = None
         self.omega = None
         self.v = None
-        self.record_rt = True  # record video in real time
+        self.record_rt = False  # record video in real time
         self.record_stepped = False  # record video in sim steps
         # print(p.getJointInfo(bot, 3))
 
