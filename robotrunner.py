@@ -79,7 +79,7 @@ class Runner:
         # footstep planner values
         self.omega_d = np.array([0, 0, 0])  # desired angular acceleration for footstep planner
         self.k_f = 0.15  # Raibert heuristic gain
-        self.h = np.array([0, 0, 0.8325])  # height, assumed to be constant
+        self.h = np.array([0, 0, 0.8325])  # height, assumed to be constant  TODO: Should this be negative?
         self.r_l = np.array([0, 0, -0.8325])  # initial footstep planning position
         self.r_r = np.array([0, 0, -0.8325])  # initial footstep planning position
 
@@ -173,7 +173,7 @@ class Runner:
                 contact_r = True
             else:
                 contact_r = False
-
+            # print(state_l, state_r)
             if state_l is not 'stance' and prev_state_l is 'stance':
                 self.r_l = self.footstep(robotleg=1, rz_phi=rz_phi, pdot=pdot, pdot_des=0)
 
@@ -196,7 +196,7 @@ class Runner:
                     skip = True  # tells gait ctrlr to default to position control.
                     print("skipping mpc")
                 mpc_counter = 0
-                print(mpc_force)
+
             mpc_counter += 1
 
             if self.force_control_test is True:
