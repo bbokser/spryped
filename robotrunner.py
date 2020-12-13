@@ -78,7 +78,7 @@ class Runner:
 
         # footstep planner values
         self.omega_d = np.array([0, 0, 0])  # desired angular acceleration for footstep planner
-        self.k_f = 0.03  # Raibert heuristic gain
+        self.k_f = 0.15  # Raibert heuristic gain
         self.h = np.array([0, 0, 0.8325])  # height, assumed to be constant
         self.r_l = np.array([0, 0, -0.8325])  # initial footstep planning position
         self.r_r = np.array([0, 0, -0.8325])  # initial footstep planning position
@@ -174,10 +174,10 @@ class Runner:
             else:
                 contact_r = False
 
-            if contact_l is True and prev_contact_l is False:
+            if state_l is not 'stance' and prev_state_l is 'stance':
                 self.r_l = self.footstep(robotleg=1, rz_phi=rz_phi, pdot=pdot, pdot_des=0)
 
-            if contact_r is True and prev_contact_r is False:
+            if state_r is not 'stance' and prev_state_r is 'stance':
                 self.r_r = self.footstep(robotleg=0, rz_phi=rz_phi, pdot=pdot, pdot_des=0)
 
             omega = np.array(self.simulator.omega_xyz)
@@ -188,7 +188,7 @@ class Runner:
 
             if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
-                    mpc_force = self.force.mpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x_in=x_in, x_ref=x_ref,
+                    mpc_force = self.force.mpcontrol(rz_phi=rz_phi, r1=pos_l, r2=pos_r, x_in=x_in, x_ref=x_ref,
                                                      c_l=contact_l, c_r=contact_r)
                     # print("force = ", mpc_force)
                     skip = False
@@ -196,7 +196,7 @@ class Runner:
                     skip = True  # tells gait ctrlr to default to position control.
                     print("skipping mpc")
                 mpc_counter = 0
-                # print(mpc_force)
+                print(mpc_force)
             mpc_counter += 1
 
             if self.force_control_test is True:
@@ -210,7 +210,6 @@ class Runner:
             # just standing for now
             self.u_r = self.gait_right.u(state=state_r, prev_state=prev_state_r, r_in=pos_r, r_d=self.r_r,
                                          b_orient=b_orient, fr_mpc=mpc_force[3:], skip=skip)
-            # just standing for now
 
             # receive disturbance torques
             dist_tau_l = self.contact_left.disturbance_torque(Mq=self.controller_left.Mq,
@@ -336,8 +335,8 @@ class Gait:
                 u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient,
                                                 force=None)
             else:
-                del_fr = self.qp.qpcontrol(fr_mpc=fr_mpc)
-                force = (fr_mpc + del_fr.T).reshape(-1, )
+                # del_fr = self.qp.qpcontrol(fr_mpc=fr_mpc)
+                force = fr_mpc  # (fr_mpc + del_fr.T).reshape(-1, )
                 u = -self.controller.wb_control(leg=self.robotleg, target=target_default, b_orient=b_orient,
                                                 force=force)
 
@@ -361,7 +360,7 @@ class Gait:
         path = np.zeros(timesteps)
 
         horizontal = np.array([0.0, timesteps / 2, timesteps])
-        vertical = np.array([-0.8325, -0.7, -0.8325])  # z traj assumed constant body height & flat floor
+        vertical = np.array([-0.8325, -0.70, -0.8325])  # z traj assumed constant body height & flat floor
         cs = CubicSpline(horizontal, vertical)
 
         # create evenly spaced sample points of desired trajectory

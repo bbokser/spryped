@@ -145,7 +145,7 @@ class Control(control.Control):
             Fr = np.dot(b_orient, force)
             force_control = (np.dot(JEE.T, Fr).reshape(-1, ))
         # print(force_control)
-        self.u = Aq_dd - self.grav + force_control
+        self.u = Aq_dd - self.grav - force_control*30
 
         self.x_dd_des = x_dd_des
         self.Mx = Mx

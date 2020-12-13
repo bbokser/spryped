@@ -80,16 +80,14 @@ class Mpc:
 
         i_global = np.dot(np.dot(rz_phi, self.inertia), rz_phi.T)  # is this right?
         i_inv = np.linalg.inv(i_global)
-        '''
+
         # vector from CoM to hip in global frame (should just use body frame?)
         rh_l_g = np.dot(rz_phi, self.rh_l)
         rh_r_g = np.dot(rz_phi, self.rh_r)
 
-        # desired footstep position in global coords
-        pf_l = x_in[1] + r1
-        pf_r = x_in[1] + r2
-        print(pf_r)
-        '''
+        r1 = r1 + rh_l_g
+        r2 = r2 + rh_r_g
+
         i11 = i_inv[0, 0]
         i12 = i_inv[0, 1]
         i13 = i_inv[0, 2]
