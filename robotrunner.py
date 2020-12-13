@@ -114,7 +114,7 @@ class Runner:
             # t_prev = time.clock()
             # print(t_diff)
 
-            time.sleep(self.dt)
+            # time.sleep(self.dt)
             # update target after specified period of time passes
             steps += 1
             t = t + self.dt
@@ -160,8 +160,8 @@ class Runner:
             rz_phi = np.zeros((3, 3))
             rz_phi[0, 0] = c_phi
             rz_phi[0, 1] = s_phi
-            rz_phi[1, 0] = -c_phi
-            rz_phi[1, 1] = s_phi
+            rz_phi[1, 0] = -s_phi
+            rz_phi[1, 1] = c_phi
             rz_phi[2, 2] = 1
 
             if state_l == ('stance' or 'early'):
@@ -268,7 +268,7 @@ class Runner:
     def gait_estimator(self, dist_force):
         # Determines whether foot is actually in contact or not
         # This is very simple for now, but needs to be revamped later
-        if dist_force >= 50:
+        if dist_force >= 70:
             sh = 1  # stance
         else:
             sh = 0  # swing
