@@ -75,23 +75,23 @@ class Rpc:
         self.rh_r = np.array([.14397, .13519, .03581])  # vector from CoM to hip
         self.rh_l = np.array([-.14397, .13519, .03581])  # vector from CoM to hip
 
-    def rpcontrol(self, rz_phi, r1, r2, x_in, x_ref, c_l, c_r):
+    def rpcontrol(self, rz_phi, r1, r2, x_in, x_ref, s_phi_1, s_phi_2):
         # inertia matrix inverse
         i_global = np.dot(np.dot(rz_phi, self.inertia), rz_phi.T)  # TODO: Check
         i_inv = np.linalg.inv(i_global)
-
+        '''
         # vector from CoM to hip in global frame (should just use body frame?)
         rh_l_g = np.dot(rz_phi, self.rh_l)
         rh_r_g = np.dot(rz_phi, self.rh_r)
 
-        # footstep position vector from CoM to end effector in global coords
-        r1 = r1 + rh_l_g
-        r2 = r2 + rh_l_g
+        # actual footstep position vector from CoM to end effector in global coords
+        r1 = r1 + rh_l_g + x_in[1]
+        r2 = r2 + rh_r_g + x_in[1]
 
         # desired footstep position in global coords
         pf_l = x_in[1] + r1
         pf_r = x_in[1] + r2
-
+        '''
         i11 = i_inv[0, 0]
         i12 = i_inv[0, 1]
         i13 = i_inv[0, 2]
@@ -112,14 +112,6 @@ class Rpc:
         rz32 = rz_phi[2, 1]
         rz33 = rz_phi[2, 2]
 
-        # r = foot position
-        r1x = r1[0]
-        r1y = r1[1]
-        r1z = r1[2]
-        r2x = r2[0]
-        r2y = r2[1]
-        r2z = r2[2]
-
         theta_x = cs.SX.sym('theta_x')
         theta_y = cs.SX.sym('theta_y')
         theta_z = cs.SX.sym('theta_z')
@@ -138,46 +130,101 @@ class Rpc:
                   pdot_x, pdot_y, pdot_z]  # state vector x
         n_states = len(states)  # number of states
 
-        f1_x = cs.SX.sym('f1_x')  # controls
-        f1_y = cs.SX.sym('f1_y')  # controls
-        f1_z = cs.SX.sym('f1_z')  # controls
-        f2_x = cs.SX.sym('f2_x')  # controls
-        f2_y = cs.SX.sym('f2_y')  # controls
-        f2_z = cs.SX.sym('f2_z')  # controls
-        controls = [f1_x, f1_y, f1_z, f2_x, f2_y, f2_z]
+        # controls
+        f1_x = cs.SX.sym('f1_x')
+        f1_y = cs.SX.sym('f1_y')
+        f1_z = cs.SX.sym('f1_z')
+        f2_x = cs.SX.sym('f2_x')
+        f2_y = cs.SX.sym('f2_y')
+        f2_z = cs.SX.sym('f2_z')
+        r1x = cs.SX.sym('r1x')
+        r1y = cs.SX.sym('r1y')
+        r1z = cs.SX.sym('r1z')
+        r2x = cs.SX.sym('r2x')
+        r2y = cs.SX.sym('r2y')
+        r2z = cs.SX.sym('r2z')
+        controls = [r1x, r1y, r1z,
+                    f1_x, f1_y, f1_z,
+                    r2x, r2y, r2z,
+                    f2_x, f2_y, f2_z]
         n_controls = len(controls)  # number of controls
 
-        gravity = -9.807
+        g = -9.807
         dt = self.dt
-        mass = self.mass
-        # gravity = cs.SX.sym("gravity")
-        # dt = cs.SX.sym("dt")
-        # mass = cs.SX.sym("mass")
-        # x_next = np.dot(A, states) + np.dot(B, controls) + g  # the discrete dynamics of the system
-        x_next = [dt * omega_x * rz11 + dt * omega_y * rz12 + dt * omega_z * rz13 + theta_x,
-                  dt * omega_x * rz21 + dt * omega_y * rz22 + dt * omega_z * rz23 + theta_y,
-                  dt * omega_x * rz31 + dt * omega_y * rz32 + dt * omega_z * rz33 + theta_z,
-                  dt * pdot_x + p_x,
-                  dt * pdot_y + p_y,
-                  dt * pdot_z + p_z,
-                  dt * f1_x * (i12 * r1z - i13 * r1y) + dt * f1_y * (-i11 * r1z + i13 * r1x)
-                  + dt * f1_z * (i11 * r1y - i12 * r1x) + dt * f2_x * (i12 * r2z - i13 * r2y)
-                  + dt * f2_y * (-i11 * r2z + i13 * r2x) + dt * f2_z * (i11 * r2y - i12 * r2x) + omega_x,
-                  dt * f1_x * (i22 * r1z - i23 * r1y) + dt * f1_y * (-i21 * r1z + i23 * r1x)
-                  + dt * f1_z * (i21 * r1y - i22 * r1x) + dt * f2_x * (i22 * r2z - i23 * r2y)
-                  + dt * f2_y * (-i21 * r2z + i23 * r2x) + dt * f2_z * (i21 * r2y - i22 * r2x) + omega_y,
-                  dt * f1_x * (i32 * r1z - i33 * r1y) + dt * f1_y * (-i31 * r1z + i33 * r1x)
-                  + dt * f1_z * (i31 * r1y - i32 * r1x) + dt * f2_x * (i32 * r2z - i33 * r2y)
-                  + dt * f2_y * (-i31 * r2z + i33 * r2x) + dt * f2_z * (i31 * r2y - i32 * r2x) + omega_z,
-                  dt * f1_x / mass + dt * f2_x / mass + pdot_x,
-                  dt * f1_y / mass + dt * f2_y / mass + pdot_y,
-                  dt * f1_z / mass + dt * f2_z / mass + gravity + pdot_z]
+        m = self.mass
+        dt2 = 0.5 * (dt**2)
+
+        x_next = [dt*omega_x + dt2*m*(f1_x*s_phi_1 + f2_x*s_phi_2) + theta_x,
+                  dt * omega_y + dt2 * m * (f1_y * s_phi_1 + f2_y * s_phi_2) + theta_y,
+                  dt * omega_z + dt2 * g + dt2 * m * (f1_z * s_phi_1 + f2_z * s_phi_2) + theta_z,
+                  dt * pdot_x + dt2 * i11 * (s_phi_1 * (
+                              f1_x * (-r1y * rz31 + r1z * rz21) + f1_y * (r1x * rz31 - r1z * rz11) + f1_z * (
+                                  -r1x * rz21 + r1y * rz11)) + s_phi_2 * (f2_x * (-r2y * rz31 + r2z * rz21) + f2_y * (
+                              r2x * rz31 - r2z * rz11) + f2_z * (-r2x * rz21 + r2y * rz11))) + dt2 * i12 * (s_phi_1 * (
+                              f1_x * (-r1y * rz32 + r1z * rz22) + f1_y * (r1x * rz32 - r1z * rz12) + f1_z * (
+                                  -r1x * rz22 + r1y * rz12)) + s_phi_2 * (f2_x * (-r2y * rz32 + r2z * rz22) + f2_y * (
+                              r2x * rz32 - r2z * rz12) + f2_z * (-r2x * rz22 + r2y * rz12))) + dt2 * i13 * (s_phi_1 * (
+                              f1_x * (-r1y * rz33 + r1z * rz23) + f1_y * (r1x * rz33 - r1z * rz13) + f1_z * (
+                                  -r1x * rz23 + r1y * rz13)) + s_phi_2 * (f2_x * (-r2y * rz33 + r2z * rz23) + f2_y * (
+                              r2x * rz33 - r2z * rz13) + f2_z * (-r2x * rz23 + r2y * rz13))) + p_x,
+                  dt * pdot_y + dt2 * i21 * (s_phi_1 * (
+                              f1_x * (-r1y * rz31 + r1z * rz21) + f1_y * (r1x * rz31 - r1z * rz11) + f1_z * (
+                                  -r1x * rz21 + r1y * rz11)) + s_phi_2 * (f2_x * (-r2y * rz31 + r2z * rz21) + f2_y * (
+                              r2x * rz31 - r2z * rz11) + f2_z * (-r2x * rz21 + r2y * rz11))) + dt2 * i22 * (s_phi_1 * (
+                              f1_x * (-r1y * rz32 + r1z * rz22) + f1_y * (r1x * rz32 - r1z * rz12) + f1_z * (
+                                  -r1x * rz22 + r1y * rz12)) + s_phi_2 * (f2_x * (-r2y * rz32 + r2z * rz22) + f2_y * (
+                              r2x * rz32 - r2z * rz12) + f2_z * (-r2x * rz22 + r2y * rz12))) + dt2 * i23 * (s_phi_1 * (
+                              f1_x * (-r1y * rz33 + r1z * rz23) + f1_y * (r1x * rz33 - r1z * rz13) + f1_z * (
+                                  -r1x * rz23 + r1y * rz13)) + s_phi_2 * (f2_x * (-r2y * rz33 + r2z * rz23) + f2_y * (
+                              r2x * rz33 - r2z * rz13) + f2_z * (-r2x * rz23 + r2y * rz13))) + p_y,
+                  dt * pdot_z + dt2 * i31 * (s_phi_1 * (
+                              f1_x * (-r1y * rz31 + r1z * rz21) + f1_y * (r1x * rz31 - r1z * rz11) + f1_z * (
+                                  -r1x * rz21 + r1y * rz11)) + s_phi_2 * (f2_x * (-r2y * rz31 + r2z * rz21) + f2_y * (
+                              r2x * rz31 - r2z * rz11) + f2_z * (-r2x * rz21 + r2y * rz11))) + dt2 * i32 * (s_phi_1 * (
+                              f1_x * (-r1y * rz32 + r1z * rz22) + f1_y * (r1x * rz32 - r1z * rz12) + f1_z * (
+                                  -r1x * rz22 + r1y * rz12)) + s_phi_2 * (f2_x * (-r2y * rz32 + r2z * rz22) + f2_y * (
+                              r2x * rz32 - r2z * rz12) + f2_z * (-r2x * rz22 + r2y * rz12))) + dt2 * i33 * (s_phi_1 * (
+                              f1_x * (-r1y * rz33 + r1z * rz23) + f1_y * (r1x * rz33 - r1z * rz13) + f1_z * (
+                                  -r1x * rz23 + r1y * rz13)) + s_phi_2 * (f2_x * (-r2y * rz33 + r2z * rz23) + f2_y * (
+                              r2x * rz33 - r2z * rz13) + f2_z * (-r2x * rz23 + r2y * rz13))) + p_z,
+                  dt * m * (f1_x * s_phi_1 + f2_x * s_phi_2) + omega_x,
+                  dt * m * (f1_y * s_phi_1 + f2_y * s_phi_2) + omega_y,
+                  dt * g + dt * m * (f1_z * s_phi_1 + f2_z * s_phi_2) + omega_z,
+                  dt * i11 * (s_phi_1 * (f1_x * (-r1y * rz31 + r1z * rz21) + f1_y * (r1x * rz31 - r1z * rz11) + f1_z * (
+                              -r1x * rz21 + r1y * rz11)) + s_phi_2 * (f2_x * (-r2y * rz31 + r2z * rz21) + f2_y * (
+                              r2x * rz31 - r2z * rz11) + f2_z * (-r2x * rz21 + r2y * rz11))) + dt * i12 * (s_phi_1 * (
+                              f1_x * (-r1y * rz32 + r1z * rz22) + f1_y * (r1x * rz32 - r1z * rz12) + f1_z * (
+                                  -r1x * rz22 + r1y * rz12)) + s_phi_2 * (f2_x * (-r2y * rz32 + r2z * rz22) + f2_y * (
+                              r2x * rz32 - r2z * rz12) + f2_z * (-r2x * rz22 + r2y * rz12))) + dt * i13 * (s_phi_1 * (
+                              f1_x * (-r1y * rz33 + r1z * rz23) + f1_y * (r1x * rz33 - r1z * rz13) + f1_z * (
+                                  -r1x * rz23 + r1y * rz13)) + s_phi_2 * (f2_x * (-r2y * rz33 + r2z * rz23) + f2_y * (
+                              r2x * rz33 - r2z * rz13) + f2_z * (-r2x * rz23 + r2y * rz13))) + pdot_x,
+                  dt * i21 * (s_phi_1 * (f1_x * (-r1y * rz31 + r1z * rz21) + f1_y * (r1x * rz31 - r1z * rz11) + f1_z * (
+                              -r1x * rz21 + r1y * rz11)) + s_phi_2 * (f2_x * (-r2y * rz31 + r2z * rz21) + f2_y * (
+                              r2x * rz31 - r2z * rz11) + f2_z * (-r2x * rz21 + r2y * rz11))) + dt * i22 * (s_phi_1 * (
+                              f1_x * (-r1y * rz32 + r1z * rz22) + f1_y * (r1x * rz32 - r1z * rz12) + f1_z * (
+                                  -r1x * rz22 + r1y * rz12)) + s_phi_2 * (f2_x * (-r2y * rz32 + r2z * rz22) + f2_y * (
+                              r2x * rz32 - r2z * rz12) + f2_z * (-r2x * rz22 + r2y * rz12))) + dt * i23 * (s_phi_1 * (
+                              f1_x * (-r1y * rz33 + r1z * rz23) + f1_y * (r1x * rz33 - r1z * rz13) + f1_z * (
+                                  -r1x * rz23 + r1y * rz13)) + s_phi_2 * (f2_x * (-r2y * rz33 + r2z * rz23) + f2_y * (
+                              r2x * rz33 - r2z * rz13) + f2_z * (-r2x * rz23 + r2y * rz13))) + pdot_y,
+                  dt * i31 * (s_phi_1 * (f1_x * (-r1y * rz31 + r1z * rz21) + f1_y * (r1x * rz31 - r1z * rz11) + f1_z * (
+                              -r1x * rz21 + r1y * rz11)) + s_phi_2 * (f2_x * (-r2y * rz31 + r2z * rz21) + f2_y * (
+                              r2x * rz31 - r2z * rz11) + f2_z * (-r2x * rz21 + r2y * rz11))) + dt * i32 * (s_phi_1 * (
+                              f1_x * (-r1y * rz32 + r1z * rz22) + f1_y * (r1x * rz32 - r1z * rz12) + f1_z * (
+                                  -r1x * rz22 + r1y * rz12)) + s_phi_2 * (f2_x * (-r2y * rz32 + r2z * rz22) + f2_y * (
+                              r2x * rz32 - r2z * rz12) + f2_z * (-r2x * rz22 + r2y * rz12))) + dt * i33 * (s_phi_1 * (
+                              f1_x * (-r1y * rz33 + r1z * rz23) + f1_y * (r1x * rz33 - r1z * rz13) + f1_z * (
+                                  -r1x * rz23 + r1y * rz13)) + s_phi_2 * (f2_x * (-r2y * rz33 + r2z * rz23) + f2_y * (
+                              r2x * rz33 - r2z * rz13) + f2_z * (-r2x * rz23 + r2y * rz13))) + pdot_z]
 
         self.fn = cs.Function('fn', [theta_x, theta_y, theta_z,
                                      p_x, p_y, p_z,
                                      omega_x, omega_y, omega_z,
                                      pdot_x, pdot_y, pdot_z,
+                                     r1x, r1y, r1z,
                                      f1_x, f1_y, f1_z,
+                                     r2x, r2y, r2z,
                                      f2_x, f2_y, f2_z],
                               x_next)  # nonlinear mapping of function f(x,u)
 
@@ -202,13 +249,21 @@ class Rpc:
         Q[10, 10] = k
         Q[11, 11] = k
 
-        R = np.zeros((6, 6))  # control weighing matrix
+        R = np.zeros((12, 12))  # control weighing matrix
         R[0, 0] = k/2
         R[1, 1] = k/2
         R[2, 2] = k/2
         R[3, 3] = k/2
         R[4, 4] = k/2
         R[5, 5] = k/2
+        R[6, 6] = k/2
+        R[7, 7] = k/2
+        R[8, 8] = k/2
+        R[9, 9] = k/2
+        R[10, 10] = k/2
+        R[11, 11] = k/2
+
+        W = np.append(np.hstack((Q, np.zeros((12, 12)))), np.hstack((np.zeros((12, 12)), R)))
 
         constr = cs.vertcat(constr, x[:, 0] - st_ref[0:n_states])  # initial condition constraints
         # compute objective and constraints

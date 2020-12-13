@@ -1,4 +1,4 @@
-clear all
+ clear all
 clc
 
 pkg load symbolic
@@ -28,12 +28,12 @@ x = [[theta_x];  % states
      [pdot_z]];
 
 f1 = [[f1_x];  % controls
-     [f1_y];
-     [f1_z]];
+      [f1_y];
+      [f1_z]];
 
 f2 = [[f2_x];
-     [f2_y];
-     [f2_z]];
+      [f2_y];
+      [f2_z]];
 
 A = [[1,  0,  0,  0,  0,  0,  dt,  0,  0,  0,  0,  0];
      [0,  1,  0,  0,  0,  0,  0,  dt,  0,  0,  0,  0];
@@ -55,13 +55,13 @@ B = [[m*dt2, 0, 0, 0, 0, 0]
      [0, 0, m*dt2, 0, 0, 0]
      [0, 0, 0, i11*dt2, i12*dt2, i13*dt2];
      [0, 0, 0, i21*dt2, i22*dt2, i23*dt2];
-     [0, 0, 0, i21*dt2, i22*dt2, i23*dt2];
+     [0, 0, 0, i31*dt2, i32*dt2, i33*dt2];
      [m*dt, 0, 0, 0, 0, 0]
      [0, m*dt, 0, 0, 0, 0]
      [0, 0, m*dt, 0, 0, 0]
      [0, 0, 0, i11*dt, i12*dt, i13*dt];
      [0, 0, 0, i21*dt, i22*dt, i23*dt];
-     [0, 0, 0, i21*dt, i22*dt, i23*dt]];   
+     [0, 0, 0, i31*dt, i32*dt, i33*dt]];   
      
 d = [[0];
      [0];
@@ -75,21 +75,20 @@ d = [[0];
      [0];
      [0];
      [0]];
+
+r1 = [[0, -r1z, r1y];
+      [r1z, 0, -r1x];
+      [-r1y, r1x, 0]];
+      
+r2 = [[0, -r2z, r2y];
+      [r2z, 0, -r2x];
+      [-r2y, r2x, 0]];      
      
-h_1 = [[1, 0, 0];
-       [0, 1, 0];
-       [0, 0, 1];
-       [(rzt12*r1z - rzt13*r1y)*dt, (-rzt11*r1z + rzt13*r1x)*dt, (rzt11*r1y - rzt12*r1x)*dt];
-       [(rzt22*r1z - rzt23*r1y)*dt, (-rzt21*r1z + rzt23*r1x)*dt, (rzt21*r1y - rzt22*r1x)*dt];
-       [(rzt32*r1z - rzt33*r1y)*dt, (-rzt31*r1z + rzt33*r1x)*dt, (rzt31*r1y - rzt32*r1x)*dt]];
+rz = sym('rz', [3, 3]);
 
-h_2 = [[1, 0, 0];
-       [0, 1, 0];
-       [0, 0, 1];
-       [(rzt12*r2z - rzt13*r2y)*dt, (-rzt11*r2z + rzt13*r2x)*dt, (rzt11*r2y - rzt12*r2x)*dt];
-       [(rzt22*r2z - rzt23*r2y)*dt, (-rzt21*r2z + rzt23*r2x)*dt, (rzt21*r2y - rzt22*r2x)*dt];
-       [(rzt32*r2z - rzt33*r2y)*dt, (-rzt31*r2z + rzt33*r2x)*dt, (rzt31*r2y - rzt32*r2x)*dt]];
-
+h_1 = [eye(3); mtimes(transpose(rz), r1)];
+h_2 = [eye(3); mtimes(transpose(rz), r2)];
+     
 % forces and torques acting on the CoM
 h = s_phi_1*mtimes(h_1, f1) + s_phi_2*mtimes(h_2, f2);  
 

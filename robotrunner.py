@@ -117,7 +117,7 @@ class Runner:
             # t_prev = time.clock()
             # print(t_diff)
 
-            time.sleep(self.dt)
+            # time.sleep(self.dt) # TODO: Check if this is actually necessary
             # update target after specified period of time passes
             steps += 1
             t = t + self.dt
@@ -180,7 +180,7 @@ class Runner:
             else:
                 contact_r = False
 
-            # this only activates when contact is initially made. Should it be?
+            # this should activate just before the foot *leaves* contact.
             if contact_l is True and prev_contact_l is False:
                 self.r_l = self.footstep(robotleg=1, rz_phi=rz_phi, pdot=pdot, pdot_des=0)
 
@@ -196,7 +196,7 @@ class Runner:
             if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
                     mpc_force = self.force.rpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r, x_in=x_in, x_ref=x_ref,
-                                                     c_l=contact_l, c_r=contact_r)
+                                                     s_phi_1=contact_l, s_phi_2=contact_r)
                     skip = False
                 else:
                     skip = True  # tells gait ctrlr to default to position control.
