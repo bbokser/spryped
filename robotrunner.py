@@ -84,7 +84,7 @@ class Runner:
         self.r_r = np.array([0, 0, -0.8325])  # initial footstep planning position
 
         self.p = np.array([0, 0, 0])  # initial body position
-        self.pdot_des = 0  # desired body velocity in world coords
+        self.pdot_des = np.array([0.01, 0.05, 0])  # desired body velocity in world coords
         self.force_control_test = False
 
     def run(self):
@@ -175,10 +175,10 @@ class Runner:
                 contact_r = False
             # print(state_l, state_r)
             if state_l is not 'stance' and prev_state_l is 'stance':
-                self.r_l = self.footstep(robotleg=1, rz_phi=rz_phi, pdot=pdot, pdot_des=0)
+                self.r_l = self.footstep(robotleg=1, rz_phi=rz_phi, pdot=pdot, pdot_des=self.pdot_des)
 
             if state_r is not 'stance' and prev_state_r is 'stance':
-                self.r_r = self.footstep(robotleg=0, rz_phi=rz_phi, pdot=pdot, pdot_des=0)
+                self.r_r = self.footstep(robotleg=0, rz_phi=rz_phi, pdot=pdot, pdot_des=self.pdot_des)
 
             omega = np.array(self.simulator.omega_xyz)
 
@@ -284,7 +284,7 @@ class Runner:
         p_hip = np.dot(rz_phi, np.array([0, l_i, 0]))
         t_stance = self.t_p * self.phi_switch
         p_symmetry = t_stance * 0.5 * pdot + self.k_f * (pdot - pdot_des)
-        p_cent = np.cross(0.5 * np.sqrt(self.h / 9.807)*pdot, self.omega_d)
+        p_cent = 0.5 * np.sqrt(self.h / 9.807)*np.cross(pdot, self.omega_d)
         p = p_hip + p_symmetry + p_cent
         # print("p_symmetry = ", p_symmetry, robotleg)
         # print("p = ", p, robotleg)

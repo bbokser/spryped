@@ -39,8 +39,8 @@ bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 0.8],
 
 p.setGravity(0, 0, GRAVITY)
 
-p.changeDynamics(bot, 3, lateralFriction=0.7)
-p.changeDynamics(bot, 7, lateralFriction=0.7)
+# p.changeDynamics(bot, 3, lateralFriction=0.5)
+# p.changeDynamics(bot, 7, lateralFriction=0.5)
 
 jointArray = range(p.getNumJoints(bot))
 
