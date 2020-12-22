@@ -81,13 +81,13 @@ class Runner:
 
         # footstep planner values
         self.omega_d = np.array([0, 0, 0])  # desired angular acceleration for footstep planner
-        self.k_f = 0.03  # Raibert heuristic gain
+        self.k_f = 0.15  # Raibert heuristic gain
         self.h = np.array([0, 0, 0.8325])  # height, assumed to be constant
         self.r_l = np.array([0, 0, -0.8325])  # initial footstep planning position
         self.r_r = np.array([0, 0, -0.8325])  # initial footstep planning position
 
         self.p = np.array([0, 0, 0])  # initial body position
-        self.pdot_des = 0  # desired body velocity in world coords
+        self.pdot_des = np.array([0, 0, 0])  # desired body velocity in world coords
         self.force_control_test = False
 
     def run(self):
@@ -117,7 +117,7 @@ class Runner:
             # t_prev = time.clock()
             # print(t_diff)
 
-            # time.sleep(self.dt) # TODO: Check if this is actually necessary
+            # time.sleep(self.dt)
             # update target after specified period of time passes
             steps += 1
             t = t + self.dt
