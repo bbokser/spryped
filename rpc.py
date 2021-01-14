@@ -78,10 +78,7 @@ class Rpc:
         self.rh_l = np.array([-.14397, .13519, .03581])  # vector from CoM to hip in the body frame
         self.pdot_d = np.array([0, 0, 0])  # desired movement speed
 
-    def rpcontrol(self, rz_phi, r1, r2, x_in, x_ref, s_phi_1, s_phi_2):
-        # inertia matrix inverse
-        i_global = np.dot(np.dot(rz_phi, self.inertia), rz_phi.T)  # TODO: Check
-        i_inv = np.linalg.inv(i_global)
+    def rpcontrol(self, rz_phi, x_in, x_ref, sched_1, sched_2):
         '''
         # vector from CoM to hip in global frame (should just use body frame?)
         rh_l_g = np.dot(rz_phi, self.rh_l)
@@ -95,6 +92,10 @@ class Rpc:
         pf_l = x_in[1] + r1
         pf_r = x_in[1] + r2
         '''
+        # inertia matrix inverse
+        i_global = np.dot(np.dot(rz_phi, self.inertia), rz_phi.T)  # TODO: Check
+        i_inv = np.linalg.inv(i_global)
+
         i11 = i_inv[0, 0]
         i12 = i_inv[0, 1]
         i13 = i_inv[0, 2]
@@ -151,6 +152,9 @@ class Rpc:
                     r2x, r2y, r2z,
                     f2_x, f2_y, f2_z]
         n_controls = len(controls)  # number of controls
+
+        s_phi_1 = cs.SX.sym('s_phi_1')  # vector of planned leg contact boolean over time
+        s_phi_2 = cs.SX.sym('s_phi_2')  # vector of planned leg contact boolean over time
 
         g = -9.807
         dt = self.dt
@@ -228,7 +232,8 @@ class Rpc:
                                      r1x, r1y, r1z,
                                      f1_x, f1_y, f1_z,
                                      r2x, r2y, r2z,
-                                     f2_x, f2_y, f2_z],
+                                     f2_x, f2_y, f2_z,
+                                     s_phi_1, s_phi_2],
                               x_next)  # nonlinear mapping of function f(x,u)
 
         u = cs.SX.sym('u', n_controls, self.N)  # decision variables, control action matrix
@@ -302,26 +307,33 @@ class Rpc:
             eta_chi[15:18] = eta_f
             eta_chi[18:21] = eta_r2
             eta_chi[21:24] = eta_f
-            print(eta_chi)
+
             chi = cs.vertcat(st, con)
             chi_err = eta_chi - chi
             obj = obj + cs.mtimes(cs.mtimes(chi_err.T, W), chi_err)
-            """
-            obj = obj + cs.mtimes(cs.mtimes((st - st_ref[n_states:(n_states * 2)]).T, Q),
-                                  st - st_ref[n_states:(n_states * 2)]) \
-                + cs.mtimes(cs.mtimes(con.T, R), con)
-                """
+
             # calculate dynamics constraint
             st_next = x[:, k + 1]
             f_value = self.fn(st[0], st[1], st[2], st[3], st[4], st[5],
                               st[6], st[7], st[8], st[9], st[10], st[11],
                               con[0], con[1], con[2], con[3], con[4], con[5],
-                              con[6], con[7], con[8], con[9], con[10], con[11])
+                              con[6], con[7], con[8], con[9], con[10], con[11],
+                              sched_1[k], sched_2[k])
             st_n_e = np.array(f_value)
             constr = cs.vertcat(constr, st_next - st_n_e)  # compute constraints
 
         # add additional constraints
         for k in range(0, self.N):
+            # Foot placed on ground
+            constr = cs.vertcat(constr, sched_1[k] * (zg - p_z))
+            constr = cs.vertcat(constr, sched_2[k] * (zg - p_z))
+            # Kinematic leg limits
+            constr = cs.vertcat(constr, sched_1[k] * (norm(r1[k] - rh_l) - p_z * tan(beta)))
+            # Foot stationary during stance
+            constr = cs.vertcat(constr, sched_1[k+1] * sched_1[k](p[k + 1] - p[k]))
+            # Positive ground force normal
+            constr = cs.vertcat(constr, sched_1[k] * thingy)
+            # Lateral Force Friction Pyramids
             constr = cs.vertcat(constr, u[0, k] - self.mu * u[2, k])  # f1x - mu*f1z
             constr = cs.vertcat(constr, -u[0, k] - self.mu * u[2, k])  # -f1x - mu*f1z
 
@@ -355,15 +367,15 @@ class Rpc:
         st_len = n_states * (self.N + 1)
 
         lbx[(st_len + 2)::3] = [0 for i in range(20)]  # lower bound on all f1z and f2z
-
-        if c_l == 0:  # if left leg is not in contact... don't calculate output forces for that leg.
+        # TODO: Redo this as a for loop for k for schedule basis
+        if s_phi_1 == 0:  # if left leg isn't scheduled to be in contact... don't create output forces for that leg.
             ubx[(n_states * (self.N + 1))::6] = [0 for i in range(10)]  # upper bound on all f1x
             ubx[(n_states * (self.N + 1) + 1)::6] = [0 for i in range(10)]  # upper bound on all f1y
             lbx[(n_states * (self.N + 1))::6] = [0 for i in range(10)]  # lower bound on all f1x
             lbx[(n_states * (self.N + 1) + 1)::6] = [0 for i in range(10)]  # lower bound on all f1y
             ubx[(n_states * (self.N + 1) + 2)::6] = [0 for i in range(10)]  # upper bound on all f1z
 
-        if c_r == 0:  # if right leg is not in contact... don't calculate output forces for that leg.
+        if s_phi_2 == 0:  # if right leg isn't scheduled to be in contact... don't create output forces for that leg.
             ubx[(n_states * (self.N + 1) + 3)::6] = [0 for i in range(10)]  # upper bound on all f2x
             ubx[(n_states * (self.N + 1) + 4)::6] = [0 for i in range(10)]  # upper bound on all f2y
             lbx[(n_states * (self.N + 1) + 3)::6] = [0 for i in range(10)]  # lower bound on all f2x

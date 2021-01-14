@@ -145,6 +145,7 @@ class Runner:
             # gait scheduler
             s_l = self.gait_scheduler(t, t0_l)
             s_r = self.gait_scheduler(t, t0_r)
+            # get estimated contact
             sh_l = self.gait_estimator(self.dist_force_l[2])
             sh_r = self.gait_estimator(self.dist_force_r[2])
 
@@ -161,14 +162,14 @@ class Runner:
             theta = np.array(transforms3d.euler.mat2euler(b_orient, axes='sxyz'))
 
             phi = np.array(transforms3d.euler.mat2euler(b_orient, axes='szyx'))[0]
-            c_phi = np.cos(phi)
-            s_phi = np.sin(phi)
+            cos_phi = np.cos(phi)
+            sin_phi = np.sin(phi)
             # rotation matrix Rz(phi)
             rz_phi = np.zeros((3, 3))
-            rz_phi[0, 0] = c_phi
-            rz_phi[0, 1] = s_phi
-            rz_phi[1, 0] = -s_phi
-            rz_phi[1, 1] = c_phi
+            rz_phi[0, 0] = cos_phi
+            rz_phi[0, 1] = sin_phi
+            rz_phi[1, 0] = -sin_phi
+            rz_phi[1, 1] = cos_phi
             rz_phi[2, 2] = 1
 
             if state_l == ('stance' or 'early'):
@@ -180,24 +181,35 @@ class Runner:
                 contact_r = True
             else:
                 contact_r = False
-
+            '''
+            # desired footstep location from CoM (not global)
             # this should activate just before the foot *leaves* contact.
             if contact_l is True and prev_contact_l is False:
                 self.r_l = self.footstep(robotleg=1, rz_phi=rz_phi, pdot=pdot, pdot_des=0)
 
             if contact_r is True and prev_contact_r is False:
                 self.r_r = self.footstep(robotleg=0, rz_phi=rz_phi, pdot=pdot, pdot_des=0)
-
+            '''
             omega = np.array(self.simulator.omega_xyz)
 
             x_in = np.hstack([theta, p, omega, pdot]).T  # array of the states for MPC
 
             x_ref = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).T  # reference pose (desired)
 
+            schedule_l = np.zeros((10, 1))
+            schedule_r = schedule_l
+
             if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
-                    mpc_force = self.force.rpcontrol(rz_phi=rz_phi, r1=self.r_l, r2=self.r_r,
-                                                     x_in=x_in, x_ref=x_ref, s_phi_1=contact_l, s_phi_2=contact_r)
+                    ts = t
+                    for k in range(0, 10):
+                        # generate vectors of scheduled contact states over the mpc's prediction horizon
+                        schedule_l[k] = self.gait_scheduler(ts, t0_l)
+                        schedule_r[k] = self.gait_scheduler(ts, t0_r)
+                        ts = ts + k*self.dt
+                    mpc_force = self.force.rpcontrol(rz_phi=rz_phi, x_in=x_in, x_ref=x_ref,
+                                                     sched_1=schedule_l, sched_2=schedule_r)
+                    # TODO: pull in r_l and r_r as well here
                     skip = False
                 else:
                     skip = True  # tells gait ctrlr to default to position control.
@@ -283,7 +295,7 @@ class Runner:
             sh = 0  # swing
 
         return sh
-
+'''
     def footstep(self, robotleg, rz_phi, pdot, pdot_des):
         # plans next footstep location
         if robotleg == 1:
@@ -300,5 +312,6 @@ class Runner:
         # print("p = ", p, robotleg)
         p[2] = -0.8325  # assume constant height for now. TODO: height changes?
         return p
+'''
 
 
