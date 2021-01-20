@@ -71,12 +71,13 @@ class Runner:
         self.dist_force_l = np.array([0, 0, 0])
         self.dist_force_r = np.array([0, 0, 0])
         self.t_p = 0.5  # gait period, seconds
+        self.N = 10  # mpc prediction horizon
         self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Percentage of gait spent in contact.
-        self.force = rpc.Rpc(dt=dt, phi_switch=self.phi_switch)
+        self.force = rpc.Rpc(dt=dt, phi_switch=self.phi_switch, n=self.N)
         self.gait_left = gait.Gait(controller=self.controller_left, robotleg=self.leg_left,
-                              t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
+                                   t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
         self.gait_right = gait.Gait(controller=self.controller_right, robotleg=self.leg_right,
-                               t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
+                                    t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
 
         self.target = None
 
@@ -196,19 +197,19 @@ class Runner:
 
             x_ref = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).T  # reference pose (desired)
 
-            schedule_l = np.zeros((10, 1))
+            schedule_l = np.zeros(((self.N+1), 1))
             schedule_r = schedule_l
 
             if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
                     ts = t
-                    for k in range(0, 10):
+                    for k in range(0, (self.N+1)):
                         # generate vectors of scheduled contact states over the mpc's prediction horizon
                         schedule_l[k] = self.gait_scheduler(ts, t0_l)
                         schedule_r[k] = self.gait_scheduler(ts, t0_r)
                         ts = ts + k*self.dt
-                    mpc_force = self.force.rpcontrol(rz_phi=rz_phi, x_in=x_in, x_ref=x_ref,
-                                                     sched_1=schedule_l, sched_2=schedule_r)
+                    mpc_force = self.force.rpcontrol(rz_phi=rz_phi, x_in=x_in, x_ref=x_ref, sched_1=schedule_l,
+                                                     sched_2=schedule_r, pf_l=pos_l, pf_r=pos_r)
                     # TODO: pull in r_l and r_r as well here
                     skip = False
                 else:

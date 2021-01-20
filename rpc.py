@@ -35,11 +35,11 @@ import transforms3d
 
 class Rpc:
 
-    def __init__(self, phi_switch, **kwargs):
+    def __init__(self, phi_switch, n, **kwargs):
 
         self.u = np.zeros((4, 1))  # control signal
         self.dt = 0.025  # sampling time (s)
-        self.N = 10  # prediction horizon
+        self.N = n  # prediction horizon
         # horizon length = self.dt*self.N = .25 seconds
         self.mass = float(12.12427)  # kg
         self.mu = 0.5  # coefficient of friction
@@ -76,22 +76,25 @@ class Rpc:
 
         self.rh_r = np.array([.14397, .13519, .03581])  # vector from CoM to hip in the body frame
         self.rh_l = np.array([-.14397, .13519, .03581])  # vector from CoM to hip in the body frame
+        self.beta = np.pi*45/180  # max kinematic leg angle allowed
         self.pdot_d = np.array([0, 0, 0])  # desired movement speed
 
-    def rpcontrol(self, rz_phi, x_in, x_ref, sched_1, sched_2):
-        '''
+    def rpcontrol(self, rz_phi, x_in, x_ref, sched_1, sched_2, pf_l, pf_r):
+
         # vector from CoM to hip in global frame (should just use body frame?)
-        rh_l_g = np.dot(rz_phi, self.rh_l)
+        rh_l_g = np.dot(rz_phi, self.rh_l)  # TODO: Change to b_orient?
         rh_r_g = np.dot(rz_phi, self.rh_r)
 
-        # actual footstep position vector from CoM to end effector in global coords
-        r1 = r1 + rh_l_g + x_in[1]
-        r2 = r2 + rh_r_g + x_in[1]
+        # actual initial footstep position vector from CoM to end effector in global coords
+        pf_1_i = pf_l + rh_l_g + x_in[1] + np.array([0, 0, 0.8325])
+        pf_2_i = pf_r + rh_r_g + x_in[1] + np.array([0, 0, 0.8325])
 
         # desired footstep position in global coords
-        pf_l = x_in[1] + r1
-        pf_r = x_in[1] + r2
-        '''
+        # r_l = x_in[1] + r_1
+        # r_r = x_in[1] + r_2
+
+        zg = 0  # estimated ground height, for terrain perception. Currently zero bc there is no terrain perception
+
         # inertia matrix inverse
         i_global = np.dot(np.dot(rz_phi, self.inertia), rz_phi.T)  # TODO: Check
         i_inv = np.linalg.inv(i_global)
@@ -275,6 +278,7 @@ class Rpc:
                             np.concatenate((np.zeros((12, 12)), R), axis=1)), axis=0)
         projection = np.eye(3)
         projection[2, 2] = 0  # projection matrix for zero ground height assumption
+        ground = np.array([0, 0, 1]).T  # ground plane, assumed level for now
 
         constr = cs.vertcat(constr, x[:, 0] - st_ref[0:n_states])  # initial condition constraints
         eta_chi = cs.SX.sym('eta_chi', n_states + n_controls, 1)  # H_x, heuristics
@@ -287,7 +291,7 @@ class Rpc:
             # hip centered stepping
             r_theta = np.array(transforms3d.euler.euler2mat(st[0], st[1], st[2], axes='sxyz'))
             eta_hip_l = cs.mtimes(projection, cs.mtimes(r_theta, self.rh_l))
-            eta_hip_r = cs.mtimes(projection, cs.mtimes(r_theta, self.rh_r))
+            eta_hip_r = cs.mtimes(projection, cs.mtimes(r_theta, self.rh_r))  # TODO: Check if using right frame
             # capture point
             pdot = np.array(([st[6], st[7], st[8]]))
             eta_cap = cs.sqrt(st[5] / 9.807) * (pdot - self.pdot_d)
@@ -320,19 +324,34 @@ class Rpc:
                               con[6], con[7], con[8], con[9], con[10], con[11],
                               sched_1[k], sched_2[k])
             st_n_e = np.array(f_value)
+            print(sched_1[k])
             constr = cs.vertcat(constr, st_next - st_n_e)  # compute constraints
+
+        # footstep positions transferred from body (r_i) to world (p_i) coordinates
+        pf_1 = cs.horzcat(pf_1_i, u[0:3, 0:self.N] + x[0:3, 0:self.N])  # TODO: Replace first value or append?
+        # pf_1[:, 0] = pf_1_i
+        # pf_1.insert(0, pf_1_i)
+        pf_2 = cs.horzcat(pf_2_i, u[6:9, 0:self.N] + x[6:9, 0:self.N])
+        print(np.shape(pf_2))
+        # pf_2[:, 0] = pf_2_i
+        # pf_2.insert(0, pf_2_i)
 
         # add additional constraints
         for k in range(0, self.N):
             # Foot placed on ground
-            constr = cs.vertcat(constr, sched_1[k] * (zg - p_z))
-            constr = cs.vertcat(constr, sched_2[k] * (zg - p_z))
+            constr = cs.vertcat(constr, sched_1[k] * (zg - pf_1[2]))  # TODO: doesn't this need a tolerance?
+            constr = cs.vertcat(constr, sched_2[k] * (zg - pf_2[2]))
             # Kinematic leg limits
-            constr = cs.vertcat(constr, sched_1[k] * (norm(r1[k] - rh_l) - p_z * tan(beta)))
+            constr = cs.vertcat(constr, sched_1[k] * (cs.norm_1(u[0:3, k] - self.rh_l)
+                                                      - x[5, k] * np.tan(self.beta)))
+            constr = cs.vertcat(constr, sched_2[k] * (cs.norm_1(u[6:9, k] - self.rh_r)
+                                                      - x[5, k] * np.tan(self.beta)))
             # Foot stationary during stance
-            constr = cs.vertcat(constr, sched_1[k+1] * sched_1[k](p[k + 1] - p[k]))
+            constr = cs.vertcat(constr, sched_1[k + 1] * sched_1[k] * (pf_1[k + 1] - pf_1[k]))
+            constr = cs.vertcat(constr, sched_2[k + 1] * sched_2[k] * (pf_2[k + 1] - pf_2[k]))
             # Positive ground force normal
-            constr = cs.vertcat(constr, sched_1[k] * thingy)
+            constr = cs.vertcat(constr, -sched_1[k] * u[3:6, k] * ground)
+            constr = cs.vertcat(constr, -sched_2[k] * u[9:12, k] * ground)
             # Lateral Force Friction Pyramids
             constr = cs.vertcat(constr, u[0, k] - self.mu * u[2, k])  # f1x - mu*f1z
             constr = cs.vertcat(constr, -u[0, k] - self.mu * u[2, k])  # -f1x - mu*f1z
