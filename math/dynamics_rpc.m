@@ -94,9 +94,9 @@ h = s_phi_1*mtimes(h_1, f1) + s_phi_2*mtimes(h_2, f2);
 
 x_next = mtimes(A, x) + mtimes(B, h) + d;
 
-for c=1:12
-dlmwrite('dynamics_rpc.csv', char(x_next(c,:)),'','-append')
-end
+%for c=1:12
+%dlmwrite('dynamics_rpc.csv', char(x_next(c,:)),'','-append')
+%end
 
 fprintf('x = \n %s', latex(x))
 fprintf('\n')
