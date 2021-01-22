@@ -221,6 +221,7 @@ class Rpc:
         for k in range(0, self.N):
             # forces and torques acting on the CoM
             h = s_phi_1[k] * cs.mtimes(h_1, f1) + s_phi_2[k] * cs.mtimes(h_2, f2)
+            # the discrete dynamics equation
             x_dyn = cs.mtimes(A, x_states) + cs.mtimes(B, h) + d
             fn["{0}".format(k)] = cs.Function('fn', [theta_x, theta_y, theta_z, p_x, p_y, p_z,
                                                      pdot_x, pdot_y, pdot_z, omega_x, omega_y, omega_z,
@@ -319,28 +320,28 @@ class Rpc:
         pf_1 = cs.horzcat(pf_1_i, u[0:3, 0:self.N] + x[0:3, 0:self.N])  # TODO: Replace first value or append?
         # pf_1[:, 0] = pf_1_i
         # pf_1.insert(0, pf_1_i)
-        pf_2 = cs.horzcat(pf_2_i, u[6:9, 0:self.N] + x[6:9, 0:self.N])
-        print(np.shape(pf_2))
+        pf_2 = cs.horzcat(pf_2_i, u[6:9, 0:self.N] + x[6:9, 0:self.N])  # 3x11
         # pf_2[:, 0] = pf_2_i
         # pf_2.insert(0, pf_2_i)
 
         # add additional constraints
         for k in range(0, self.N):
-            # Foot placed on ground
-            constr = cs.vertcat(constr, sched_1[k] * (zg - pf_1[2]))  # TODO: doesn't this need a tolerance?
-            constr = cs.vertcat(constr, sched_2[k] * (zg - pf_2[2]))
-            # Kinematic leg limits
+            # Foot placed on ground (=0)
+            constr = cs.vertcat(constr, sched_1[k] * (zg - pf_1[2, k]))
+            constr = cs.vertcat(constr, sched_2[k] * (zg - pf_2[2, k]))
+            # Foot stationary during stance (=0)
+            constr = cs.vertcat(constr, sched_1[k + 1] * sched_1[k] * (pf_1[2, k + 1] - pf_1[2, k]))
+            constr = cs.vertcat(constr, sched_2[k + 1] * sched_2[k] * (pf_2[2, k + 1] - pf_2[2, k]))
+        for k in range(0, self.N):
+            # Kinematic leg limits (<=0)
             constr = cs.vertcat(constr, sched_1[k] * (cs.norm_1(u[0:3, k] - self.rh_l)
                                                       - x[5, k] * np.tan(self.beta)))
             constr = cs.vertcat(constr, sched_2[k] * (cs.norm_1(u[6:9, k] - self.rh_r)
                                                       - x[5, k] * np.tan(self.beta)))
-            # Foot stationary during stance
-            constr = cs.vertcat(constr, sched_1[k + 1] * sched_1[k] * (pf_1[k + 1] - pf_1[k]))
-            constr = cs.vertcat(constr, sched_2[k + 1] * sched_2[k] * (pf_2[k + 1] - pf_2[k]))
-            # Positive ground force normal
+            # Positive ground force normal (<=0)
             constr = cs.vertcat(constr, -sched_1[k] * u[3:6, k] * ground)
             constr = cs.vertcat(constr, -sched_2[k] * u[9:12, k] * ground)
-            # Lateral Force Friction Pyramids
+            # Lateral Force Friction Pyramids (<=0)
             constr = cs.vertcat(constr, u[0, k] - self.mu * u[2, k])  # f1x - mu*f1z
             constr = cs.vertcat(constr, -u[0, k] - self.mu * u[2, k])  # -f1x - mu*f1z
 
@@ -355,6 +356,7 @@ class Rpc:
 
         opt_variables = cs.vertcat(cs.reshape(x, n_states * (self.N + 1), 1),
                                    cs.reshape(u, n_controls * self.N, 1))
+        # TODO: Add Hessian of the Lagrangian p. 68
         nlp_prob = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
         opts = {'print_time': 0, 'error_on_fail': 0, 'ipopt.print_level': 0, 'ipopt.acceptable_tol': 1e-6,
                 'ipopt.acceptable_obj_change_tol': 1e-6}
@@ -364,34 +366,21 @@ class Rpc:
         o_length = np.shape(opt_variables)[0]
 
         lbg = list(itertools.repeat(-1e10, c_length))  # inequality constraints: big enough to act like infinity
-        lbg[0:(self.N + 1)] = itertools.repeat(0, self.N + 1)  # IC + dynamics equality constraint
+        # IC + dynamics + foot equality constraint TODO: Check if this is correct
+        lbg[0:(self.N + 1 + 4 * self.N)] = itertools.repeat(0, (self.N + 1 + 4 * self.N))
         ubg = list(itertools.repeat(0, c_length))  # inequality constraints
 
         # constraints for optimization variables
-        lbx = list(itertools.repeat(-1e10, o_length))  # input inequality constraints
+        lbx = list(itertools.repeat(-1e10, o_length))  # input inequality constraints  # TODO: See p. 73
         ubx = list(itertools.repeat(1e10, o_length))  # input inequality constraints
 
         st_len = n_states * (self.N + 1)
 
-        lbx[(st_len + 2)::3] = [0 for i in range(20)]  # lower bound on all f1z and f2z
-        # TODO: Redo this as a for loop for k for schedule basis
-        if s_phi_1 == 0:  # if left leg isn't scheduled to be in contact... don't create output forces for that leg.
-            ubx[(n_states * (self.N + 1))::6] = [0 for i in range(10)]  # upper bound on all f1x
-            ubx[(n_states * (self.N + 1) + 1)::6] = [0 for i in range(10)]  # upper bound on all f1y
-            lbx[(n_states * (self.N + 1))::6] = [0 for i in range(10)]  # lower bound on all f1x
-            lbx[(n_states * (self.N + 1) + 1)::6] = [0 for i in range(10)]  # lower bound on all f1y
-            ubx[(n_states * (self.N + 1) + 2)::6] = [0 for i in range(10)]  # upper bound on all f1z
-
-        if s_phi_2 == 0:  # if right leg isn't scheduled to be in contact... don't create output forces for that leg.
-            ubx[(n_states * (self.N + 1) + 3)::6] = [0 for i in range(10)]  # upper bound on all f2x
-            ubx[(n_states * (self.N + 1) + 4)::6] = [0 for i in range(10)]  # upper bound on all f2y
-            lbx[(n_states * (self.N + 1) + 3)::6] = [0 for i in range(10)]  # lower bound on all f2x
-            lbx[(n_states * (self.N + 1) + 4)::6] = [0 for i in range(10)]  # lower bound on all f2y
-            ubx[(n_states * (self.N + 1) + 5)::6] = [0 for i in range(10)]  # upper bound on all f2z
+        lbx[(st_len + 2)::3] = [0 for i in range(40)]  # lower bound on all f1z and f2z
 
         # setup is finished, now solve-------------------------------------------------------------------------------- #
 
-        u0 = np.zeros((self.N, n_controls))  # six control inputs
+        u0 = np.zeros((self.N, n_controls))  # control inputs
         X0 = np.matlib.repmat(x_in, 1, self.N + 1).T  # initialization of the state's decision variables
 
         # parameters and xin must be changed every timestep

@@ -100,10 +100,10 @@ x_next = mtimes(A, x) + mtimes(B, h) + d;
 
 fprintf('x = \n %s', latex(x))
 fprintf('\n')
-fprintf('f = \n %s', latex(h))
-fprintf('\n')
 fprintf('A = \n %s', latex(A))
 fprintf('\n')
 fprintf('B = \n %s', latex(B))
+fprintf('\n')
+fprintf('h = \n %s', latex(h))
 fprintf('\n')
 fprintf('x(k+1) = \n %s', latex(x_next))

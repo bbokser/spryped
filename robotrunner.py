@@ -106,7 +106,8 @@ class Runner:
         prev_contact_l = False
         prev_contact_r = False
 
-        mpc_force = np.zeros(6)
+        mpc_force_l = np.zeros(6)
+        mpc_force_r = mpc_force_l
         mpc_dt = 0.025  # mpc period
         mpc_factor = mpc_dt / self.dt  # repeat mpc every x seconds
         mpc_counter = mpc_factor
@@ -182,55 +183,49 @@ class Runner:
                 contact_r = True
             else:
                 contact_r = False
-            '''
-            # desired footstep location from CoM (not global)
-            # this should activate just before the foot *leaves* contact.
-            if contact_l is True and prev_contact_l is False:
-                self.r_l = self.footstep(robotleg=1, rz_phi=rz_phi, pdot=pdot, pdot_des=0)
 
-            if contact_r is True and prev_contact_r is False:
-                self.r_r = self.footstep(robotleg=0, rz_phi=rz_phi, pdot=pdot, pdot_des=0)
-            '''
             omega = np.array(self.simulator.omega_xyz)
 
             x_in = np.hstack([theta, p, omega, pdot]).T  # array of the states for MPC
 
             x_ref = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).T  # reference pose (desired)
 
-            schedule_l = np.zeros(((self.N+1), 1))
+            schedule_l = np.zeros(((self.N + 1), 1))
             schedule_r = schedule_l
 
             if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
                     ts = t
-                    for k in range(0, (self.N+1)):
+                    for k in range(0, (self.N + 1)):
                         # generate vectors of scheduled contact states over the mpc's prediction horizon
                         schedule_l[k] = self.gait_scheduler(ts, t0_l)
                         schedule_r[k] = self.gait_scheduler(ts, t0_r)
-                        ts = ts + k*self.dt
-                    mpc_force = self.force.rpcontrol(rz_phi=rz_phi, x_in=x_in, x_ref=x_ref, sched_1=schedule_l,
-                                                     sched_2=schedule_r, pf_l=pos_l, pf_r=pos_r)
-                    # TODO: pull in r_l and r_r as well here
+                        ts = ts + k * self.dt
+                    mpc_result = self.force.rpcontrol(rz_phi=rz_phi, x_in=x_in, x_ref=x_ref, sched_1=schedule_l,
+                                                      sched_2=schedule_r, pf_l=pos_l, pf_r=pos_r)
+                    self.r_l = mpc_result[0:3]
+                    mpc_force_l = mpc_result[3:6]
+                    self.r_r = mpc_result[6:9]
+                    mpc_force_r = mpc_result[9:12]
                     skip = False
                 else:
                     skip = True  # tells gait ctrlr to default to position control.
                     print("skipping mpc")
                 mpc_counter = 0
-
             mpc_counter += 1
 
             if self.force_control_test is True:
                 state_l = 'stance'
                 state_r = 'stance'
-                mpc_force = np.zeros(6)
-            print(state_r, state_l)
+                mpc_force_l = np.zeros(6)
+                mpc_force_r = mpc_force_l
 
             # calculate wbc control signal
             self.u_l = self.gait_left.u(state=state_l, prev_state=prev_state_l, r_in=pos_l, r_d=self.r_l,
-                                        b_orient=b_orient, fr_mpc=mpc_force[0:3], skip=skip)
+                                        b_orient=b_orient, fr_mpc=mpc_force_l, skip=skip)
             # just standing for now
             self.u_r = self.gait_right.u(state=state_r, prev_state=prev_state_r, r_in=pos_r, r_d=self.r_r,
-                                         b_orient=b_orient, fr_mpc=mpc_force[3:], skip=skip)
+                                         b_orient=b_orient, fr_mpc=mpc_force_r, skip=skip)
             # just standing for now
 
             # receive disturbance torques
@@ -296,6 +291,8 @@ class Runner:
             sh = 0  # swing
 
         return sh
+
+
 '''
     def footstep(self, robotleg, rz_phi, pdot, pdot_des):
         # plans next footstep location
@@ -314,5 +311,3 @@ class Runner:
         p[2] = -0.8325  # assume constant height for now. TODO: height changes?
         return p
 '''
-
-
