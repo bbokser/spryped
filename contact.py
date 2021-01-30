@@ -30,7 +30,7 @@ class Contact:
         self.dt = dt
         self.delay_term = 0
         self.tau_d = None
-        la = 15  # lambda, cutoff frequency. PLACEHOLDER VALUE
+        la = 15  # lambda, cutoff frequency. PLACEHOLDER VALUE # TODO: Replace
         self.gamma = np.exp(-la * self.dt)
         self.beta = (1 - self.gamma) / (self.gamma * self.dt)
 

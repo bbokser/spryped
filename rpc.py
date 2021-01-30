@@ -332,6 +332,9 @@ class Rpc:
             # Foot stationary during stance (=0)
             constr = cs.vertcat(constr, sched_1[k + 1] * sched_1[k] * (pf_1[2, k + 1] - pf_1[2, k]))
             constr = cs.vertcat(constr, sched_2[k + 1] * sched_2[k] * (pf_2[2, k + 1] - pf_2[2, k]))
+
+        len_eq = np.shape(constr)[0]  # Length of the equality constraints TODO: Check if this is correct
+
         for k in range(0, self.N):
             # Kinematic leg limits (<=0)
             constr = cs.vertcat(constr, sched_1[k] * (cs.norm_1(u[0:3, k] - self.rh_l)
@@ -356,7 +359,6 @@ class Rpc:
 
         opt_variables = cs.vertcat(cs.reshape(x, n_states * (self.N + 1), 1),
                                    cs.reshape(u, n_controls * self.N, 1))
-        # TODO: Add Hessian of the Lagrangian p. 68
         nlp_prob = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
         opts = {'print_time': 0, 'error_on_fail': 0, 'ipopt.print_level': 0, 'ipopt.acceptable_tol': 1e-6,
                 'ipopt.acceptable_obj_change_tol': 1e-6}
@@ -365,15 +367,17 @@ class Rpc:
         c_length = np.shape(constr)[0]
         o_length = np.shape(opt_variables)[0]
 
+        # constraint upper and lower bounds
         lbg = list(itertools.repeat(-1e10, c_length))  # inequality constraints: big enough to act like infinity
-        # IC + dynamics + foot equality constraint TODO: Check if this is correct
-        lbg[0:(self.N + 1 + 4 * self.N)] = itertools.repeat(0, (self.N + 1 + 4 * self.N))
-        ubg = list(itertools.repeat(0, c_length))  # inequality constraints
+        # IC + dynamics + foot equality constraint
+        lbg[0:len_eq] = itertools.repeat(0, len_eq)  # set lower limit of equality constraints to zero
+        ubg = list(itertools.repeat(0, c_length))  # default upper limit of inequality constraints is zero
 
-        # constraints for optimization variables
-        lbx = list(itertools.repeat(-1e10, o_length))  # input inequality constraints  # TODO: See p. 73
+        # upper and lower bounds for optimization variables
+        lbx = list(itertools.repeat(-1e10, o_length))  # input inequality constraints
+        lbg[0:2] = itertools.repeat(-np.pi/4, 2)  # set lower limit of pitch and roll to -pi/4
         ubx = list(itertools.repeat(1e10, o_length))  # input inequality constraints
-
+        ubg[0:2] = itertools.repeat(np.pi/4, 2)  # set upper limit of pitch and roll to -pi/4
         st_len = n_states * (self.N + 1)
 
         lbx[(st_len + 2)::3] = [0 for i in range(40)]  # lower bound on all f1z and f2z
