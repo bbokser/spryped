@@ -64,8 +64,8 @@ class Runner:
 
         # gait scheduler values
         self.target_init = np.array([0, 0, -0.8325])  # , self.init_alpha, self.init_beta, self.init_gamma])
-        self.target_l = self.target_init
-        self.target_r = self.target_init
+        self.target_l = self.target_init[:]
+        self.target_r = self.target_init[:]
         self.sh_l = 1  # estimated contact state (left)
         self.sh_r = 1  # estimated contact state (right)
         self.dist_force_l = np.array([0, 0, 0])
@@ -96,15 +96,15 @@ class Runner:
 
         steps = 0
         t = 0  # time
-        p = np.array([0, 0, 0])  # initialize body position
+        p = np.array([0, 0, 0.8325])  # initialize body position
 
         t0_l = t  # starting time, left leg
         t0_r = t0_l + self.t_p / 2  # starting time, right leg. Half a period out of phase with left
 
         prev_state_l = str("init")
-        prev_state_r = prev_state_l
-        prev_contact_l = False
-        prev_contact_r = False
+        prev_state_r = str("init")
+        # prev_contact_l = False
+        # prev_contact_r = False
 
         mpc_force_l = np.zeros(6)
         mpc_force_r = mpc_force_l
@@ -147,6 +147,7 @@ class Runner:
             # gait scheduler
             s_l = self.gait_scheduler(t, t0_l)
             s_r = self.gait_scheduler(t, t0_r)
+
             # get estimated contact
             sh_l = self.gait_estimator(self.dist_force_l[2])
             sh_r = self.gait_estimator(self.dist_force_r[2])
@@ -173,7 +174,7 @@ class Runner:
             rz_phi[1, 0] = -sin_phi
             rz_phi[1, 1] = cos_phi
             rz_phi[2, 2] = 1
-
+            """
             if state_l == ('stance' or 'early'):
                 contact_l = True
             else:
@@ -183,26 +184,27 @@ class Runner:
                 contact_r = True
             else:
                 contact_r = False
-
+            """
             omega = np.array(self.simulator.omega_xyz)
 
             x_in = np.hstack([theta, p, omega, pdot]).T  # array of the states for MPC
-
-            x_ref = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).T  # reference pose (desired)
+            print(x_in[5])
+            x_ref = np.array([0, 0, 0, 0, 0, 0.8325, 0, 0, 0, 0, 0, 0]).T  # reference pose (desired)
 
             schedule_l = np.zeros(((self.N + 1), 1))
-            schedule_r = schedule_l
+            schedule_r = np.zeros(((self.N + 1), 1))
 
             if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
                     ts = t
                     for k in range(0, (self.N + 1)):
                         # generate vectors of scheduled contact states over the mpc's prediction horizon
-                        schedule_l[k] = self.gait_scheduler(ts, t0_l)
-                        schedule_r[k] = self.gait_scheduler(ts, t0_r)
+                        # TODO: this "probably" isn't the most efficient way to do it
+                        schedule_l[k] = self.gait_scheduler(t=ts, t0=t0_l)
+                        schedule_r[k] = self.gait_scheduler(t=ts, t0=t0_r)
                         ts = ts + k * self.dt
-                    mpc_result = self.force.rpcontrol(rz_phi=rz_phi, x_in=x_in, x_ref=x_ref, sched_1=schedule_l,
-                                                      sched_2=schedule_r, pf_l=pos_l, pf_r=pos_r)
+                    mpc_result = self.force.rpcontrol(rz_phi=rz_phi, x_in=x_in, x_ref=x_ref, s_phi_1=schedule_l,
+                                                      s_phi_2=schedule_r, pf_l=pos_l, pf_r=pos_r)
                     self.r_l = mpc_result[0:3]
                     mpc_force_l = mpc_result[3:6]
                     self.r_r = mpc_result[6:9]
@@ -218,7 +220,7 @@ class Runner:
                 state_l = 'stance'
                 state_r = 'stance'
                 mpc_force_l = np.zeros(6)
-                mpc_force_r = mpc_force_l
+                mpc_force_r = np.zeros(6)
 
             # calculate wbc control signal
             self.u_l = self.gait_left.u(state=state_l, prev_state=prev_state_l, r_in=pos_l, r_d=self.r_l,
@@ -226,7 +228,6 @@ class Runner:
             # just standing for now
             self.u_r = self.gait_right.u(state=state_r, prev_state=prev_state_r, r_in=pos_r, r_d=self.r_r,
                                          b_orient=b_orient, fr_mpc=mpc_force_r, skip=skip)
-            # just standing for now
 
             # receive disturbance torques
             dist_tau_l = self.contact_left.disturbance_torque(Mq=self.controller_left.Mq,
@@ -245,9 +246,8 @@ class Runner:
 
             prev_state_l = state_l
             prev_state_r = state_r
-
-            prev_contact_l = contact_l
-            prev_contact_r = contact_r
+            # prev_contact_l = contact_l
+            # prev_contact_r = contact_r
 
             # -------------------------quaternion-visualizer-animation--------------------------------- #
             if self.qvis_en is True:
@@ -291,23 +291,3 @@ class Runner:
             sh = 0  # swing
 
         return sh
-
-
-'''
-    def footstep(self, robotleg, rz_phi, pdot, pdot_des):
-        # plans next footstep location
-        if robotleg == 1:
-            l_i = 0.144  # left hip length
-        else:
-            l_i = -0.144  # right hip length
-
-        p_hip = np.dot(rz_phi, np.array([0, l_i, 0]))
-        t_stance = self.t_p * self.phi_switch
-        p_symmetry = t_stance * 0.5 * pdot + self.k_f * (pdot - pdot_des)
-        p_cent = 0.5 * np.sqrt(self.h / 9.807) * np.cross(pdot, self.omega_d)
-        p = p_hip + p_symmetry + p_cent
-        # print("p_symmetry = ", p_symmetry, robotleg)
-        # print("p = ", p, robotleg)
-        p[2] = -0.8325  # assume constant height for now. TODO: height changes?
-        return p
-'''
