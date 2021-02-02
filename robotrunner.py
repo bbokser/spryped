@@ -72,7 +72,7 @@ class Runner:
         self.dist_force_r = np.array([0, 0, 0])
         self.t_p = 0.5  # initial gait period, seconds
         self.mpc_dt = 0.025  # mpc sampling time (s)
-        self.N = int(self.t_p*2/self.mpc_dt)  # mpc prediction horizon
+        self.N = int(self.t_p * 2 / self.mpc_dt)  # mpc prediction horizon
 
         self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Percentage of gait spent in contact.
         self.height = 0.7967  # starting height of CoM from ground, must be positive  # TODO: Check with model
@@ -110,8 +110,8 @@ class Runner:
         # prev_contact_l = False
         # prev_contact_r = False
 
-        mpc_force_l = np.zeros(6)
-        mpc_force_r = mpc_force_l
+        fmpc_l = np.zeros(6)
+        fmpc_r = np.zeros(6)
         mpc_factor = self.mpc_dt / self.dt  # repeat mpc every x seconds
         mpc_counter = mpc_factor
         skip = False
@@ -159,7 +159,7 @@ class Runner:
             state_r = self.state_right.FSM.execute(s_r, sh_r)
             # print(state_l, sh_l, self.dist_force_l[2])
             # forward kinematics
-            pos_l = np.dot(b_orient, self.leg_left.position()[:, -1])
+            pos_l = np.dot(b_orient, self.leg_left.position()[:, -1])  # foot vector from base in global frame
             pos_r = np.dot(b_orient, self.leg_right.position()[:, -1])
 
             pdot = np.array(self.simulator.v)  # base linear velocity in global Cartesian coordinates
@@ -196,18 +196,15 @@ class Runner:
                         schedule_l[k] = self.gait_scheduler(t=ts, t0=t0_l)
                         schedule_r[k] = self.gait_scheduler(t=ts, t0=t0_r)
                         ts = ts + k * self.dt
-                    pf_l = np.dot(b_orient, pos_l)
-                    pf_r = np.dot(b_orient, pos_r)
-                    mpc_result = self.force.rpcontrol(b_orient=b_orient, rz_phi=rz_phi, x_in=x_in, x_ref=x_ref,
-                                                      s_phi_1=schedule_l, s_phi_2=schedule_r, pf_l=pf_l, pf_r=pf_r)
-                    self.r_l = mpc_result[0:3]
-                    mpc_force_l = mpc_result[3:6]
-                    self.r_r = mpc_result[6:9]
-                    mpc_force_r = mpc_result[9:12]
-                    print("r_l =", self.r_l)
-                    print("f_l =", mpc_force_l)
-                    print("r_r =", self.r_r)
-                    print("f_r =", mpc_force_r)
+                    r_l, fmpc_l, r_r, fmpc_r = self.force.rpcontrol(b_orient=b_orient, rz_phi=rz_phi, x_in=x_in,
+                                                                    x_ref=x_ref, s_phi_1=schedule_l, s_phi_2=schedule_r,
+                                                                    pf_l=pos_l, pf_r=pos_r)
+                    self.r_l = r_l
+                    self.r_r = r_r
+                    # print("r_l =", self.r_l)
+                    # print("f_l =", fmpc_l)
+                    # print("r_r =", self.r_r)
+                    # print("f_r =", fmpc_r)
                     skip = False
                 else:
                     skip = True  # tells gait ctrlr to default to position control.
@@ -218,15 +215,15 @@ class Runner:
             if self.force_control_test is True:
                 state_l = 'stance'
                 state_r = 'stance'
-                mpc_force_l = np.zeros(6)
-                mpc_force_r = np.zeros(6)
+                fmpc_l = np.zeros(6)
+                fmpc_r = np.zeros(6)
 
             # calculate wbc control signal
             self.u_l = self.gait_left.u(state=state_l, prev_state=prev_state_l, r_in=pos_l, r_d=self.r_l,
-                                        b_orient=b_orient, fr_mpc=mpc_force_l, skip=skip)
+                                        b_orient=b_orient, fr_mpc=fmpc_l, skip=skip)
             # just standing for now
             self.u_r = self.gait_right.u(state=state_r, prev_state=prev_state_r, r_in=pos_r, r_d=self.r_r,
-                                         b_orient=b_orient, fr_mpc=mpc_force_r, skip=skip)
+                                         b_orient=b_orient, fr_mpc=fmpc_r, skip=skip)
 
             # receive disturbance torques
             dist_tau_l = self.contact_left.disturbance_torque(Mq=self.controller_left.Mq,

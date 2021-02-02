@@ -106,17 +106,12 @@ class Rpc:
     def rpcontrol(self, b_orient, rz_phi, x_in, x_ref, s_phi_1, s_phi_2, pf_l, pf_r):
 
         # vector from CoM to hip in global frame (should just use body frame?)
-        rh_l_g = np.dot(b_orient, self.rh_l)  # TODO: Change to b_orient?
+        rh_l_g = np.dot(b_orient, self.rh_l)  # TODO: should this still be rz_phi?
         rh_r_g = np.dot(b_orient, self.rh_r)
 
         # actual initial footstep position vector from CoM to end effector in global coords
-        # the last array just transfers the coord system from hip to global
-        pf_1_i = pf_l + rh_l_g + x_in[1] + np.array([0, 0, 0.8325])
-        pf_2_i = pf_r + rh_r_g + x_in[1] + np.array([0, 0, 0.8325])
-
-        # desired footstep position in global coords
-        # r_l = x_in[1] + r_1
-        # r_r = x_in[1] + r_2
+        pf_1_i = pf_l - rh_l_g + x_in[3:6]  # + np.array([0, 0, 0.8325])  # TODO: Check math
+        pf_2_i = pf_r - rh_r_g + x_in[3:6]  # + np.array([0, 0, 0.8325])
 
         # inertia matrix inverse
         i_global = np.dot(np.dot(rz_phi, self.inertia), rz_phi.T)  # TODO: Check
@@ -330,6 +325,7 @@ class Rpc:
 
         zg = 0  # estimated ground height, for terrain perception. Currently zero bc there is no terrain perception
         # add additional constraints
+
         for k in range(0, self.N):
             # Foot placed on ground (=0)
             constr = cs.vertcat(constr, s_phi_1[k] * (zg - pf_1[2, k]))
@@ -343,25 +339,26 @@ class Rpc:
         for k in range(0, self.N):
             # Kinematic leg limits (<=0)
             # TODO: p.71 should it really be - rh, or + rh?
-            # constr = cs.vertcat(constr, s_phi_1[k] * (cs.norm_2(u[0:3, k] + self.rh_l) - x[5, k] / np.cos(self.beta)))
-            # constr = cs.vertcat(constr, s_phi_2[k] * (cs.norm_2(u[6:9, k] + self.rh_r) - x[5, k] / np.cos(self.beta)))
+            # constr = cs.vertcat(constr, s_phi_1[k] * (cs.norm_2(u[0:3, k] - self.rh_l) - x[5, k] * np.tan(self.beta)))
+            # constr = cs.vertcat(constr, s_phi_2[k] * (cs.norm_2(u[6:9, k] - self.rh_r) - x[5, k] * np.tan(self.beta)))
             # Positive ground force normal (<=0)
             constr = cs.vertcat(constr, -s_phi_1[k] * u[3:6, k] * ground)
             constr = cs.vertcat(constr, -s_phi_2[k] * u[9:12, k] * ground)
             # Lateral Force Friction Pyramids (<=0)
-            constr = cs.vertcat(constr, u[3, k] - self.mu * u[2, k])  # f1x - mu*f1z
-            constr = cs.vertcat(constr, -u[3, k] - self.mu * u[2, k])  # -f1x - mu*f1z
+            constr = cs.vertcat(constr, u[3, k] - self.mu * u[5, k])  # f1x - mu*f1z
+            constr = cs.vertcat(constr, -u[3, k] - self.mu * u[5, k])  # -f1x - mu*f1z
 
-            constr = cs.vertcat(constr, u[4, k] - self.mu * u[2, k])  # f1y - mu*f1z
-            constr = cs.vertcat(constr, -u[4, k] - self.mu * u[2, k])  # -f1y - mu*f1z
+            constr = cs.vertcat(constr, u[4, k] - self.mu * u[5, k])  # f1y - mu*f1z
+            constr = cs.vertcat(constr, -u[4, k] - self.mu * u[5, k])  # -f1y - mu*f1z
 
-            constr = cs.vertcat(constr, u[9, k] - self.mu * u[5, k])  # f2x - mu*f2z
-            constr = cs.vertcat(constr, -u[9, k] - self.mu * u[5, k])  # -f2x - mu*f2z
+            constr = cs.vertcat(constr, u[9, k] - self.mu * u[11, k])  # f2x - mu*f2z
+            constr = cs.vertcat(constr, -u[9, k] - self.mu * u[11, k])  # -f2x - mu*f2z
 
-            constr = cs.vertcat(constr, u[10, k] - self.mu * u[5, k])  # f2y - mu*f2z
-            constr = cs.vertcat(constr, -u[10, k] - self.mu * u[5, k])  # -f2y - mu*f2z
+            constr = cs.vertcat(constr, u[10, k] - self.mu * u[11, k])  # f2y - mu*f2z
+            constr = cs.vertcat(constr, -u[10, k] - self.mu * u[11, k])  # -f2y - mu*f2z
 
         st_len = n_states * (self.N + 1)
+
         ct_len = n_controls * self.N
         opt_variables = cs.vertcat(cs.reshape(x, st_len, 1),
                                    cs.reshape(u, ct_len, 1))
@@ -380,16 +377,16 @@ class Rpc:
         # IC + dynamics + foot equality constraint
         lbg[0:len_eq] = itertools.repeat(0, len_eq)  # set lower limit of equality constraints to zero
         ubg = list(itertools.repeat(0, c_length))  # default upper limit of inequality constraints is zero
-        """
+
         # upper and lower bounds for optimization variables
-        lbx = list(itertools.repeat(-1e10, o_length-1))  # input inequality constraints
+        lbx = list(itertools.repeat(-1e10, o_length))  # input inequality constraints
         lbx[0:st_len:n_states] = itertools.repeat(-np.pi / 4, self.N + 1)  # set lower limit of pitch
         lbx[1:st_len:n_states] = itertools.repeat(-np.pi / 4, self.N + 1)  # set lower limit of roll
         lbx[5:st_len:n_states] = itertools.repeat(0.5, self.N + 1)  # set lower limit of p_z
         lbx[st_len + 0::n_controls] = itertools.repeat(-0.5, self.N)  # set lower limit of r1_x
-        lbx[st_len + 1::n_controls] = itertools.repeat(-0.25, self.N)  # set lower limit of r1_y
+        lbx[st_len + 1::n_controls] = itertools.repeat(-0.25, self.N)  # set lower limit of r1_y  # TODO: Check CAD
         lbx[st_len + 2::n_controls] = itertools.repeat(-0.9, self.N)  # set lower limit of r1_z
-        lbx[st_len + 3::n_controls] = itertools.repeat(0, self.N)  # set lower limit of f1_x 0
+        lbx[st_len + 3::n_controls] = itertools.repeat(0, self.N)  # set lower limit of f1_x
         lbx[st_len + 4::n_controls] = itertools.repeat(0, self.N)  # set lower limit of f1_y
         lbx[st_len + 5::n_controls] = itertools.repeat(0, self.N)  # set lower limit of f1_z
         lbx[st_len + 6::n_controls] = itertools.repeat(-0.5, self.N)  # set lower limit of r2_x
@@ -403,37 +400,17 @@ class Rpc:
         ubx[0:st_len:n_states] = itertools.repeat(np.pi / 4, self.N + 1)  # set upper limit of pitch
         ubx[1:st_len:n_states] = itertools.repeat(np.pi / 4, self.N + 1)  # set upper limit of roll
         ubx[st_len + 0::n_controls] = itertools.repeat(0.5, self.N)  # set upper limit of r1_x
-        ubx[st_len + 1::n_controls] = itertools.repeat(0.25, self.N)  # set upper limit of r1_y
+        ubx[st_len + 1::n_controls] = itertools.repeat(0.5, self.N)  # set upper limit of r1_y
         ubx[st_len + 2::n_controls] = itertools.repeat(-0.4, self.N)  # set upper limit of r1_z
         ubx[st_len + 3::n_controls] = itertools.repeat(200, self.N)  # set upper limit of f1_x
         ubx[st_len + 4::n_controls] = itertools.repeat(200, self.N)  # set upper limit of f1_y
         ubx[st_len + 5::n_controls] = itertools.repeat(200, self.N)  # set upper limit of f1_z
         ubx[st_len + 6::n_controls] = itertools.repeat(0.5, self.N)  # set upper limit of r2_x
-        ubx[st_len + 7::n_controls] = itertools.repeat(0.5, self.N)  # set upper limit of r2_y
-        ubx[st_len + 8::n_controls] = itertools.repeat(-0.5, self.N)  # set upper limit of r2_z
+        ubx[st_len + 7::n_controls] = itertools.repeat(0.25, self.N)  # set upper limit of r2_y
+        ubx[st_len + 8::n_controls] = itertools.repeat(-0.4, self.N)  # set upper limit of r2_z
         ubx[st_len + 9::n_controls] = itertools.repeat(200, self.N)  # set upper limit of f2_x
         ubx[st_len + 10::n_controls] = itertools.repeat(200, self.N)  # set upper limit of f2_y
         ubx[st_len + 11::n_controls] = itertools.repeat(200, self.N)  # set upper limit of f2_z
-        """
-        # upper and lower bounds for optimization variables
-        lbx = list(itertools.repeat(-1e10, o_length))  # input inequality constraints
-        lbx[0:st_len:n_states] = itertools.repeat(-np.pi / 4, self.N + 1)  # set lower limit of pitch
-        lbx[1:st_len:n_states] = itertools.repeat(-np.pi / 4, self.N + 1)  # set lower limit of roll
-        lbx[5:st_len:n_states] = itertools.repeat(207, self.N + 1)  # set lower limit of p_z
-        lbx[st_len + 0::n_controls] = itertools.repeat(207, self.N)  # set lower limit of r1_x
-        lbx[st_len + 1::n_controls] = itertools.repeat(202, self.N)  # set lower limit of r1_y
-        lbx[st_len + 2::n_controls] = itertools.repeat(203, self.N)  # set lower limit of r1_z
-        lbx[st_len + 3::n_controls] = itertools.repeat(101, self.N)  # set lower limit of f1_x 0
-        lbx[st_len + 4::n_controls] = itertools.repeat(102, self.N)  # set lower limit of f1_y
-        lbx[st_len + 5::n_controls] = itertools.repeat(103, self.N)  # set lower limit of f1_z
-        lbx[st_len + 6::n_controls] = itertools.repeat(204, self.N)  # set lower limit of r2_x
-        lbx[st_len + 7::n_controls] = itertools.repeat(205, self.N)  # set lower limit of r2_y
-        lbx[st_len + 8::n_controls] = itertools.repeat(206, self.N)  # set lower limit of r2_z
-        lbx[st_len + 9::n_controls] = itertools.repeat(104, self.N)  # set lower limit of f2_x
-        lbx[st_len + 10::n_controls] = itertools.repeat(105, self.N)  # set lower limit of f2_y
-        lbx[st_len + 11::n_controls] = itertools.repeat(106, self.N)  # set lower limit of f2_z
-
-        ubx = list(itertools.repeat(1e10, o_length))  # input inequality constraints
 
         # setup is finished, now solve-------------------------------------------------------------------------------- #
 
@@ -449,12 +426,15 @@ class Rpc:
         sol = solver(x0=x0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg, p=parameters)
 
         solu = np.array(sol['x'][st_len:])
-        u = np.reshape(solu.T, (n_controls, self.N)).T  # get controls from the solution
-
-        u_cl = u[0, :]  # ignore rows other than new first row
+        u = np.reshape(solu.T, (self.N, n_controls)).T  # get controls from the solution
+        # print("u = ", u)
+        u_cl = u[:, 0]  # ignore columns other than new first column
+        print("u_cl = ", u_cl)
+        r_l = u_cl[0:3] + rh_l_g  # convert back to hip coord sys
+        fmpc_l = u_cl[3:6]
+        r_r = u_cl[6:9] + rh_r_g  # convert back to hip coord sys
+        fmpc_r = u_cl[9:12]
+        # print("Time elapsed for MPC: ", t1 - t0)
         # ss_error = np.linalg.norm(x0 - x_ref)  # defaults to Euclidean norm
         # print("ss_error = ", ss_error)
-
-        # print("Time elapsed for MPC: ", t1 - t0)
-
-        return u_cl
+        return r_l, fmpc_l, r_r, fmpc_r
