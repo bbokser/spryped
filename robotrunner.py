@@ -63,17 +63,20 @@ class Runner:
         self.state_right = statemachine.Char()
 
         # gait scheduler values
-        self.target_init = np.array([0, 0, -0.8325])  # , self.init_alpha, self.init_beta, self.init_gamma])
+        self.target_init = np.array([0, 0, -0.8325])  # , self.init_alpha, self.init_beta, self.init_gamma]) # from hip
         self.target_l = self.target_init[:]
         self.target_r = self.target_init[:]
         self.sh_l = 1  # estimated contact state (left)
         self.sh_r = 1  # estimated contact state (right)
         self.dist_force_l = np.array([0, 0, 0])
         self.dist_force_r = np.array([0, 0, 0])
-        self.t_p = 0.5  # gait period, seconds
-        self.N = 10  # mpc prediction horizon
+        self.t_p = 0.5  # initial gait period, seconds
+        self.mpc_dt = 0.025  # mpc sampling time (s)
+        self.N = int(self.t_p*2/self.mpc_dt)  # mpc prediction horizon
+        
         self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Percentage of gait spent in contact.
-        self.force = rpc.Rpc(dt=dt, phi_switch=self.phi_switch, n=self.N)
+        self.height = 0.7967  # starting height of CoM from ground, must be positive  # TODO: Check with model
+        self.force = rpc.Rpc(mpc_dt=self.mpc_dt, height=self.height, phi_switch=self.phi_switch, n=self.N)
         self.gait_left = gait.Gait(controller=self.controller_left, robotleg=self.leg_left,
                                    t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
         self.gait_right = gait.Gait(controller=self.controller_right, robotleg=self.leg_right,
@@ -84,7 +87,8 @@ class Runner:
         # footstep planner values
         self.omega_d = np.array([0, 0, 0])  # desired angular acceleration for footstep planner
         self.k_f = 0.15  # Raibert heuristic gain
-        self.h = np.array([0, 0, 0.8325])  # height, assumed to be constant
+        self.k_f = 0.15  # Raibert heuristic gain
+
         self.r_l = np.array([0, 0, -0.8325])  # initial footstep planning position
         self.r_r = np.array([0, 0, -0.8325])  # initial footstep planning position
 
@@ -96,7 +100,7 @@ class Runner:
 
         steps = 0
         t = 0  # time
-        p = np.array([0, 0, 0.8325])  # initialize body position
+        p = np.array([0, 0, self.height])  # initialize body position
 
         t0_l = t  # starting time, left leg
         t0_r = t0_l + self.t_p / 2  # starting time, right leg. Half a period out of phase with left
@@ -108,8 +112,7 @@ class Runner:
 
         mpc_force_l = np.zeros(6)
         mpc_force_r = mpc_force_l
-        mpc_dt = 0.025  # mpc period
-        mpc_factor = mpc_dt / self.dt  # repeat mpc every x seconds
+        mpc_factor = self.mpc_dt / self.dt  # repeat mpc every x seconds
         mpc_counter = mpc_factor
         skip = False
         t_prev = time.clock()
@@ -174,22 +177,12 @@ class Runner:
             rz_phi[1, 0] = -sin_phi
             rz_phi[1, 1] = cos_phi
             rz_phi[2, 2] = 1
-            """
-            if state_l == ('stance' or 'early'):
-                contact_l = True
-            else:
-                contact_l = False
 
-            if state_r == ('stance' or 'early'):
-                contact_r = True
-            else:
-                contact_r = False
-            """
             omega = np.array(self.simulator.omega_xyz)
 
             x_in = np.hstack([theta, p, omega, pdot]).T  # array of the states for MPC
-            print(x_in[5])
-            x_ref = np.array([0, 0, 0, 0, 0, 0.8325, 0, 0, 0, 0, 0, 0]).T  # reference pose (desired)
+
+            x_ref = np.array([0, 0, 0, 0, 0, self.height, 0, 0, 0, 0, 0, 0]).T  # reference pose (desired)
 
             schedule_l = np.zeros(((self.N + 1), 1))
             schedule_r = np.zeros(((self.N + 1), 1))
@@ -203,8 +196,10 @@ class Runner:
                         schedule_l[k] = self.gait_scheduler(t=ts, t0=t0_l)
                         schedule_r[k] = self.gait_scheduler(t=ts, t0=t0_r)
                         ts = ts + k * self.dt
-                    mpc_result = self.force.rpcontrol(rz_phi=rz_phi, x_in=x_in, x_ref=x_ref, s_phi_1=schedule_l,
-                                                      s_phi_2=schedule_r, pf_l=pos_l, pf_r=pos_r)
+                    pf_l = np.dot(b_orient, pos_l)
+                    pf_r = np.dot(b_orient, pos_r)
+                    mpc_result = self.force.rpcontrol(b_orient=b_orient, rz_phi=rz_phi, x_in=x_in, x_ref=x_ref,
+                                                      s_phi_1=schedule_l, s_phi_2=schedule_r, pf_l=pf_l, pf_r=pf_r)
                     self.r_l = mpc_result[0:3]
                     mpc_force_l = mpc_result[3:6]
                     self.r_r = mpc_result[6:9]
@@ -260,9 +255,6 @@ class Runner:
 
             # tau_d_left = self.contact_left.contact(leg=self.leg_left, g=self.leg_left.grav)
 
-            # fw kinematics
-            # print(np.transpose(np.append(np.dot(b_orient, self.leg_left.position()[:, -1]),
-            #                              np.dot(b_orient, self.leg_right.position()[:, -1]))))
             # joint velocity
             # print("vel = ", self.leg_left.velocity())
             # encoder feedback

@@ -30,6 +30,8 @@ import csv
 import itertools
 
 import casadi as cs
+
+
 # import transforms3d
 
 
@@ -57,10 +59,10 @@ def e2mat(x, y, z):
 
 class Rpc:
 
-    def __init__(self, phi_switch, n, **kwargs):
+    def __init__(self, mpc_dt, height, phi_switch, n, **kwargs):
 
         self.u = np.zeros((4, 1))  # control signal
-        self.dt = 0.025  # sampling time (s)
+        self.dt = mpc_dt  # sampling time (s)
         self.N = n  # prediction horizon
         # horizon length = self.dt*self.N = .25 seconds
         self.mass = float(12.12427)  # kg
@@ -97,17 +99,18 @@ class Rpc:
 
         self.rh_r = np.array([.14397, .13519, .03581])  # vector from CoM to hip in the body frame
         self.rh_l = np.array([-.14397, .13519, .03581])  # vector from CoM to hip in the body frame
-        self.height = 0.8325  # height of CoM from ground, must be positive
+        self.height = height  # height of CoM from ground, must be positive  # TODO: Check with model
         self.beta = np.pi * 45 / 180  # max kinematic leg angle allowed
         self.pdot_d = np.array([0, 0, 0])  # desired movement speed
 
-    def rpcontrol(self, rz_phi, x_in, x_ref, s_phi_1, s_phi_2, pf_l, pf_r):
+    def rpcontrol(self, b_orient, rz_phi, x_in, x_ref, s_phi_1, s_phi_2, pf_l, pf_r):
 
         # vector from CoM to hip in global frame (should just use body frame?)
-        rh_l_g = np.dot(rz_phi, self.rh_l)  # TODO: Change to b_orient?
-        rh_r_g = np.dot(rz_phi, self.rh_r)
+        rh_l_g = np.dot(b_orient, self.rh_l)  # TODO: Change to b_orient?
+        rh_r_g = np.dot(b_orient, self.rh_r)
 
         # actual initial footstep position vector from CoM to end effector in global coords
+        # the last array just transfers the coord system from hip to global
         pf_1_i = pf_l + rh_l_g + x_in[1] + np.array([0, 0, 0.8325])
         pf_2_i = pf_r + rh_r_g + x_in[1] + np.array([0, 0, 0.8325])
 
@@ -170,7 +173,7 @@ class Rpc:
         dt = self.dt
         m = self.mass
         dt2 = 0.5 * (dt ** 2)
-        
+
         x_states = cs.SX(np.array([theta_x, theta_y, theta_z,
                                    p_x, p_y, p_z,
                                    omega_x, omega_y, omega_z,
@@ -319,10 +322,12 @@ class Rpc:
 
         # footstep positions transferred from body (r_i) to world (p_i) coordinates
         pf_1 = cs.horzcat(pf_1_i, u[0:3, 0:self.N] + x[0:3, 0:self.N])  # TODO: Replace first value or append?
+        # pf_1 = u[0:3, 0:self.N] + x[0:3, 0:self.N]
         # pf_1[:, 0] = pf_1_i
         pf_2 = cs.horzcat(pf_2_i, u[6:9, 0:self.N] + x[6:9, 0:self.N])  # 3x11
+        # pf_2 = u[6:9, 0:self.N] + x[6:9, 0:self.N]
         # pf_2[:, 0] = pf_2_i
-        
+
         zg = 0  # estimated ground height, for terrain perception. Currently zero bc there is no terrain perception
         # add additional constraints
         for k in range(0, self.N):
@@ -337,10 +342,9 @@ class Rpc:
 
         for k in range(0, self.N):
             # Kinematic leg limits (<=0)
-            constr = cs.vertcat(constr, s_phi_1[k] * (cs.norm_1(u[0:3, k] - self.rh_l)
-                                                      - x[5, k] * np.tan(self.beta)))
-            constr = cs.vertcat(constr, s_phi_2[k] * (cs.norm_1(u[6:9, k] - self.rh_r)
-                                                      - x[5, k] * np.tan(self.beta)))
+            # TODO: p.71 should it really be - rh, or + rh?
+            constr = cs.vertcat(constr, s_phi_1[k] * (cs.norm_2(u[0:3, k] + self.rh_l) - x[5, k] / np.cos(self.beta)))
+            constr = cs.vertcat(constr, s_phi_2[k] * (cs.norm_2(u[6:9, k] + self.rh_r) - x[5, k] / np.cos(self.beta)))
             # Positive ground force normal (<=0)
             constr = cs.vertcat(constr, -s_phi_1[k] * u[3:6, k] * ground)
             constr = cs.vertcat(constr, -s_phi_2[k] * u[9:12, k] * ground)
@@ -360,9 +364,9 @@ class Rpc:
         opt_variables = cs.vertcat(cs.reshape(x, n_states * (self.N + 1), 1),
                                    cs.reshape(u, n_controls * self.N, 1))
         nlp_prob = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
-        opts = {'print_time': 0, 'error_on_fail': 0, 'ipopt.print_level': 0, 'ipopt.acceptable_tol': 1e-6,
-                'ipopt.acceptable_obj_change_tol': 1e-6, "verbose": False}
-                # "ipopt.hessian_approximation": "limited-memory"}
+        opts = {'print_time': 0, 'error_on_fail': 0, 'ipopt.print_level': 0, 'ipopt.acceptable_tol': 1e-3,
+                'ipopt.acceptable_obj_change_tol': 1e-3, "verbose": False}
+        # "ipopt.hessian_approximation": "limited-memory"}
         solver = cs.nlpsol('solver', 'ipopt', nlp_prob, opts)
 
         c_length = np.shape(constr)[0]
@@ -376,10 +380,12 @@ class Rpc:
 
         # upper and lower bounds for optimization variables
         lbx = list(itertools.repeat(-1e10, o_length))  # input inequality constraints
-        lbx[0:2] = itertools.repeat(-np.pi / 4, 2)  # set lower limit of pitch and roll to -pi/4
-        lbx[5] = 0.5  # set lower limit of p_z to something reasonable, otherwise NaN errors can occur
+        lbx[0:(n_states * (self.N + 1)):n_states] = itertools.repeat(-np.pi / 4, self.N + 1)  # set lower limit of pitch
+        lbx[1:(n_states * (self.N + 1)):n_states] = itertools.repeat(-np.pi / 4, self.N + 1)  # set lower limit of roll
+        lbx[5:(n_states * (self.N + 1)):n_states] = itertools.repeat(0.5, self.N + 1)  # set lower limit of p_z
         ubx = list(itertools.repeat(1e10, o_length))  # input inequality constraints
-        ubx[0:2] = itertools.repeat(np.pi / 4, 2)  # set upper limit of pitch and roll to -pi/4
+        ubx[0:(n_states * (self.N + 1)):n_states] = itertools.repeat(np.pi / 4, self.N + 1)  # set upper limit of pitch
+        ubx[1:(n_states * (self.N + 1)):n_states] = itertools.repeat(np.pi / 4, self.N + 1)  # set upper limit of roll
         # st_len = n_states * (self.N + 1)
 
         # lbx[(st_len + 2)::3] = [0 for i in range(40)]  # lower bound on all f1z and f2z Should be fixed
