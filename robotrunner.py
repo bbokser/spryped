@@ -73,7 +73,7 @@ class Runner:
         self.t_p = 0.5  # initial gait period, seconds
         self.mpc_dt = 0.025  # mpc sampling time (s)
         self.N = int(self.t_p*2/self.mpc_dt)  # mpc prediction horizon
-        
+
         self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Percentage of gait spent in contact.
         self.height = 0.7967  # starting height of CoM from ground, must be positive  # TODO: Check with model
         self.force = rpc.Rpc(mpc_dt=self.mpc_dt, height=self.height, phi_switch=self.phi_switch, n=self.N)
@@ -204,6 +204,10 @@ class Runner:
                     mpc_force_l = mpc_result[3:6]
                     self.r_r = mpc_result[6:9]
                     mpc_force_r = mpc_result[9:12]
+                    print("r_l =", self.r_l)
+                    print("f_l =", mpc_force_l)
+                    print("r_r =", self.r_r)
+                    print("f_r =", mpc_force_r)
                     skip = False
                 else:
                     skip = True  # tells gait ctrlr to default to position control.

@@ -343,26 +343,29 @@ class Rpc:
         for k in range(0, self.N):
             # Kinematic leg limits (<=0)
             # TODO: p.71 should it really be - rh, or + rh?
-            constr = cs.vertcat(constr, s_phi_1[k] * (cs.norm_2(u[0:3, k] + self.rh_l) - x[5, k] / np.cos(self.beta)))
-            constr = cs.vertcat(constr, s_phi_2[k] * (cs.norm_2(u[6:9, k] + self.rh_r) - x[5, k] / np.cos(self.beta)))
+            # constr = cs.vertcat(constr, s_phi_1[k] * (cs.norm_2(u[0:3, k] + self.rh_l) - x[5, k] / np.cos(self.beta)))
+            # constr = cs.vertcat(constr, s_phi_2[k] * (cs.norm_2(u[6:9, k] + self.rh_r) - x[5, k] / np.cos(self.beta)))
             # Positive ground force normal (<=0)
             constr = cs.vertcat(constr, -s_phi_1[k] * u[3:6, k] * ground)
             constr = cs.vertcat(constr, -s_phi_2[k] * u[9:12, k] * ground)
             # Lateral Force Friction Pyramids (<=0)
-            constr = cs.vertcat(constr, u[0, k] - self.mu * u[2, k])  # f1x - mu*f1z
-            constr = cs.vertcat(constr, -u[0, k] - self.mu * u[2, k])  # -f1x - mu*f1z
+            constr = cs.vertcat(constr, u[3, k] - self.mu * u[2, k])  # f1x - mu*f1z
+            constr = cs.vertcat(constr, -u[3, k] - self.mu * u[2, k])  # -f1x - mu*f1z
 
-            constr = cs.vertcat(constr, u[1, k] - self.mu * u[2, k])  # f1y - mu*f1z
-            constr = cs.vertcat(constr, -u[1, k] - self.mu * u[2, k])  # -f1y - mu*f1z
+            constr = cs.vertcat(constr, u[4, k] - self.mu * u[2, k])  # f1y - mu*f1z
+            constr = cs.vertcat(constr, -u[4, k] - self.mu * u[2, k])  # -f1y - mu*f1z
 
-            constr = cs.vertcat(constr, u[3, k] - self.mu * u[5, k])  # f2x - mu*f2z
-            constr = cs.vertcat(constr, -u[3, k] - self.mu * u[5, k])  # -f2x - mu*f2z
+            constr = cs.vertcat(constr, u[9, k] - self.mu * u[5, k])  # f2x - mu*f2z
+            constr = cs.vertcat(constr, -u[9, k] - self.mu * u[5, k])  # -f2x - mu*f2z
 
-            constr = cs.vertcat(constr, u[4, k] - self.mu * u[5, k])  # f2y - mu*f2z
-            constr = cs.vertcat(constr, -u[4, k] - self.mu * u[5, k])  # -f2y - mu*f2z
+            constr = cs.vertcat(constr, u[10, k] - self.mu * u[5, k])  # f2y - mu*f2z
+            constr = cs.vertcat(constr, -u[10, k] - self.mu * u[5, k])  # -f2y - mu*f2z
 
-        opt_variables = cs.vertcat(cs.reshape(x, n_states * (self.N + 1), 1),
-                                   cs.reshape(u, n_controls * self.N, 1))
+        st_len = n_states * (self.N + 1)
+        ct_len = n_controls * self.N
+        opt_variables = cs.vertcat(cs.reshape(x, st_len, 1),
+                                   cs.reshape(u, ct_len, 1))
+
         nlp_prob = {'x': opt_variables, 'f': obj, 'g': constr, 'p': st_ref}
         opts = {'print_time': 0, 'error_on_fail': 0, 'ipopt.print_level': 0, 'ipopt.acceptable_tol': 1e-3,
                 'ipopt.acceptable_obj_change_tol': 1e-3, "verbose": False}
@@ -377,18 +380,60 @@ class Rpc:
         # IC + dynamics + foot equality constraint
         lbg[0:len_eq] = itertools.repeat(0, len_eq)  # set lower limit of equality constraints to zero
         ubg = list(itertools.repeat(0, c_length))  # default upper limit of inequality constraints is zero
+        """
+        # upper and lower bounds for optimization variables
+        lbx = list(itertools.repeat(-1e10, o_length-1))  # input inequality constraints
+        lbx[0:st_len:n_states] = itertools.repeat(-np.pi / 4, self.N + 1)  # set lower limit of pitch
+        lbx[1:st_len:n_states] = itertools.repeat(-np.pi / 4, self.N + 1)  # set lower limit of roll
+        lbx[5:st_len:n_states] = itertools.repeat(0.5, self.N + 1)  # set lower limit of p_z
+        lbx[st_len + 0::n_controls] = itertools.repeat(-0.5, self.N)  # set lower limit of r1_x
+        lbx[st_len + 1::n_controls] = itertools.repeat(-0.25, self.N)  # set lower limit of r1_y
+        lbx[st_len + 2::n_controls] = itertools.repeat(-0.9, self.N)  # set lower limit of r1_z
+        lbx[st_len + 3::n_controls] = itertools.repeat(0, self.N)  # set lower limit of f1_x 0
+        lbx[st_len + 4::n_controls] = itertools.repeat(0, self.N)  # set lower limit of f1_y
+        lbx[st_len + 5::n_controls] = itertools.repeat(0, self.N)  # set lower limit of f1_z
+        lbx[st_len + 6::n_controls] = itertools.repeat(-0.5, self.N)  # set lower limit of r2_x
+        lbx[st_len + 7::n_controls] = itertools.repeat(-0.5, self.N)  # set lower limit of r2_y
+        lbx[st_len + 8::n_controls] = itertools.repeat(-0.9, self.N)  # set lower limit of r2_z
+        lbx[st_len + 9::n_controls] = itertools.repeat(0, self.N)  # set lower limit of f2_x
+        lbx[st_len + 10::n_controls] = itertools.repeat(0, self.N)  # set lower limit of f2_y
+        lbx[st_len + 11::n_controls] = itertools.repeat(0, self.N)  # set lower limit of f2_z
 
+        ubx = list(itertools.repeat(1e10, o_length))  # input inequality constraints
+        ubx[0:st_len:n_states] = itertools.repeat(np.pi / 4, self.N + 1)  # set upper limit of pitch
+        ubx[1:st_len:n_states] = itertools.repeat(np.pi / 4, self.N + 1)  # set upper limit of roll
+        ubx[st_len + 0::n_controls] = itertools.repeat(0.5, self.N)  # set upper limit of r1_x
+        ubx[st_len + 1::n_controls] = itertools.repeat(0.25, self.N)  # set upper limit of r1_y
+        ubx[st_len + 2::n_controls] = itertools.repeat(-0.4, self.N)  # set upper limit of r1_z
+        ubx[st_len + 3::n_controls] = itertools.repeat(200, self.N)  # set upper limit of f1_x
+        ubx[st_len + 4::n_controls] = itertools.repeat(200, self.N)  # set upper limit of f1_y
+        ubx[st_len + 5::n_controls] = itertools.repeat(200, self.N)  # set upper limit of f1_z
+        ubx[st_len + 6::n_controls] = itertools.repeat(0.5, self.N)  # set upper limit of r2_x
+        ubx[st_len + 7::n_controls] = itertools.repeat(0.5, self.N)  # set upper limit of r2_y
+        ubx[st_len + 8::n_controls] = itertools.repeat(-0.5, self.N)  # set upper limit of r2_z
+        ubx[st_len + 9::n_controls] = itertools.repeat(200, self.N)  # set upper limit of f2_x
+        ubx[st_len + 10::n_controls] = itertools.repeat(200, self.N)  # set upper limit of f2_y
+        ubx[st_len + 11::n_controls] = itertools.repeat(200, self.N)  # set upper limit of f2_z
+        """
         # upper and lower bounds for optimization variables
         lbx = list(itertools.repeat(-1e10, o_length))  # input inequality constraints
-        lbx[0:(n_states * (self.N + 1)):n_states] = itertools.repeat(-np.pi / 4, self.N + 1)  # set lower limit of pitch
-        lbx[1:(n_states * (self.N + 1)):n_states] = itertools.repeat(-np.pi / 4, self.N + 1)  # set lower limit of roll
-        lbx[5:(n_states * (self.N + 1)):n_states] = itertools.repeat(0.5, self.N + 1)  # set lower limit of p_z
-        ubx = list(itertools.repeat(1e10, o_length))  # input inequality constraints
-        ubx[0:(n_states * (self.N + 1)):n_states] = itertools.repeat(np.pi / 4, self.N + 1)  # set upper limit of pitch
-        ubx[1:(n_states * (self.N + 1)):n_states] = itertools.repeat(np.pi / 4, self.N + 1)  # set upper limit of roll
-        # st_len = n_states * (self.N + 1)
+        lbx[0:st_len:n_states] = itertools.repeat(-np.pi / 4, self.N + 1)  # set lower limit of pitch
+        lbx[1:st_len:n_states] = itertools.repeat(-np.pi / 4, self.N + 1)  # set lower limit of roll
+        lbx[5:st_len:n_states] = itertools.repeat(207, self.N + 1)  # set lower limit of p_z
+        lbx[st_len + 0::n_controls] = itertools.repeat(207, self.N)  # set lower limit of r1_x
+        lbx[st_len + 1::n_controls] = itertools.repeat(202, self.N)  # set lower limit of r1_y
+        lbx[st_len + 2::n_controls] = itertools.repeat(203, self.N)  # set lower limit of r1_z
+        lbx[st_len + 3::n_controls] = itertools.repeat(101, self.N)  # set lower limit of f1_x 0
+        lbx[st_len + 4::n_controls] = itertools.repeat(102, self.N)  # set lower limit of f1_y
+        lbx[st_len + 5::n_controls] = itertools.repeat(103, self.N)  # set lower limit of f1_z
+        lbx[st_len + 6::n_controls] = itertools.repeat(204, self.N)  # set lower limit of r2_x
+        lbx[st_len + 7::n_controls] = itertools.repeat(205, self.N)  # set lower limit of r2_y
+        lbx[st_len + 8::n_controls] = itertools.repeat(206, self.N)  # set lower limit of r2_z
+        lbx[st_len + 9::n_controls] = itertools.repeat(104, self.N)  # set lower limit of f2_x
+        lbx[st_len + 10::n_controls] = itertools.repeat(105, self.N)  # set lower limit of f2_y
+        lbx[st_len + 11::n_controls] = itertools.repeat(106, self.N)  # set lower limit of f2_z
 
-        # lbx[(st_len + 2)::3] = [0 for i in range(40)]  # lower bound on all f1z and f2z Should be fixed
+        ubx = list(itertools.repeat(1e10, o_length))  # input inequality constraints
 
         # setup is finished, now solve-------------------------------------------------------------------------------- #
 
@@ -398,12 +443,12 @@ class Rpc:
         # parameters and xin must be changed every timestep
         parameters = cs.vertcat(x_in, x_ref)  # set values of parameters vector
         # init value of optimization variables
-        x0 = cs.vertcat(np.reshape(X0.T, (n_states * (self.N + 1), 1)),
-                        np.reshape(u0.T, (n_controls * self.N, 1)))
+        x0 = cs.vertcat(np.reshape(X0.T, (st_len, 1)),
+                        np.reshape(u0.T, (ct_len, 1)))
 
         sol = solver(x0=x0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg, p=parameters)
 
-        solu = np.array(sol['x'][n_states * (self.N + 1):])
+        solu = np.array(sol['x'][st_len:])
         u = np.reshape(solu.T, (n_controls, self.N)).T  # get controls from the solution
 
         u_cl = u[0, :]  # ignore rows other than new first row
@@ -411,5 +456,5 @@ class Rpc:
         # print("ss_error = ", ss_error)
 
         # print("Time elapsed for MPC: ", t1 - t0)
-        print(u_cl)
+
         return u_cl
