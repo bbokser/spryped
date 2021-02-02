@@ -258,7 +258,8 @@ class Mpc:
         st_len = n_states * (self.N + 1)
 
         lbx[(st_len + 2)::3] = [0 for i in range(20)]  # lower bound on all f1z and f2z
-
+        ubx[(n_states * (self.N + 1) + 2)::6] = [6 for i in range(10)]  # upper bound on all f1z
+        ubx[(n_states * (self.N + 1) + 5)::6] = [6 for i in range(10)]  # upper bound on all f2z
         if c_l == 0:  # if left leg is not in contact... don't calculate output forces for that leg.
             ubx[(n_states * (self.N + 1))::6] = [0 for i in range(10)]  # upper bound on all f1x
             ubx[(n_states * (self.N + 1) + 1)::6] = [0 for i in range(10)]  # upper bound on all f1y
@@ -287,12 +288,14 @@ class Mpc:
         sol = solver(x0=x0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg, p=parameters)
 
         solu = np.array(sol['x'][n_states * (self.N + 1):])
-        u = np.reshape(solu.T, (n_controls, self.N)).T  # get controls from the solution
+        # u = np.reshape(solu.T, (n_controls, self.N)).T  # get controls from the solution
+        u = np.reshape(solu.T, (self.N, n_controls)).T  # get controls from the solution
 
-        u_cl = u[0, :]  # ignore rows other than new first row
+        # u_cl = u[0, :]  # ignore rows other than new first row
+        u_cl = u[:, 0]  # ignore rows other than new first row
         # ss_error = np.linalg.norm(x0 - x_ref)  # defaults to Euclidean norm
         # print("ss_error = ", ss_error)
-
+        # print(u_cl)
         # print("Time elapsed for MPC: ", t1 - t0)
 
         return u_cl

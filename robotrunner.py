@@ -61,13 +61,13 @@ class Runner:
 
         # gait scheduler values
         self.target_init = np.array([0, 0, -0.8325])  # , self.init_alpha, self.init_beta, self.init_gamma])
-        self.target_l = self.target_init
-        self.target_r = self.target_init
+        self.target_l = self.target_init[:]
+        self.target_r = self.target_init[:]
         self.sh_l = 1  # estimated contact state (left)
         self.sh_r = 1  # estimated contact state (right)
         self.dist_force_l = np.array([0, 0, 0])
         self.dist_force_r = np.array([0, 0, 0])
-        self.t_p = 0.5  # gait period, seconds
+        self.t_p = 0.5  # gait period, seconds 0.5
         self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Percentage of gait spent in contact.
         self.gait_left = gait.Gait(controller=self.controller_left, robotleg=self.leg_left,
                                    t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
@@ -183,7 +183,7 @@ class Runner:
             omega = np.array(self.simulator.omega_xyz)
 
             x_in = np.hstack([theta, p, omega, pdot]).T  # array of the states for MPC
-
+            # x_ref = np.hstack([np.zeros(3), np.zeros(3), self.omega_d, self.pdot_des]).T
             x_ref = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).T  # reference pose (desired)
 
             if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
@@ -237,7 +237,7 @@ class Runner:
             # qvis.animate(q_e)
             # ----------------------------------------------------------------------------------------- #
 
-            # print(self.dist_force_l[2])
+            print(self.dist_force_l[2], self.dist_force_r[2])
             # print(self.reaction_torques()[0:4])
 
             # tau_d_left = self.contact_left.contact(leg=self.leg_left, g=self.leg_left.grav)
