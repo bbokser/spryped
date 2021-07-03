@@ -82,10 +82,13 @@ class Runner:
         self.h = np.array([0, 0, 0.8325])  # height, assumed to be constant
         self.r_l = np.array([0, 0, -0.8325])  # initial footstep planning position
         self.r_r = np.array([0, 0, -0.8325])  # initial footstep planning position
+        self.rh_r = np.array([.14397, .13519, .03581])  # vector from CoM to hip in the body frame
+        self.rh_l = np.array([-.14397, .13519, .03581])  # vector from CoM to hip in the body frame
 
         self.p = np.array([0, 0, 0])  # initial body position
         self.pdot_des = np.array([0.01, 0.05, 0])  # desired body velocity in world coords
         self.force_control_test = False
+        self.useSimContact = True
 
     def run(self):
 
@@ -121,7 +124,7 @@ class Runner:
             # print(t)
             # run simulator to get encoder and IMU feedback
             # put an if statement here once we have hardware bridge too
-            q, b_orient = self.simulator.sim_run(u_l=self.u_l, u_r=self.u_r)
+            q, b_orient, c1, c2 = self.simulator.sim_run(u_l=self.u_l, u_r=self.u_r)
 
             q_left = q[0:4]
             q_left[1] *= -1
@@ -138,8 +141,18 @@ class Runner:
             # gait scheduler
             s_l = self.gait_scheduler(t, t0_l)
             s_r = self.gait_scheduler(t, t0_r)
-            sh_l = self.gait_estimator(self.dist_force_l[2])
-            sh_r = self.gait_estimator(self.dist_force_r[2])
+
+            if self.useSimContact is True:
+                # cheat by using PyBullet's getContactPoints
+                sh_l = int(c1)
+                sh_r = int(c2)
+                sh_l_i = self.gait_estimator(self.dist_force_l[2])
+                sh_r_i = self.gait_estimator(self.dist_force_r[2])
+                print(sh_l, sh_l_i)
+            else:
+                # force-based contact estimation
+                sh_l = self.gait_estimator(self.dist_force_l[2])
+                sh_r = self.gait_estimator(self.dist_force_r[2])
 
             state_l = self.state_left.FSM.execute(s_l, sh_l)
             state_r = self.state_right.FSM.execute(s_r, sh_r)
@@ -163,7 +176,7 @@ class Runner:
             rz_phi[1, 0] = -s_phi
             rz_phi[1, 1] = c_phi
             rz_phi[2, 2] = 1
-
+            # TODO: what is the point of this?? We already have this in sh_l, sh_r
             if state_l == ('stance' or 'early'):
                 contact_l = True
             else:
@@ -176,7 +189,6 @@ class Runner:
             # print(state_l, state_r)
             if state_l is not 'stance' and prev_state_l is 'stance':
                 self.r_l = self.footstep(robotleg=1, rz_phi=rz_phi, pdot=pdot, pdot_des=self.pdot_des)
-
             if state_r is not 'stance' and prev_state_r is 'stance':
                 self.r_r = self.footstep(robotleg=0, rz_phi=rz_phi, pdot=pdot, pdot_des=self.pdot_des)
 
@@ -188,8 +200,8 @@ class Runner:
 
             if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
-                    mpc_force = self.force.mpcontrol(rz_phi=rz_phi, r1=pos_l, r2=pos_r, x_in=x_in, x_ref=x_ref,
-                                                     c_l=contact_l, c_r=contact_r)
+                    mpc_force = self.force.mpcontrol(b_orient=b_orient, rz_phi=rz_phi, pf_l=pos_l, pf_r=pos_r,
+                                                     x_in=x_in, x_ref=x_ref, c_l=contact_l, c_r=contact_r)
                     # print("force = ", mpc_force)
                     skip = False
                 else:
@@ -203,12 +215,20 @@ class Runner:
                 state_l = 'stance'
                 state_r = 'stance'
                 mpc_force = np.zeros(6)
-
+            '''
+            # vector from CoM to hip in global frame (should just use body frame?)
+            rh_l_g = np.dot(b_orient, self.rh_l)
+            rh_r_g = np.dot(b_orient, self.rh_r)
+            # actual initial footstep position vector from CoM to end effector in global coords
+            pf_1 = pos_l - rh_l_g + p  # + np.array([0, 0, 0.8325])  # TODO: Check math
+            pf_2 = pos_r - rh_r_g + p  # + np.array([0, 0, 0.8325])
+            '''
+            delp = pdot*self.dt
             # calculate wbc control signal
-            self.u_l = self.gait_left.u(state=state_l, prev_state=prev_state_l, r_in=pos_l, r_d=self.r_l,
+            self.u_l = self.gait_left.u(state=state_l, prev_state=prev_state_l, r_in=pos_l, r_d=self.r_l, delp=delp,
                                         b_orient=b_orient, fr_mpc=mpc_force[0:3], skip=skip)
             # just standing for now
-            self.u_r = self.gait_right.u(state=state_r, prev_state=prev_state_r, r_in=pos_r, r_d=self.r_r,
+            self.u_r = self.gait_right.u(state=state_r, prev_state=prev_state_r, r_in=pos_r, r_d=self.r_r, delp=delp,
                                          b_orient=b_orient, fr_mpc=mpc_force[3:], skip=skip)
 
             # receive disturbance torques
@@ -236,8 +256,8 @@ class Runner:
             # q_e = self.controller_left.q_e
             # qvis.animate(q_e)
             # ----------------------------------------------------------------------------------------- #
-
-            print(self.dist_force_l[2], self.dist_force_r[2])
+            # print(state_l, state_r)
+            # print(self.dist_force_l[2], self.dist_force_r[2])
             # print(self.reaction_torques()[0:4])
 
             # tau_d_left = self.contact_left.contact(leg=self.leg_left, g=self.leg_left.grav)

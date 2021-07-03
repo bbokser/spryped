@@ -30,15 +30,18 @@ class Gait:
         self.init_alpha = -np.pi / 2
         self.init_beta = 0  # can't control, ee Jacobian is zeros in that row
         self.init_gamma = 0
+        self.init_angle = np.array([self.init_alpha, self.init_beta, self.init_gamma])
         self.controller = controller
         self.robotleg = robotleg
         self.x_last = None
         self.target = None
+        self.r_save = np.array([0, 0, -0.8325])
+        self.target = np.hstack(np.append(np.array([0, 0, -0.8325]), self.init_angle))
 
-    def u(self, state, prev_state, r_in, r_d, b_orient, fr_mpc, skip):
+    def u(self, state, prev_state, r_in, r_d, delp, b_orient, fr_mpc, skip):
 
-        self.target = np.hstack(np.append(np.array([0, 0, -0.8325]),
-                                          np.array([self.init_alpha, self.init_beta, self.init_gamma])))
+        # self.target = np.hstack(np.append(np.array([0, 0, -0.8325]), self.init_angle))
+        # TODO: This is causing feet to drag, should stay constant in global frame during stance mode
 
         if state == 'swing':
             if prev_state != state:
@@ -47,19 +50,22 @@ class Gait:
 
             # set target position
             self.target = self.trajectory[:, self.swing_steps]
-            self.target = np.hstack(np.append(self.target,
-                                              np.array([self.init_alpha, self.init_beta, self.init_gamma])))
+            self.target = np.hstack(np.append(self.target, self.init_angle))
 
             self.swing_steps += 1
             # calculate wbc control signal
             u = -self.controller.wb_control(leg=self.robotleg, target=self.target, b_orient=b_orient, force=None)
 
         elif state == 'stance' or state == 'early':
-            if state == 'early' and prev_state != state:
+
+            # if state == 'early' and prev_state != state:
+            if prev_state != state and prev_state != 'early':
                 # if contact has just been made early, save that contact point as the new target to stay at
                 # (stop following through with trajectory)
-                self.target = np.hstack(np.append(r_in,
-                                                  np.array([self.init_alpha, self.init_beta, self.init_gamma])))
+                self.r_save = r_in
+
+            self.target = np.hstack(np.append(self.r_save + delp, self.init_angle))  # accounts for body movement
+            self.target[2] = -0.8325  # maintain height estimate at constant to keep ctrl simple
 
             if skip is True:  # skip force control this time because robot is already in correct pose
                 # calculate wbc control signal

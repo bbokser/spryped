@@ -29,8 +29,7 @@ GRAVITY = -9.807
 p.connect(p.GUI)
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.resetSimulation()
-# planeID = p.loadURDF("plane.urdf")
-p.loadURDF("plane.urdf")
+plane = p.loadURDF("plane.urdf")
 robotStartOrientation = p.getQuaternionFromEuler([0, 0, 0])
 
 bot = p.loadURDF("spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf", [0, 0, 0.8],
@@ -130,17 +129,16 @@ class Sim:
         # Pull values in from simulator, select relevant ones, reshape to 2D array
         q = np.reshape([j[0] for j in p.getJointStates(1, range(0, 8))], (-1, 1))
 
+        # Detect contact of feet with ground plane
+        c1 = bool(len([c[8] for c in p.getContactPoints(bot, plane, 7)]))
+        c2 = bool(len([c[8] for c in p.getContactPoints(bot, plane, 3)]))
+
+        # dq = [j[1] for j in p.getJointStates(bot, range(8))]
+
         if record_stepped is True:
             record_stepped(self.out)
 
         if useRealTime == 0:
             p.stepSimulation()
 
-        return q, b_orient
-    '''
-    def get_states(self):
-        self.q = [j[0] for j in p.getJointStates(bot, range(8))]
-        self.dq = [j[1] for j in p.getJointStates(bot, range(8))]
-        state = append(state_q, state_dq)
-        return state
-    '''
+        return q, b_orient, c1, c2

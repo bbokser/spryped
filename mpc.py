@@ -76,17 +76,20 @@ class Mpc:
         self.rh_r = np.array([.14397, .13519, .03581])  # vector from CoM to hip
         self.rh_l = np.array([-.14397, .13519, .03581])  # vector from CoM to hip
 
-    def mpcontrol(self, rz_phi, r1, r2, x_in, x_ref, c_l, c_r):  # p_l, p_r, c_l, c_r):
-
-        i_global = np.dot(np.dot(rz_phi, self.inertia), rz_phi.T)  # is this right?
-        i_inv = np.linalg.inv(i_global)
+    def mpcontrol(self, b_orient, rz_phi, x_in, x_ref, c_l, c_r, pf_l, pf_r):
 
         # vector from CoM to hip in global frame (should just use body frame?)
-        rh_l_g = np.dot(rz_phi, self.rh_l)
-        rh_r_g = np.dot(rz_phi, self.rh_r)
+        rh_l_g = np.dot(b_orient, self.rh_l)  # TODO: should this still be rz_phi?
+        rh_r_g = np.dot(b_orient, self.rh_r)
 
-        r1 = r1 + rh_l_g
-        r2 = r2 + rh_r_g
+        # actual initial footstep position vector from CoM to end effector
+        r1 = pf_l + rh_l_g
+        r2 = pf_r + rh_r_g
+
+        # inertia matrix inverse
+        # i_global = np.dot(np.dot(rz_phi, self.inertia), rz_phi.T)
+        i_global = np.dot(np.dot(b_orient, self.inertia), b_orient.T)  # TODO: should this still be rz_phi?
+        i_inv = np.linalg.inv(i_global)
 
         i11 = i_inv[0, 0]
         i12 = i_inv[0, 1]

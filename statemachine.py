@@ -38,8 +38,8 @@ class Swing(State):
     def execute(self):
         if self.FSM.s == 1 and self.FSM.sh == 1:
             self.FSM.to_transition("toStance")
-        elif self.FSM.s == 0 and self.FSM.sh == 1:
-            self.FSM.to_transition("toEarly")
+        # elif self.FSM.s == 0 and self.FSM.sh == 1:  # Causes stuck in stance bug
+        #    self.FSM.to_transition("toEarly")
         elif self.FSM.s == 1 and self.FSM.sh == 0:
             self.FSM.to_transition("toLate")
 
