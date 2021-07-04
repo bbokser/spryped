@@ -281,10 +281,13 @@ class Runner:
         # plans next footstep location
         if robotleg == 1:
             l_i = 0.144  # left hip length
+            # l_i = self.rh_l
         else:
             l_i = -0.144  # right hip length
+            # l_i = self.rh_r
 
         p_hip = np.dot(rz_phi, np.array([0, l_i, 0]))
+        # p_hip = np.dot(rz_phi, l_i)
         t_stance = self.t_p * self.phi_switch
         p_symmetry = t_stance * 0.5 * pdot + self.k_f * (pdot - pdot_des)
         p_cent = 0.5 * np.sqrt(self.h / 9.807)*np.cross(pdot, self.omega_d)
