@@ -20,7 +20,7 @@ from scipy.interpolate import CubicSpline
 
 
 class Gait:
-    def __init__(self, controller, robotleg, t_p, phi_switch, dt=1e-3, **kwargs):
+    def __init__(self, controller, robotleg, t_p, phi_switch, hconst, dt=1e-3, **kwargs):
 
         self.swing_steps = 0
         self.trajectory = None
@@ -35,8 +35,9 @@ class Gait:
         self.robotleg = robotleg
         self.x_last = None
         self.target = None
-        self.r_save = np.array([0, 0, -0.8325])
-        self.target = np.hstack(np.append(np.array([0, 0, -0.8325]), self.init_angle))
+        self.hconst = hconst
+        self.r_save = np.array([0, 0, -self.hconst])
+        self.target = np.hstack(np.append(np.array([0, 0, -self.hconst]), self.init_angle))
 
     def u(self, state, prev_state, r_in, r_d, delp, b_orient, fr_mpc, skip):
 
@@ -58,23 +59,20 @@ class Gait:
 
         elif state == 'stance' or state == 'early':
 
-            # if state == 'early' and prev_state != state:
             if prev_state != state and prev_state != 'early':
-                # if contact has just been made early, save that contact point as the new target to stay at
+                # if contact has just been made, save that contact point as the new target to stay at
                 # (stop following through with trajectory)
                 self.r_save = r_in
 
             self.target = np.hstack(np.append(self.r_save + delp, self.init_angle))  # accounts for body movement
-            self.target[2] = -0.8325  # maintain height estimate at constant to keep ctrl simple
+            self.target[2] = -self.hconst  # maintain height estimate at constant to keep ctrl simple
 
             if skip is True:  # skip force control this time because robot is already in correct pose
                 # calculate wbc control signal
-                u = -self.controller.wb_control(leg=self.robotleg, target=self.target, b_orient=b_orient,
-                                                force=None)
+                u = -self.controller.wb_control(leg=self.robotleg, target=self.target, b_orient=b_orient, force=None)
             else:
                 force = fr_mpc
-                u = -self.controller.wb_control(leg=self.robotleg, target=self.target, b_orient=b_orient,
-                                                force=force)
+                u = -self.controller.wb_control(leg=self.robotleg, target=self.target, b_orient=b_orient, force=force)
 
         elif state == 'late':
             # calculate wbc control signal
@@ -96,7 +94,9 @@ class Gait:
         path = np.zeros(timesteps)
 
         horizontal = np.array([0.0, timesteps / 2, timesteps])
-        vertical = np.array([-0.8325, -0.7, -0.8325])  # z traj assumed constant body height & flat floor
+        # z traj assumed constant body height & flat floor
+        vertical = np.array([-self.hconst, -self.hconst + 0.1325, -self.hconst])
+        # vertical = np.array([-self.hconst, -0.7, -self.hconst])
         cs = CubicSpline(horizontal, vertical)
 
         # create evenly spaced sample points of desired trajectory

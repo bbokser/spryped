@@ -115,7 +115,7 @@ class Sim:
         torque[0] *= -1  # readjust to match motor polarity
         torque[4:8] = -u_r
         torque[7] *= -1  # readjust to match motor polarity
-        # print(torque)
+
         # print(self.reaction_torques()[0:4])
         p.setJointMotorControlArray(bot, jointArray, p.TORQUE_CONTROL, forces=torque)
         velocities = p.getBaseVelocity(bot)
@@ -130,8 +130,8 @@ class Sim:
         q = np.reshape([j[0] for j in p.getJointStates(1, range(0, 8))], (-1, 1))
 
         # Detect contact of feet with ground plane
-        c1 = bool(len([c[8] for c in p.getContactPoints(bot, plane, 7)]))
-        c2 = bool(len([c[8] for c in p.getContactPoints(bot, plane, 3)]))
+        c1 = bool(len([c[8] for c in p.getContactPoints(bot, plane, 3)]))
+        c2 = bool(len([c[8] for c in p.getContactPoints(bot, plane, 7)]))
 
         # dq = [j[1] for j in p.getJointStates(bot, range(8))]
 

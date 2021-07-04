@@ -38,8 +38,9 @@ class Swing(State):
     def execute(self):
         if self.FSM.s == 1 and self.FSM.sh == 1:
             self.FSM.to_transition("toStance")
-        # elif self.FSM.s == 0 and self.FSM.sh == 1:  # Causes stuck in stance bug
-        #    self.FSM.to_transition("toEarly")
+        # "go" var stops toEarly from being triggered, well, early (causing stuck-in-stance bug)
+        elif self.FSM.s == 0 and self.FSM.sh == 1 and self.FSM.go == 1:
+            self.FSM.to_transition("toEarly")
         elif self.FSM.s == 1 and self.FSM.sh == 0:
             self.FSM.to_transition("toLate")
 
@@ -98,6 +99,7 @@ class FSM:
 
         self.s = None
         self.sh = None
+        self.go = None  # Prevents stuck-in-stance bug
 
     def add_transition(self, transname, transition):
         self.transitions[transname] = transition
@@ -114,9 +116,10 @@ class FSM:
         # set the transition state
         self.trans = self.transitions[to_trans]
 
-    def execute(self, s, sh):
+    def execute(self, s, sh, go):
         self.s = s
         self.sh = sh
+        self.go = go
 
         if self.trans:
             self.curState.exit()

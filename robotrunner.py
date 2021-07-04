@@ -20,12 +20,10 @@ import leg
 import wbc
 import mpc
 import statemachine
-import qp
 import gait
-# import qvis
 
 import time
-# import sys
+import sys
 # import curses
 
 import transforms3d
@@ -44,6 +42,8 @@ class Runner:
 
         left = 1
         right = 0
+        # height constant
+        self.hconst = 0.8325
 
         self.leg_left = leg.Leg(dt=dt, leg=left)
         self.leg_right = leg.Leg(dt=dt, leg=right)
@@ -56,11 +56,9 @@ class Runner:
         self.simulator = simulationbridge.Sim(dt=dt)
         self.state_left = statemachine.Char()
         self.state_right = statemachine.Char()
-        # self.qp_l = qp.Qp(controller=self.controller_left)
-        # self.qp_r = qp.Qp(controller=self.controller_right)
 
         # gait scheduler values
-        self.target_init = np.array([0, 0, -0.8325])  # , self.init_alpha, self.init_beta, self.init_gamma])
+        self.target_init = np.array([0, 0, -self.hconst])  # , self.init_alpha, self.init_beta, self.init_gamma])
         self.target_l = self.target_init[:]
         self.target_r = self.target_init[:]
         self.sh_l = 1  # estimated contact state (left)
@@ -70,25 +68,30 @@ class Runner:
         self.t_p = 0.5  # gait period, seconds 0.5
         self.phi_switch = 0.75  # switching phase, must be between 0 and 1. Percentage of gait spent in contact.
         self.gait_left = gait.Gait(controller=self.controller_left, robotleg=self.leg_left,
-                                   t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
+                                   t_p=self.t_p, phi_switch=self.phi_switch, hconst=self.hconst, dt=dt)
         self.gait_right = gait.Gait(controller=self.controller_right, robotleg=self.leg_right,
-                                    t_p=self.t_p, phi_switch=self.phi_switch, dt=dt)
+                                    t_p=self.t_p, phi_switch=self.phi_switch, hconst=self.hconst, dt=dt)
 
         self.target = None
 
         # footstep planner values
         self.omega_d = np.array([0, 0, 0])  # desired angular acceleration for footstep planner
-        self.k_f = 0.15  # Raibert heuristic gain
-        self.h = np.array([0, 0, 0.8325])  # height, assumed to be constant
-        self.r_l = np.array([0, 0, -0.8325])  # initial footstep planning position
-        self.r_r = np.array([0, 0, -0.8325])  # initial footstep planning position
+        # self.k_f = 0.15  # Raibert heuristic gain
+        self.k_f = 0.015  # Raibert heuristic gain
+        self.h = np.array([0, 0, self.hconst])  # height, assumed to be constant
+        self.r_l = np.array([0, 0, -self.hconst])  # initial footstep planning position
+        self.r_r = np.array([0, 0, -self.hconst])  # initial footstep planning position
         self.rh_r = np.array([.14397, .13519, .03581])  # vector from CoM to hip in the body frame
         self.rh_l = np.array([-.14397, .13519, .03581])  # vector from CoM to hip in the body frame
 
         self.p = np.array([0, 0, 0])  # initial body position
-        self.pdot_des = np.array([0.01, 0.05, 0])  # desired body velocity in world coords
+        # self.pdot_des = np.array([0.01, 0.05, 0])  # desired body velocity in world coords
+        self.pdot_des = np.array([0, 0, 0])  # desired body velocity in world coords
         self.force_control_test = False
         self.useSimContact = True
+        self.qvis_animate = False
+        if self.qvis_animate:
+            import qvis
 
     def run(self):
 
@@ -100,28 +103,30 @@ class Runner:
         t0_r = t0_l + self.t_p / 2  # starting time, right leg. Half a period out of phase with left
 
         prev_state_l = str("init")
-        prev_state_r = prev_state_l
-        prev_contact_l = False
-        prev_contact_r = False
+        prev_state_r = str("init")
 
         mpc_force = np.zeros(6)
         mpc_dt = 0.025  # mpc period
         mpc_factor = mpc_dt / self.dt  # repeat mpc every x seconds
         mpc_counter = mpc_factor
         skip = False
-        t_prev = time.clock()
+        # t_prev = time.clock()
         time.sleep(self.dt)
+
+        ct_l = 0
+        ct_r = 0
+        s_l = 0
+        s_r = 0
 
         while 1:
             # t_diff = time.clock() - t_prev
             # t_prev = time.clock()
             # print(t_diff)
 
-            # time.sleep(self.dt)
             # update target after specified period of time passes
             steps += 1
             t = t + self.dt
-            # print(t)
+
             # run simulator to get encoder and IMU feedback
             # put an if statement here once we have hardware bridge too
             q, b_orient, c1, c2 = self.simulator.sim_run(u_l=self.u_l, u_r=self.u_r)
@@ -138,24 +143,26 @@ class Runner:
             self.leg_left.update_state(q_in=q_left)
             self.leg_right.update_state(q_in=q_right)
 
+            s_prev_l = s_l
+            s_prev_r = s_r
             # gait scheduler
             s_l = self.gait_scheduler(t, t0_l)
             s_r = self.gait_scheduler(t, t0_r)
 
+            go_l, ct_l = self.gait_check(s_l, s_prev=s_prev_l, ct=ct_l, t=t)
+            go_r, ct_r = self.gait_check(s_r, s_prev=s_prev_r, ct=ct_r, t=t)
+
             if self.useSimContact is True:
-                # cheat by using PyBullet's getContactPoints
+                # more like using limit switches
                 sh_l = int(c1)
                 sh_r = int(c2)
-                sh_l_i = self.gait_estimator(self.dist_force_l[2])
-                sh_r_i = self.gait_estimator(self.dist_force_r[2])
-                print(sh_l, sh_l_i)
             else:
                 # force-based contact estimation
                 sh_l = self.gait_estimator(self.dist_force_l[2])
                 sh_r = self.gait_estimator(self.dist_force_r[2])
 
-            state_l = self.state_left.FSM.execute(s_l, sh_l)
-            state_r = self.state_right.FSM.execute(s_r, sh_r)
+            state_l = self.state_left.FSM.execute(s_l, sh_l, go_l)
+            state_r = self.state_right.FSM.execute(s_r, sh_r, go_r)
             # print(state_l, sh_l, self.dist_force_l[2])
             # forward kinematics
             pos_l = np.dot(b_orient, self.leg_left.position()[:, -1])
@@ -176,17 +183,7 @@ class Runner:
             rz_phi[1, 0] = -s_phi
             rz_phi[1, 1] = c_phi
             rz_phi[2, 2] = 1
-            # TODO: what is the point of this?? We already have this in sh_l, sh_r
-            if state_l == ('stance' or 'early'):
-                contact_l = True
-            else:
-                contact_l = False
 
-            if state_r == ('stance' or 'early'):
-                contact_r = True
-            else:
-                contact_r = False
-            # print(state_l, state_r)
             if state_l is not 'stance' and prev_state_l is 'stance':
                 self.r_l = self.footstep(robotleg=1, rz_phi=rz_phi, pdot=pdot, pdot_des=self.pdot_des)
             if state_r is not 'stance' and prev_state_r is 'stance':
@@ -201,7 +198,7 @@ class Runner:
             if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
                     mpc_force = self.force.mpcontrol(b_orient=b_orient, rz_phi=rz_phi, pf_l=pos_l, pf_r=pos_r,
-                                                     x_in=x_in, x_ref=x_ref, c_l=contact_l, c_r=contact_r)
+                                                     x_in=x_in, x_ref=x_ref, c_l=sh_l, c_r=sh_r)
                     # print("force = ", mpc_force)
                     skip = False
                 else:
@@ -215,14 +212,7 @@ class Runner:
                 state_l = 'stance'
                 state_r = 'stance'
                 mpc_force = np.zeros(6)
-            '''
-            # vector from CoM to hip in global frame (should just use body frame?)
-            rh_l_g = np.dot(b_orient, self.rh_l)
-            rh_r_g = np.dot(b_orient, self.rh_r)
-            # actual initial footstep position vector from CoM to end effector in global coords
-            pf_1 = pos_l - rh_l_g + p  # + np.array([0, 0, 0.8325])  # TODO: Check math
-            pf_2 = pos_r - rh_r_g + p  # + np.array([0, 0, 0.8325])
-            '''
+
             delp = pdot*self.dt
             # calculate wbc control signal
             self.u_l = self.gait_left.u(state=state_l, prev_state=prev_state_l, r_in=pos_l, r_d=self.r_l, delp=delp,
@@ -249,29 +239,12 @@ class Runner:
             prev_state_l = state_l
             prev_state_r = state_r
 
-            prev_contact_l = contact_l
-            prev_contact_r = contact_r
-
-            # -------------------------quaternion-visualizer-animation--------------------------------- #
-            # q_e = self.controller_left.q_e
-            # qvis.animate(q_e)
-            # ----------------------------------------------------------------------------------------- #
-            # print(state_l, state_r)
-            # print(self.dist_force_l[2], self.dist_force_r[2])
-            # print(self.reaction_torques()[0:4])
-
-            # tau_d_left = self.contact_left.contact(leg=self.leg_left, g=self.leg_left.grav)
-
-            # fw kinematics
-            # print(np.transpose(np.append(np.dot(b_orient, self.leg_left.position()[:, -1]),
-            #                              np.dot(b_orient, self.leg_right.position()[:, -1]))))
-            # joint velocity
-            # print("vel = ", self.leg_left.velocity())
-            # encoder feedback
-            # print(np.transpose(np.append(self.leg_left.q, self.leg_right.q)))
-
-            # sys.stdout.write("\033[F")  # back to previous line
-            # sys.stdout.write("\033[K")  # clear line
+            if self.qvis_animate:
+                q_e = self.controller_left.q_e
+                qvis.animate(q_e)
+            print(state_l, state_r)
+            sys.stdout.write("\033[F")  # back to previous line
+            sys.stdout.write("\033[K")  # clear line
 
     def gait_scheduler(self, t, t0):
         # Add variable period later
@@ -283,6 +256,16 @@ class Runner:
             s = 1  # scheduled stance
 
         return s
+
+    def gait_check(self, s, s_prev, ct, t):
+        if s_prev != s:
+            ct = t  # time of gait change
+        if ct - t >= self.t_p * (1 - self.phi_switch) * 0.5:
+            go = True
+        else:
+            go = False
+
+        return go, ct
 
     def gait_estimator(self, dist_force):
         # Determines whether foot is actually in contact or not
@@ -306,7 +289,5 @@ class Runner:
         p_symmetry = t_stance * 0.5 * pdot + self.k_f * (pdot - pdot_des)
         p_cent = 0.5 * np.sqrt(self.h / 9.807)*np.cross(pdot, self.omega_d)
         p = p_hip + p_symmetry + p_cent
-        # print("p_symmetry = ", p_symmetry, robotleg)
-        # print("p = ", p, robotleg)
-        p[2] = -0.8325  # assume constant height for now. TODO: height changes?
+        p[2] = -self.hconst  # assume constant height for now. TODO: height changes?
         return p

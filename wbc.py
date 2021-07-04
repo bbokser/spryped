@@ -144,8 +144,9 @@ class Control(control.Control):
         else:
             Fr = np.dot(b_orient, force)
             force_control = (np.dot(JEE.T, Fr).reshape(-1, ))
-        # print(force_control)
-        self.u = Aq_dd - self.grav - force_control*5.9
+
+        k_f = 12  # 5.9
+        self.u = Aq_dd - self.grav - force_control*k_f
 
         self.x_dd_des = x_dd_des
         self.Mx = Mx
@@ -165,10 +166,10 @@ class Control(control.Control):
             q_des = (np.dot(self.kn, prop_val))
             #        + np.dot(self.knd, -leg.dq.reshape(-1, )))
 
-            Fq_null = np.dot(Mq, q_des)
+            Fq_null = np.dot(self.Mq, q_des)
 
             # calculate the null space filter
-            Jdyn_inv = np.dot(Mx, np.dot(JEE, np.linalg.inv(Mq)))
+            Jdyn_inv = np.dot(Mx, np.dot(JEE, np.linalg.inv(self.Mq)))
 
             null_filter = np.eye(len(leg.L)) - np.dot(JEE.T, Jdyn_inv)
 
