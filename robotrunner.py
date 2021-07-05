@@ -28,6 +28,8 @@ import sys
 
 import transforms3d
 import numpy as np
+import qvis
+import matplotlib.pyplot as plt
 
 np.set_printoptions(suppress=True, linewidth=np.nan)
 
@@ -77,12 +79,12 @@ class Runner:
         # footstep planner values
         self.omega_d = np.array([0, 0, 0])  # desired angular acceleration for footstep planner
         # self.k_f = 0.15  # Raibert heuristic gain
-        self.k_f = 0.015  # Raibert heuristic gain
+        self.k_f = 0.3  # Raibert heuristic gain
         self.h = np.array([0, 0, self.hconst])  # height, assumed to be constant
         self.r_l = np.array([0, 0, -self.hconst])  # initial footstep planning position
         self.r_r = np.array([0, 0, -self.hconst])  # initial footstep planning position
-        self.rh_r = np.array([.14397, .13519, .03581])  # vector from CoM to hip in the body frame
-        self.rh_l = np.array([-.14397, .13519, .03581])  # vector from CoM to hip in the body frame
+        self.rh_r = np.array([.03581, -.14397, .13519])  # vector from CoM to hip
+        self.rh_l = np.array([.03581, .14397, .13519])  # vector from CoM to hip
 
         self.p = np.array([0, 0, 0])  # initial body position
         # self.pdot_des = np.array([0.01, 0.05, 0])  # desired body velocity in world coords
@@ -90,8 +92,7 @@ class Runner:
         self.force_control_test = False
         self.useSimContact = True
         self.qvis_animate = False
-        if self.qvis_animate:
-            import qvis
+        self.plot = True
 
     def run(self):
 
@@ -118,14 +119,20 @@ class Runner:
         s_l = 0
         s_r = 0
 
-        while 1:
-            # t_diff = time.clock() - t_prev
-            # t_prev = time.clock()
-            # print(t_diff)
+        total = 1100  # number of timesteps to plot
+        if self.plot:
+            fig, axs = plt.subplots(2, 3, sharey=False)
+            value1 = np.zeros((total, 3))
+            value2 = np.zeros((total, 3))
+        else:
+            value1 = None
+            value2 = None
 
-            # update target after specified period of time passes
+        while 1:
             steps += 1
             t = t + self.dt
+            # t_diff = time.clock() - t_prev
+            # t_prev = time.clock()
 
             # run simulator to get encoder and IMU feedback
             # put an if statement here once we have hardware bridge too
@@ -163,7 +170,7 @@ class Runner:
 
             state_l = self.state_left.FSM.execute(s_l, sh_l, go_l)
             state_r = self.state_right.FSM.execute(s_r, sh_r, go_r)
-            # print(state_l, sh_l, self.dist_force_l[2])
+
             # forward kinematics
             pos_l = np.dot(b_orient, self.leg_left.position()[:, -1])
             pos_r = np.dot(b_orient, self.leg_right.position()[:, -1])
@@ -192,14 +199,13 @@ class Runner:
             omega = np.array(self.simulator.omega_xyz)
 
             x_in = np.hstack([theta, p, omega, pdot]).T  # array of the states for MPC
-            # x_ref = np.hstack([np.zeros(3), np.zeros(3), self.omega_d, self.pdot_des]).T
-            x_ref = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).T  # reference pose (desired)
+            x_ref = np.hstack([np.zeros(3), np.zeros(3), self.omega_d, self.pdot_des]).T  # reference pose (desired)
+            # x_ref = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).T
 
             if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
                     mpc_force = self.force.mpcontrol(b_orient=b_orient, rz_phi=rz_phi, pf_l=pos_l, pf_r=pos_r,
                                                      x_in=x_in, x_ref=x_ref, c_l=sh_l, c_r=sh_r)
-                    # print("force = ", mpc_force)
                     skip = False
                 else:
                     skip = True  # tells gait ctrlr to default to position control.
@@ -235,16 +241,30 @@ class Runner:
                                        np.array(dist_tau_l))
             self.dist_force_r = np.dot(np.linalg.pinv(np.transpose(self.leg_right.gen_jacEE()[0:3])),
                                        np.array(dist_tau_r))
-            # print(self.dist_force_l[2], self.dist_force_r[2])
+
             prev_state_l = state_l
             prev_state_r = state_r
 
             if self.qvis_animate:
                 q_e = self.controller_left.q_e
                 qvis.animate(q_e)
-            print(state_l, state_r)
-            sys.stdout.write("\033[F")  # back to previous line
-            sys.stdout.write("\033[K")  # clear line
+
+            if self.plot and steps <= total-1:
+                # value1[steps-1, :] = self.gait_left.target[0:3]
+                # value2[steps-1, :] = self.gait_right.target[0:3]
+                value1[steps - 1, :] = mpc_force[0:3]
+                value2[steps - 1, :] = mpc_force[3:6]
+                if steps == total-1:
+                    axs[0, 0].plot(range(total-1), value1[:-1, 0], color='blue')
+                    axs[0, 1].plot(range(total-1), value1[:-1, 1], color='blue')
+                    axs[0, 2].plot(range(total-1), value1[:-1, 2], color='blue')
+                    axs[1, 0].plot(range(total-1), value2[:-1, 0], color='blue')
+                    axs[1, 1].plot(range(total-1), value2[:-1, 1], color='blue')
+                    axs[1, 2].plot(range(total-1), value2[:-1, 2], color='blue')
+                    plt.show()
+
+            # sys.stdout.write("\033[F")  # back to previous line
+            # sys.stdout.write("\033[K")  # clear line
 
     def gait_scheduler(self, t, t0):
         # Add variable period later
@@ -280,14 +300,13 @@ class Runner:
     def footstep(self, robotleg, rz_phi, pdot, pdot_des):
         # plans next footstep location
         if robotleg == 1:
-            l_i = 0.144  # left hip length
-            # l_i = self.rh_l
+            # l_i = np.array([0, 0.144, 0])
+            l_i = self.rh_l
         else:
-            l_i = -0.144  # right hip length
-            # l_i = self.rh_r
+            # l_i = np.array([0, -0.144, 0])
+            l_i = self.rh_r
 
-        p_hip = np.dot(rz_phi, np.array([0, l_i, 0]))
-        # p_hip = np.dot(rz_phi, l_i)
+        p_hip = np.dot(rz_phi, l_i)
         t_stance = self.t_p * self.phi_switch
         p_symmetry = t_stance * 0.5 * pdot + self.k_f * (pdot - pdot_des)
         p_cent = 0.5 * np.sqrt(self.h / 9.807)*np.cross(pdot, self.omega_d)

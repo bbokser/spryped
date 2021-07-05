@@ -63,8 +63,8 @@ class Gait:
                 # if contact has just been made, save that contact point as the new target to stay at
                 # (stop following through with trajectory)
                 self.r_save = r_in
-
-            self.target = np.hstack(np.append(self.r_save + delp, self.init_angle))  # accounts for body movement
+            self.r_save = self.r_save - delp
+            self.target = np.hstack(np.append(self.r_save, self.init_angle))
             self.target[2] = -self.hconst  # maintain height estimate at constant to keep ctrl simple
 
             if skip is True:  # skip force control this time because robot is already in correct pose
@@ -88,6 +88,7 @@ class Gait:
 
         # number of time steps allotted for swing trajectory
         timesteps = self.t_p * (1 - self.phi_switch) / self.dt
+        timesteps = round(timesteps, 2)  # fixes floating point math issues
         if not timesteps.is_integer():
             print("Error: period and timesteps are not divisible")  # if t_p is variable
         timesteps = int(timesteps)

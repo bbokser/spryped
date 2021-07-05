@@ -73,14 +73,17 @@ class Mpc:
         i[2, 2] = izz
         self.inertia = i  # inertia tensor in local frame
 
-        self.rh_r = np.array([.14397, .13519, .03581])  # vector from CoM to hip
-        self.rh_l = np.array([-.14397, .13519, .03581])  # vector from CoM to hip
+        # TODO: Check which one's supposed to be negative
+        self.rh_r = np.array([.03581, -.14397, .13519])  # vector from CoM to hip
+        self.rh_l = np.array([.03581, .14397, .13519])  # vector from CoM to hip
 
     def mpcontrol(self, b_orient, rz_phi, x_in, x_ref, c_l, c_r, pf_l, pf_r):
 
         # vector from CoM to hip in global frame (should just use body frame?)
         rh_l_g = np.dot(b_orient, self.rh_l)  # TODO: should this still be rz_phi?
         rh_r_g = np.dot(b_orient, self.rh_r)
+        # rh_l_g = np.dot(rz_phi, self.rh_l)
+        # rh_r_g = np.dot(rz_phi, self.rh_r)
 
         # actual initial footstep position vector from CoM to end effector
         r1 = pf_l + rh_l_g
@@ -261,14 +264,19 @@ class Mpc:
         st_len = n_states * (self.N + 1)
 
         lbx[(st_len + 2)::3] = [0 for i in range(20)]  # lower bound on all f1z and f2z
-        ubx[(n_states * (self.N + 1) + 2)::6] = [6 for i in range(10)]  # upper bound on all f1z
-        ubx[(n_states * (self.N + 1) + 5)::6] = [6 for i in range(10)]  # upper bound on all f2z
+
         if c_l == 0:  # if left leg is not in contact... don't calculate output forces for that leg.
             ubx[(n_states * (self.N + 1))::6] = [0 for i in range(10)]  # upper bound on all f1x
             ubx[(n_states * (self.N + 1) + 1)::6] = [0 for i in range(10)]  # upper bound on all f1y
             lbx[(n_states * (self.N + 1))::6] = [0 for i in range(10)]  # lower bound on all f1x
             lbx[(n_states * (self.N + 1) + 1)::6] = [0 for i in range(10)]  # lower bound on all f1y
             ubx[(n_states * (self.N + 1) + 2)::6] = [0 for i in range(10)]  # upper bound on all f1z
+        else:
+            ubx[(n_states * (self.N + 1))::6] = [1 for i in range(10)]  # upper bound on all f1x
+            ubx[(n_states * (self.N + 1) + 1)::6] = [1 for i in range(10)]  # upper bound on all f1y
+            lbx[(n_states * (self.N + 1))::6] = [-1 for i in range(10)]  # lower bound on all f1x
+            lbx[(n_states * (self.N + 1) + 1)::6] = [-1 for i in range(10)]  # lower bound on all f1y
+            ubx[(n_states * (self.N + 1) + 2)::6] = [2.5 for i in range(10)]  # upper bound on all f1z
 
         if c_r == 0:  # if right leg is not in contact... don't calculate output forces for that leg.
             ubx[(n_states * (self.N + 1) + 3)::6] = [0 for i in range(10)]  # upper bound on all f2x
@@ -276,7 +284,12 @@ class Mpc:
             lbx[(n_states * (self.N + 1) + 3)::6] = [0 for i in range(10)]  # lower bound on all f2x
             lbx[(n_states * (self.N + 1) + 4)::6] = [0 for i in range(10)]  # lower bound on all f2y
             ubx[(n_states * (self.N + 1) + 5)::6] = [0 for i in range(10)]  # upper bound on all f2z
-
+        else:
+            ubx[(n_states * (self.N + 1) + 3)::6] = [1 for i in range(10)]  # upper bound on all f2x
+            ubx[(n_states * (self.N + 1) + 4)::6] = [1 for i in range(10)]  # upper bound on all f2y
+            lbx[(n_states * (self.N + 1) + 3)::6] = [-1 for i in range(10)]  # lower bound on all f2x
+            lbx[(n_states * (self.N + 1) + 4)::6] = [-1 for i in range(10)]  # lower bound on all f2y
+            ubx[(n_states * (self.N + 1) + 5)::6] = [2.5 for i in range(10)]  # upper bound on all f2z
         # setup is finished, now solve-------------------------------------------------------------------------------- #
 
         u0 = np.zeros((self.N, n_controls))  # six control inputs
