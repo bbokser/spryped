@@ -96,7 +96,8 @@ class Gait:
 
         horizontal = np.array([0.0, timesteps / 2, timesteps])
         # z traj assumed constant body height & flat floor
-        vertical = np.array([-self.hconst, -self.hconst + 0.1325, -self.hconst])
+        # vertical = np.array([-self.hconst, -self.hconst + 0.1325, -self.hconst])
+        vertical = np.array([-self.hconst, -self.hconst + 0.13, -self.hconst])
         # vertical = np.array([-self.hconst, -0.7, -self.hconst])
         cs = CubicSpline(horizontal, vertical)
 

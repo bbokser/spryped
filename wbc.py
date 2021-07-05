@@ -83,7 +83,7 @@ class Control(control.Control):
         leg Leg: the leg model being controlled
         des list: the desired system position
         """
-        self.leveler = False
+        self.leveler = True  # this does seem to help
         self.target = target
         self.b_orient = np.array(b_orient)
 
@@ -145,8 +145,8 @@ class Control(control.Control):
             Fr = np.dot(b_orient, force)
             force_control = (np.dot(JEE.T, Fr).reshape(-1, ))
 
-        k_f = 8  # 5.9
-        self.u = Aq_dd - self.grav - force_control*k_f
+        k_force = 10  # 5.9
+        self.u = Aq_dd - self.grav - force_control*k_force
         self.x_dd_des = x_dd_des
         self.Mx = Mx
         self.J = JEE
