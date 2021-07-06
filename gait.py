@@ -41,9 +41,6 @@ class Gait:
 
     def u(self, state, prev_state, r_in, r_d, delp, b_orient, fr_mpc, skip):
 
-        # self.target = np.hstack(np.append(np.array([0, 0, -0.8325]), self.init_angle))
-        # TODO: This is causing feet to drag, should stay constant in global frame during stance mode
-
         if state == 'swing':
             if prev_state != state:
                 self.swing_steps = 0
@@ -97,7 +94,7 @@ class Gait:
         horizontal = np.array([0.0, timesteps / 2, timesteps])
         # z traj assumed constant body height & flat floor
         # vertical = np.array([-self.hconst, -self.hconst + 0.1325, -self.hconst])
-        vertical = np.array([-self.hconst, -self.hconst + 0.13, -self.hconst])
+        vertical = np.array([-self.hconst, -self.hconst + 0.1325, -self.hconst])
         # vertical = np.array([-self.hconst, -0.7, -self.hconst])
         cs = CubicSpline(horizontal, vertical)
 

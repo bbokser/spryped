@@ -73,7 +73,6 @@ class Mpc:
         i[2, 2] = izz
         self.inertia = i  # inertia tensor in local frame
 
-        # TODO: Check which one's supposed to be negative
         self.rh_r = np.array([.03581, -.14397, .13519])  # vector from CoM to hip
         self.rh_l = np.array([.03581, .14397, .13519])  # vector from CoM to hip
 
