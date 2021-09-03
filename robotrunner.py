@@ -34,6 +34,16 @@ import matplotlib.pyplot as plt
 np.set_printoptions(suppress=True, linewidth=np.nan)
 
 
+def contact_check(c, c_s, c_prev, steps, con_c):
+    if c_prev != c:
+        con_c = steps  # timestep at contact change
+        c_s = c  # saved contact value
+    if con_c - steps <= 300:  # TODO: reset con_c
+        c = c_s
+
+    return c, c_s, con_c
+
+
 class Runner:
 
     def __init__(self, dt=1e-3):
@@ -80,20 +90,19 @@ class Runner:
         # footstep planner values
         self.omega_d = np.array([0, 0, 0])  # desired angular acceleration for footstep planner
         # self.k_f = 0.15  # Raibert heuristic gain
-        self.k_f = 0.3  # Raibert heuristic gain
+        self.k_f = 0.4  # Raibert heuristic gain
         self.h = np.array([0, 0, self.hconst])  # height, assumed to be constant
         self.r_l = np.array([0, 0, -self.hconst])  # initial footstep planning position
         self.r_r = np.array([0, 0, -self.hconst])  # initial footstep planning position
         self.rh_r = np.array([.03581, -.14397, .13519])  # vector from CoM to hip
         self.rh_l = np.array([.03581, .14397, .13519])  # vector from CoM to hip
 
-        self.p = np.array([0, 0, 0])  # initial body position
         # self.pdot_des = np.array([0.01, 0.05, 0])  # desired body velocity in world coords
-        self.pdot_des = np.array([0, 0, 0])  # desired body velocity in world coords
+        self.pdot_des = np.array([0.02, 0, 0])  # desired body velocity in world coords
         self.force_control_test = False
         self.useSimContact = True
         self.qvis_animate = False
-        self.plot = False
+        self.plot = True
 
     def run(self):
 
@@ -119,8 +128,14 @@ class Runner:
         ct_r = 0
         s_l = 0
         s_r = 0
+        c1_prev = 0
+        c2_prev = 0
+        con_c1 = 0
+        con_c2 = 0
+        c_s1 = 0
+        c_s2 = 0
 
-        total = 1100  # number of timesteps to plot
+        total = 3000  # number of timesteps to plot
         if self.plot:
             fig, axs = plt.subplots(2, 3, sharey=False)
             value1 = np.zeros((total, 3))
@@ -161,13 +176,21 @@ class Runner:
             go_r, ct_r = self.gait_check(s_r, s_prev=s_prev_r, ct=ct_r, t=t)
 
             if self.useSimContact is True:
-                # more like using limit switches
+                # Like using limit switches
+                # if contact has just been made, freeze contact detection to True for 300 timesteps
+                # protects against vibration/bouncing-related bugs
+                c1, c_s1, con_c1 = contact_check(c1, c_s1, c1_prev, steps, con_c1)
+                c2, c_s2, con_c2 = contact_check(c2, c_s2, c2_prev, steps, con_c2)
+
                 sh_l = int(c1)
                 sh_r = int(c2)
             else:
                 # force-based contact estimation
                 sh_l = self.gait_estimator(self.dist_force_l[2])
                 sh_r = self.gait_estimator(self.dist_force_r[2])
+
+            c1_prev = c1
+            c2_prev = c2
 
             state_l = self.state_left.FSM.execute(s_l, sh_l, go_l)
             state_r = self.state_right.FSM.execute(s_r, sh_r, go_r)
@@ -253,22 +276,25 @@ class Runner:
             if self.plot and steps <= total-1:
                 # value1[steps-1, :] = self.gait_left.target[0:3]
                 # value2[steps-1, :] = self.gait_right.target[0:3]
-                value1[steps - 1, :] = mpc_force[0:3]
-                value2[steps - 1, :] = mpc_force[3:6]
+                # value1[steps - 1, :] = mpc_force[0:3]
+                # value2[steps - 1, :] = mpc_force[3:6]
+                value1[steps - 1, :] = c1
+                value2[steps - 1, :] = c2
                 if steps == total-1:
                     axs[0, 0].plot(range(total-1), value1[:-1, 0], color='blue')
-                    axs[0, 1].plot(range(total-1), value1[:-1, 1], color='blue')
-                    axs[0, 2].plot(range(total-1), value1[:-1, 2], color='blue')
+                    # axs[0, 1].plot(range(total-1), value1[:-1, 1], color='blue')
+                    # axs[0, 2].plot(range(total-1), value1[:-1, 2], color='blue')
                     axs[1, 0].plot(range(total-1), value2[:-1, 0], color='blue')
-                    axs[1, 1].plot(range(total-1), value2[:-1, 1], color='blue')
-                    axs[1, 2].plot(range(total-1), value2[:-1, 2], color='blue')
+                    # axs[1, 1].plot(range(total-1), value2[:-1, 1], color='blue')
+                    # axs[1, 2].plot(range(total-1), value2[:-1, 2], color='blue')
                     plt.show()
 
             # sys.stdout.write("\033[F")  # back to previous line
             # sys.stdout.write("\033[K")  # clear line
 
     def gait_scheduler(self, t, t0):
-        # Add variable period later
+        # Schedules gait, obviously
+        # TODO: Add variable period
         phi = np.mod((t - t0) / self.t_p, 1)
 
         if phi > self.phi_switch:
@@ -279,8 +305,10 @@ class Runner:
         return s
 
     def gait_check(self, s, s_prev, ct, t):
+        # To ensure that after state has been changed from stance to swing, it cannot change to "early" immediately...
+        # Generates "go" variable as True only when criteria for time passed since gait change is met
         if s_prev != s:
-            ct = t  # time of gait change
+            ct = t  # record time of gait change
         if ct - t >= self.t_p * (1 - self.phi_switch) * 0.5:
             go = True
         else:

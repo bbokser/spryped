@@ -22,6 +22,8 @@ import pybullet_data
 
 import cv2
 import pyautogui
+from mss import mss
+from PIL import Image
 
 
 GRAVITY = -9.807
@@ -46,7 +48,7 @@ jointArray = range(p.getNumJoints(bot))
 useRealTime = 0
 
 
-def record_stepped(out):
+def record_st(out):
     img = pyautogui.screenshot()
     image = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
     out.write(image)
@@ -82,10 +84,12 @@ class Sim:
             output = "video.avi"
             img = pyautogui.screenshot()
             img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
             # get info from img
             height, width, channels = img.shape
             # Define the codec and create VideoWriter object
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            # fourcc = cv2.VideoWriter_fourcc(*"XVID")
             self.out = cv2.VideoWriter(output, fourcc, 20.0, (width, height))
 
         p.setTimeStep(self.dt)
@@ -135,8 +139,8 @@ class Sim:
 
         # dq = [j[1] for j in p.getJointStates(bot, range(8))]
 
-        if record_stepped is True:
-            record_stepped(self.out)
+        if self.record_stepped is True:
+            record_st(self.out)
 
         if useRealTime == 0:
             p.stepSimulation()
