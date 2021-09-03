@@ -90,7 +90,7 @@ class Runner:
         # footstep planner values
         self.omega_d = np.array([0, 0, 0])  # desired angular acceleration for footstep planner
         # self.k_f = 0.15  # Raibert heuristic gain
-        self.k_f = 0.4  # Raibert heuristic gain
+        self.k_f = 0.3  # Raibert heuristic gain
         self.h = np.array([0, 0, self.hconst])  # height, assumed to be constant
         self.r_l = np.array([0, 0, -self.hconst])  # initial footstep planning position
         self.r_r = np.array([0, 0, -self.hconst])  # initial footstep planning position
