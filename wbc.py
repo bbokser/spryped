@@ -156,12 +156,12 @@ class Control(control.Control):
         # self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - self.grav + (np.dot(JEE.T, Fr).reshape(-1, ))
 
         # add in velocity compensation in GC space for stability
-        if self.vel_comp:
+        if self.vel_comp is True:
             self.u += -np.dot(self.Mq, np.dot(self.kd, leg.dq)).flatten()
 
         # if null_control is selected, add a control signal in the
         # null space to try to move the leg to selected position
-        if self.null_control:
+        if self.null_control is True:
             # calculate our secondary control signal
             # calculated desired joint angle acceleration
             leg_des_angle = np.array([-np.pi / 2, np.pi * 32 / 180, -np.pi * 44.18 / 180, np.pi * 12.18 / 180.])
@@ -175,7 +175,7 @@ class Control(control.Control):
             null_signal = np.dot(null_filter, Fq_null).reshape(-1, )
             self.u += null_signal
 
-        if self.leveler:
+        if self.leveler is True:
             # keeps ee pitch level
             base_y = transforms3d.euler.mat2euler(b_orient, axes='ryxz')[0]  # get y axis rotation of base
             q1 = leg.q[1]

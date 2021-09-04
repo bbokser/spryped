@@ -70,8 +70,8 @@ class Sim:
 
         p.setTimeStep(self.dt)
 
-        p.setRealTimeSimulation(useRealTime)
-        # p.setRealTimeSimulation(0)
+        # p.setRealTimeSimulation(useRealTime)
+        p.setRealTimeSimulation(0)
 
         # Disable the default velocity/position motor:
         for i in range(p.getNumJoints(bot)):
