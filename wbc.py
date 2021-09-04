@@ -29,7 +29,7 @@ class Control(control.Control):
     Controls the (x,y,z) position of the end-effector.
     """
 
-    def __init__(self, dt=1e-3, null_control=False, **kwargs):
+    def __init__(self, dt=1e-3, **kwargs):
         """
         null_control boolean: apply second controller in null space or not
         """
@@ -37,7 +37,8 @@ class Control(control.Control):
         super(Control, self).__init__(**kwargs)
         self.dt = dt
         self.DOF = 3  # task space dimensionality
-        self.null_control = null_control
+        self.vel_comp = False  # velocity compensation in GC space
+        self.null_control = False
         self.leveler = True
 
         self.kp = np.zeros((3, 3))
@@ -56,10 +57,13 @@ class Control(control.Control):
         self.ko[2, 2] = 1000
 
         self.kn = np.zeros((4, 4))
-        self.kn[0, 0] = 0
-        self.kn[1, 1] = 0  # 100
-        self.kn[2, 2] = 0
+        self.kn[0, 0] = 10
+        self.kn[1, 1] = 10  # 100
+        self.kn[2, 2] = 10
         self.kn[3, 3] = 10
+
+        self.kd = np.zeros((4, 4))
+        np.fill_diagonal(self.kd, 1)
 
         self.kf = np.zeros((3, 3))
         self.kf[0, 0] = 0.01
@@ -83,7 +87,6 @@ class Control(control.Control):
         leg Leg: the leg model being controlled
         des list: the desired system position
         """
-        self.leveler = True  # this does seem to help
         self.target = target
         self.b_orient = np.array(b_orient)
 
@@ -153,27 +156,23 @@ class Control(control.Control):
         # self.u = (np.dot(JEE.T, Fx).reshape(-1, )) - self.grav + (np.dot(JEE.T, Fr).reshape(-1, ))
 
         # add in velocity compensation in GC space for stability
-        # self.u = np.dot(JEE.T, Fx).reshape(-1, ) \
-        #     - np.dot(Mq, np.dot(self.kd, leg.dq)).flatten() - self.grav
+        if self.vel_comp:
+            self.u += -np.dot(self.Mq, np.dot(self.kd, leg.dq)).flatten()
 
         # if null_control is selected, add a control signal in the
         # null space to try to move the leg to selected position
         if self.null_control:
             # calculate our secondary control signal
             # calculated desired joint angle acceleration
-            prop_val = ((leg.ee_angle() - leg.q) + np.pi) % (np.pi * 2) - np.pi
+            leg_des_angle = np.array([-np.pi / 2, np.pi * 32 / 180, -np.pi * 44.18 / 180, np.pi * 12.18 / 180.])
+            prop_val = ((leg_des_angle - leg.q) + np.pi) % (np.pi * 2) - np.pi
             q_des = (np.dot(self.kn, prop_val))
             #        + np.dot(self.knd, -leg.dq.reshape(-1, )))
-
             Fq_null = np.dot(self.Mq, q_des)
-
             # calculate the null space filter
             Jdyn_inv = np.dot(Mx, np.dot(JEE, np.linalg.inv(self.Mq)))
-
             null_filter = np.eye(len(leg.L)) - np.dot(JEE.T, Jdyn_inv)
-
             null_signal = np.dot(null_filter, Fq_null).reshape(-1, )
-
             self.u += null_signal
 
         if self.leveler:

@@ -20,11 +20,6 @@ import transforms3d
 import pybullet as p
 import pybullet_data
 
-import cv2
-import pyautogui
-from mss import mss
-from PIL import Image
-
 
 GRAVITY = -9.807
 # physicsClient = p.connect(p.GUI)
@@ -48,12 +43,6 @@ jointArray = range(p.getNumJoints(bot))
 useRealTime = 0
 
 
-def record_st(out):
-    img = pyautogui.screenshot()
-    image = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-    out.write(image)
-
-
 def reaction_torques():
     # returns joint reaction torques
     reaction_force = [j[2] for j in p.getJointStates(bot, range(8))]  # j[2]=jointReactionForces
@@ -73,28 +62,16 @@ class Sim:
         self.omega = None
         self.v = None
         self.record_rt = False  # record video in real time
-        self.record_stepped = False  # record video in sim steps  # TODO: Deprecated?
         # print(p.getJointInfo(bot, 3))
 
         # Record Video in real time
         if self.record_rt is True:
             p.startStateLogging(p.STATE_LOGGING_VIDEO_MP4, "file1.mp4")
 
-        if self.record_stepped is True:
-            output = "video.avi"
-            img = pyautogui.screenshot()
-            img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-
-            # get info from img
-            height, width, channels = img.shape
-            # Define the codec and create VideoWriter object
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            # fourcc = cv2.VideoWriter_fourcc(*"XVID")
-            self.out = cv2.VideoWriter(output, fourcc, 20.0, (width, height))
-
         p.setTimeStep(self.dt)
 
         p.setRealTimeSimulation(useRealTime)
+        # p.setRealTimeSimulation(0)
 
         # Disable the default velocity/position motor:
         for i in range(p.getNumJoints(bot)):
@@ -138,9 +115,6 @@ class Sim:
         c2 = bool(len([c[8] for c in p.getContactPoints(bot, plane, 7)]))
 
         # dq = [j[1] for j in p.getJointStates(bot, range(8))]
-
-        if self.record_stepped is True:
-            record_st(self.out)
 
         if useRealTime == 0:
             p.stepSimulation()
