@@ -38,7 +38,7 @@ class Control(control.Control):
         self.dt = dt
         self.DOF = 3  # task space dimensionality
         self.vel_comp = False  # velocity compensation in GC space
-        self.null_control = False
+        self.null_control = True
         self.leveler = True
 
         self.kp = np.zeros((3, 3))
@@ -55,6 +55,9 @@ class Control(control.Control):
         self.ko[0, 0] = 1000
         self.ko[1, 1] = 1000
         self.ko[2, 2] = 1000
+
+        self.kl = np.zeros((4, 4))
+        self.kl[3, 3] = 10
 
         self.kn = np.zeros((4, 4))
         self.kn[0, 0] = 10
@@ -183,7 +186,7 @@ class Control(control.Control):
             # keep ee level
             ee_target = -(q1 + q2)
             angles = np.array([0, np.pi * 32 / 180, 0, ee_target])
-            u_level = np.dot(self.kn, -base_y + angles - leg.q)
+            u_level = np.dot(self.kl, -base_y + angles - leg.q)
             self.u += u_level
 
         # add in any additional signals
