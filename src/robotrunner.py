@@ -24,7 +24,6 @@ import gait
 
 import time
 import sys
-# import curses
 
 import transforms3d
 import numpy as np
@@ -46,16 +45,21 @@ def contact_check(c, c_s, c_prev, steps, con_c):
 
 class Runner:
 
-    def __init__(self, dt=1e-3):
+    def __init__(self, dt=1e-3, plot=False, fixed=False, record=False, qvis_animate=False):
 
         self.dt = dt
+        self.useSimContact = True
+        self.qvis_animate = qvis_animate
+        self.record = record
+        self.plot = plot
+        self.fixed = fixed
+
         self.u_l = np.zeros(4)
         self.u_r = np.zeros(4)
 
         left = 1
         right = 0
         # height constant
-        # self.hconst = 0.8325
         self.hconst = 0.8325
 
         self.leg_left = leg.Leg(dt=dt, leg=left)
@@ -66,7 +70,7 @@ class Runner:
         self.force = mpc.Mpc(dt=dt)
         self.contact_left = contact.Contact(leg=self.leg_left, dt=dt)
         self.contact_right = contact.Contact(leg=self.leg_right, dt=dt)
-        self.simulator = simulationbridge.Sim(dt=dt)
+        self.simulator = simulationbridge.Sim(dt=dt, fixed=fixed, record=record)
         self.state_left = statemachine.Char()
         self.state_right = statemachine.Char()
 
@@ -97,12 +101,7 @@ class Runner:
         self.rh_r = np.array([.03581, -.14397, .13519])  # vector from CoM to hip
         self.rh_l = np.array([.03581, .14397, .13519])  # vector from CoM to hip
 
-        # self.pdot_des = np.array([0.01, 0.05, 0])  # desired body velocity in world coords
-        self.pdot_des = np.array([0.02, 0, 0])  # desired body velocity in world coords
-        self.force_control_test = False
-        self.useSimContact = True
-        self.qvis_animate = False
-        self.plot = True
+        self.pdot_des = np.array([-0.02, 0, 0])  # desired body velocity in world coords
 
     def run(self):
 
@@ -151,7 +150,6 @@ class Runner:
             # t_prev = time.clock()
 
             # run simulator to get encoder and IMU feedback
-            # put an if statement here once we have hardware bridge too
             q, b_orient, c1, c2 = self.simulator.sim_run(u_l=self.u_l, u_r=self.u_r)
 
             q_left = q[0:4]
@@ -181,7 +179,6 @@ class Runner:
                 # protects against vibration/bouncing-related bugs
                 c1, c_s1, con_c1 = contact_check(c1, c_s1, c1_prev, steps, con_c1)
                 c2, c_s2, con_c2 = contact_check(c2, c_s2, c2_prev, steps, con_c2)
-
                 sh_l = int(c1)
                 sh_r = int(c2)
             else:
@@ -224,7 +221,6 @@ class Runner:
 
             x_in = np.hstack([theta, p, omega, pdot]).T  # array of the states for MPC
             x_ref = np.hstack([np.zeros(3), np.zeros(3), self.omega_d, self.pdot_des]).T  # reference pose (desired)
-            # x_ref = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).T
 
             if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
@@ -238,7 +234,7 @@ class Runner:
 
             mpc_counter += 1
 
-            if self.force_control_test is True:
+            if self.fixed is True:
                 state_l = 'stance'
                 state_r = 'stance'
                 mpc_force = np.zeros(6)
@@ -269,11 +265,11 @@ class Runner:
             prev_state_l = state_l
             prev_state_r = state_r
 
-            if self.qvis_animate:
+            if self.qvis_animate == True:
                 q_e = self.controller_left.q_e
                 qvis.animate(q_e)
 
-            if self.plot and steps <= total-1:
+            if self.plot == True and steps <= total-1:
                 # value1[steps-1, :] = self.gait_left.target[0:3]
                 # value2[steps-1, :] = self.gait_right.target[0:3]
                 # value1[steps - 1, :] = mpc_force[0:3]

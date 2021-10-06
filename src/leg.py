@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import os
 import numpy as np
 import sympy as sp
 import csv
@@ -40,13 +41,16 @@ class Leg(LegBase):
         LegBase.__init__(self, init_q=init_q, init_dq=init_dq, **kwargs)
 
         # values = []
+        curdir = os.getcwd()
+        path_parent = os.path.dirname(curdir)
 
         if leg == 1:
-            spryped_data = str('spryped_urdf_rev06/spryped_data_left.csv')
+            csv_lr_path = 'res/spryped_urdf_rev06/spryped_data_left.csv'
         else:
-            spryped_data = str('spryped_urdf_rev06/spryped_data_right.csv')
+            csv_lr_path = 'res/spryped_urdf_rev06/spryped_data_right.csv'
 
-        with open(spryped_data, 'r') as csvfile:
+        data_path = os.path.join(path_parent, csv_lr_path)  # os.path.pardir
+        with open(data_path, 'r') as csvfile:
             data = csv.reader(csvfile, delimiter=',')
             next(data)  # skip headers
             values = list(zip(*(row for row in data)))  # transpose rows to columns
@@ -61,7 +65,9 @@ class Leg(LegBase):
 
         self.coml = values[7].astype(np.float)
 
-        with open('spryped_urdf_rev06/urdf/spryped_urdf_rev06.csv', 'r') as csvfile:
+        csv_path = 'res/spryped_urdf_rev06/urdf/spryped_urdf_rev06.csv'
+        path = os.path.join(path_parent, csv_path)
+        with open(path, 'r') as csvfile:
             data_direct = csv.reader(csvfile, delimiter=',')
             next(data_direct)  # skip headers
             values_direct = list(zip(*(row for row in data_direct)))  # transpose rows to columns
@@ -151,12 +157,15 @@ class Leg(LegBase):
 
         com3 = sp.Matrix([[-l3 * sp.sin(q3)], [l3 * sp.cos(q3)], [0], [1]])
 
-        # xee = sp.Matrix([[0], [0], [0], [1]])
+
         xee = sp.Matrix([[-L3 * sp.sin(q3)], [L3 * sp.cos(q3)], [0], [1]])
 
         Torg1 = Torg0 @ T01
         Torg2 = Torg0 @ T01 @ T12
-        Torg3 = Torg0 @ T01 @ T12 @ T23
+
+        # xee = sp.Matrix([[0], [0], [0], [1]])
+        # Torg3 = Torg0 @ T01 @ T12 @ T23
+        # Txee = Torg3 @ xee
 
         Tcom1 = Torg0 @ com1
         Tcom2 = Torg1 @ com2
@@ -192,6 +201,7 @@ class Leg(LegBase):
         self.JCOM3_init = sp.lambdify([q0, q1, q2, q3], JCOM3_init)
 
         JEE_v = Txee.jacobian([q0, q1, q2, q3])
+
         JEE_v.row_del(3)
         JEE_w = sp.Matrix([[1, 0, 0, 0],
                            [0, 0, 0, 0],

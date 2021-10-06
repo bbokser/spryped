@@ -24,6 +24,7 @@ https://github.com/MMehrez/ ...Sim_3_MPC_Robot_PS_obs_avoid_mul_sh.m
 """
 
 import time
+import os
 import numpy as np
 import numpy.matlib
 
@@ -46,7 +47,11 @@ class Mpc:
         self.b = 40 * np.pi / 180  # maximum kinematic leg angle
         self.fn = None
 
-        with open('spryped_urdf_rev06/spryped_data_body.csv', 'r') as csvfile:
+        curdir = os.getcwd()
+        path_parent = os.path.dirname(curdir)
+        csv_body_path = 'res/spryped_urdf_rev06/spryped_data_body.csv'
+        data_path_b = os.path.join(path_parent, csv_body_path)  # os.path.pardir
+        with open(data_path_b, 'r') as csvfile:
             data = csv.reader(csvfile, delimiter=',')
             next(data)  # skip headers
             values = list(zip(*(row for row in data)))  # transpose rows to columns

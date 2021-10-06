@@ -1,0 +1,185 @@
+%\documentclass[fleqn]{article}
+\documentclass{article}
+
+\usepackage[margin=0.5in]{geometry}
+\usepackage{amsmath}
+\usepackage{mathtools}
+
+\begin{document}
+
+\begin{equation}
+	{}_{org}^0 T = \begin{bmatrix}
+	1 & 0 & 0 & 0\\
+	0 & \cos{(q_{0} )} & - \sin{(q_{0} )} & L_{0} \cos{(q_{0} )}\\
+	0 & \sin{(q_{0} )} & \cos{(q_{0} )} & L_{0} \sin{(q_{0} )}\\
+	0 & 0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	{}_0^1 T = \begin{bmatrix}
+	\cos{(q_{1} )} & - \sin{(q_{1} )} & 0 & -L_{1} \sin{(q_{1} )}\\
+	\sin{(q_{1} )} & \cos{(q_{1} )} & 0 & L_{1} \cos{(q_{1} )}\\
+	0 & 0 & 1 & 0\\
+	0 & 0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	{}_1^2 T = \begin{bmatrix}
+ 	\cos{(q_{2} )} & - \sin{(q_{2} )} & 0 & -L_{2} \sin{(q_{2} )}\\
+ 	\sin{(q_{2} )} & \cos{(q_{2} )} & 0 & L_{2} \cos{(q_{2} )}\\
+ 	0 & 0 & 1 & 0\\
+ 	0 & 0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	{}_2^3 T = \begin{bmatrix}
+ 	\cos{(q_{3} )} & - \sin{(q_{3} )} & 0 & -L_{3} \sin{(q_{3} )}\\
+ 	\sin{(q_{3} )} & \cos{(q_{3} )} & 0 & L_{3} \cos{(q_{3} )}\\
+ 	0 & 0 & 1 & 0\\
+ 	0 & 0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+
+
+\begin{equation}
+	com_0 = \begin{bmatrix}
+ 	0\\
+ 	l_{0} \cos{(q_{0} )}\\
+ 	l_{0} \sin{(q_{0} )}\\
+ 	1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	com_1 = \begin{bmatrix}
+ 	{-l_{1} \sin{(q_{1} )}}\\
+ 	l_{1} \cos{(q_{1} )}\\
+ 	0\\
+ 	1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	com_2 = \begin{bmatrix}
+ 	-l_{2} \sin{(q_{2} )}\\
+ 	l_{2} \cos{(q_{2} )}\\
+ 	0\\
+ 	1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	com_3 = \begin{bmatrix}
+  	-l_{3} \sin{(q_{3} )}\\
+  	l_{3} \cos{(q_{3} )}\\
+  	0\\
+  	1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	x_{ee} = \begin{bmatrix}
+ 	0\\
+ 	0\\
+ 	0\\
+ 	1
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+	{}_{org}^1 T = {}_{org}^0 T \, {}_0^1 T
+\end{equation}
+
+\begin{equation}
+	{}_{org}^2 T = {}_{org}^0 T \, {}_0^1 T \, {}_1^2 T
+\end{equation}
+
+\begin{equation}
+	{}_{org}^3 T = {}_{org}^0 T \, {}_0^1 T \, {}_1^2 T \, {}_2^3 T
+\end{equation}
+
+\begin{equation}
+	Jacobian = 
+	\begin{bsmallmatrix}
+	\frac{\partial x}{\partial q_0} & \frac{\partial x}{\partial q_1} & \frac{\partial x}{\partial q_2} & \frac{\partial x}{\partial q_3}\\
+	\frac{\partial y}{\partial q_0} & \frac{\partial y}{\partial q_1} & \frac{\partial y}{\partial q_2} & \frac{\partial y}{\partial q_3}\\
+	\frac{\partial z}{\partial q_0} & \frac{\partial z}{\partial q_1} & \frac{\partial z}{\partial q_2} & \frac{\partial z}{\partial q_3}\\
+	\frac{\partial \omega_x}{\partial q_0} & \frac{\partial \omega_x}{\partial q_1} & \frac{\partial \omega_x}{\partial q_2} & \frac{\partial \omega_x}{\partial q_3}\\
+	\frac{\partial \omega_y}{\partial q_0} & \frac{\partial \omega_y}{\partial q_1} & \frac{\partial \omega_y}{\partial q_2} & \frac{\partial \omega_y}{\partial q_3}\\
+	\frac{\partial \omega_z}{\partial q_0} & \frac{\partial \omega_z}{\partial q_1} & \frac{\partial \omega_z}{\partial q_2} & \frac{\partial \omega_z}{\partial q_3}\\
+	\end{bsmallmatrix}
+\end{equation}
+
+\begin{equation}
+	J_0 =  Jacobian(com_0) =
+	\begin{bsmallmatrix}
+	0 & 0 & 0 & 0\\
+	- l_{0} \sin{(q_{0} )} & 0 & 0 & 0\\
+	l_{0} \cos{(q_{0} )} & 0 & 0 & 0\\
+	1 & 0 & 0 & 0\\
+	0 & 0 & 0 & 0\\
+	0 & 0 & 0 & 0
+	\end{bsmallmatrix}
+\end{equation}
+
+\begin{equation}
+	J_1 = Jacobian({}_{org}^0 T \, com_1) =
+	\begin{bsmallmatrix}
+	0 & - l_{1} \cos{(q_{1} )} & 0 & 0\\- (L_{0} + l_{1} \cos{(q_{1} )}) \sin{(q_{0} )} & - l_{1} \sin{(q_{1} )} \cos{(q_{0} )} & 0 & 0\\
+	(L_{0} + l_{1} \cos{(q_{1} )}) \cos{(q_{0} )} & - l_{1} \sin{(q_{0} )} \sin{(q_{1} )} & 0 & 0\\
+	1 & 0 & 0 & 0\\
+	0 & 0 & 0 & 0\\
+	0 & 1 & 0 & 0
+\end{bsmallmatrix}
+\end{equation}
+
+\begin{equation}
+	J_2 = Jacobian({}_{org}^1 T \, com_2)
+\end{equation}
+
+\begin{equation}
+	J_3 = Jacobian({}_{org}^2 T \, com_3)
+\end{equation}
+
+\begin{equation}
+	J_{EE} = Jacobian({}_{org}^3 T \, x_{ee})
+\end{equation}
+
+\begin{equation}
+x =
+ \left[\begin{matrix}\theta_{x}\\\theta_{y}\\\theta_{z}\\p_{x}\\p_{y}\\p_{z}\\\omega_{x}\\\omega_{y}\\\omega_{z}\\\dot{p}_{x}\\\dot{p}_{y}\\\dot{p}_{z}\end{matrix}\right]
+ \end{equation}
+ 
+ \begin{equation}
+f =
+ \left[\begin{matrix}f_{1 x}\\f_{1 y}\\f_{1 z}\\f_{2 x}\\f_{2 y}\\f_{2 z}\end{matrix}\right]
+ \end{equation}
+ 
+\begin{equation}
+g =
+ \left[\begin{matrix}0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\gravity\end{matrix}\right]
+\end{equation}
+
+\begin{equation}
+A =
+ \left[\begin{array}{cccccccccccc}1 & 0 & 0 & 0 & 0 & 0 & dt rz_{11} & dt rz_{12} & dt rz_{13} & 0 & 0 & 0\\0 & 1 & 0 & 0 & 0 & 0 & dt rz_{21} & dt rz_{22} & dt rz_{23} & 0 & 0 & 0\\0 & 0 & 1 & 0 & 0 & 0 & dt rz_{31} & dt rz_{32}& dt rz_{33} & 0 & 0 & 0\\0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & dt & 0 & 0\\0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & dt & 0\\0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & dt\\0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0\\0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0\\0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0\\0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0& 1 & 0 & 0\\0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0\\0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1\end{array}\right]
+ \end{equation}
+ 
+ \begin{equation}
+B =
+ \left[\begin{matrix}0 & 0 & 0 & 0 & 0 & 0\\0 & 0 & 0 & 0 & 0 & 0\\0 & 0 & 0 & 0 & 0 & 0\\0 & 0 & 0 & 0 & 0 & 0\\0& 0 & 0 & 0 & 0 & 0\\0 & 0 & 0 & 0 & 0 & 0\\dt \left(i_{12} r1z - i_{13} r1y\right) & dt \left(- i_{11} r1z + i_{13} r1x\right) & dt \left(i_{11} r1y - i_{12} r1x\right) & dt \left(i_{12} r2z - i_{13} r2y\right) & dt \left(- i_{11} r2z + i_{13} r2x\right) & dt \left(i_{11} r2y - i_{12} r2x\right)\\dt \left(i_{22} r1z - i_{23} r1y\right) & dt \left(- i_{21} r1z + i_{23} r1x\right) & dt \left(i_{21} r1y - i_{22} r1x\right) & dt \left(i_{22} r2z - i_{23} r2y\right) & dt \left(- i_{21} r2z + i_{23} r2x\right) & dt \left(i_{21} r2y - i_{22} r2x\right)\\dt \left(i_{32} r1z - i_{33} r1y\right) & dt \left(- i_{31} r1z + i_{33} r1x\right) & dt \left(i_{31} r1y - i_{32} r1x\right) & dt \left(i_{32} r2z - i_{33} r2y\right) & dt \left(- i_{31} r2z + i_{33} r2x\right) & dt \left(i_{31} r2y - i_{32} r2x\right)\\\frac{dt}{mass} & 0 & 0 & \frac{dt}{mass} & 0 & 0\\0 & \frac{dt}{mass} & 0 & 0 & \frac{dt}{mass} & 0\\0 & 0 & \frac{dt}{mass} & 0 & 0 & \frac{dt}{mass}\end{matrix}\right]
+\end{equation}
+
+ \begin{equation}
+x(k+1) =
+ \left[\begin{matrix}dt \omega_{x} rz_{11} + dt \omega_{y} rz_{12} + dt \omega_{z} rz_{13} + \theta_{x}\\dt \omega_{x} rz_{21} + dt \omega_{y} rz_{22} + dt \omega_{z} rz_{23} + \theta_{y}\\dt \omega_{x} rz_{31} + dt \omega_{y} rz_{32} + dt \omega_{z} rz_{33} + \theta_{z}\\dt \dot{p}_{x} + p_{x}\\dt \dot{p}_{y} + p_{y}\\dt \dot{p}_{z} + p_{z}\\dt f_{1 x} \left(i_{12} r1z - i_{13} r1y\right) + dt f_{1 y} \left(- i_{11} r1z + i_{13} r1x\right) + dt f_{1 z} \left(i_{11} r1y - i_{12} r1x\right) + dt f_{2 x} \left(i_{12} r2z - i_{13} r2y\right) + dt f_{2 y} \left(- i_{11} r2z + i_{13} r2x\right) + dt f_{2 z} \left(i_{11} r2y - i_{12} r2x\right) + \omega_{x}\\dt f_{1 x} \left(i_{22} r1z - i_{23} r1y\right) + dt f_{1 y} \left(- i_{21} r1z + i_{23} r1x\right) + dt f_{1 z} \left(i_{21} r1y - i_{22} r1x\right) + dt f_{2 x} \left(i_{22} r2z - i_{23} r2y\right) + dt f_{2 y} \left(- i_{21} r2z + i_{23} r2x\right) + dt f_{2 z} \left(i_{21} r2y - i_{22} r2x\right) + \omega_{y}\\dt f_{1 x} \left(i_{32} r1z - i_{33} r1y\right) + dt f_{1y} \left(- i_{31} r1z + i_{33} r1x\right) + dt f_{1 z} \left(i_{31} r1y - i_{32} r1x\right) + dt f_{2 x} \left(i_{32} r2z - i_{33} r2y\right) + dt f_{2 y} \left(- i_{31} r2z + i_{33} r2x\right) + dt f_{2 z} \left(i_{31} r2y - i_{32} r2x\right) + \omega_{z}\\\frac{dt f_{1 x}}{mass} + \frac{dt f_{2 x}}{mass} + \dot{p}_{x}\\\frac{dt f_{1 y}}{mass} + \frac{dt f_{2 y}}{mass} + \dot{p}_{y}\\\frac{dt f_{1 z}}{mass} + \frac{dt f_{2 z}}{mass} + gravity + \dot{p}_{z}\end{matrix}\right]
+ \end{equation}
+
+\begin{equation}
+ \| f(k)\|_R = \sqrt{f(k)_R} = \sqrt{f(k)^T R f(k)}
+ \end{equation}
+ 
+ \end{document}
