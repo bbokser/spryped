@@ -42,28 +42,23 @@ startpoints = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]])
 endpoints = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
 
 # prepare the axes limits
-ax.set_xlim((-8, 8))
-ax.set_ylim((-8, 8))
-ax.set_zlim((-8, 8))
+ax.set_xlim((-2, 2))
+ax.set_ylim((-2, 2))
+ax.set_zlim((-2, 2))
 
 ax.view_init(30, 0)  # set point-of-view: specified by (altitude degrees, azimuth degrees)
 # q_e = np.array([0., 0., 0., 0.])
 
 
 def animate(q_e):
-    # animation function.  This will be called sequentially with the frame number
 
     q_in = Quaternion(q_e[0], q_e[1], q_e[2], q_e[3])
     for line, start, end in zip(lines, startpoints, endpoints):
         # end *= 5
         start = q_in.rotate(start)
         end = q_in.rotate(end)
-
-        line.set_data([start[0], end[0]], [start[1], end[1]])
-        line.set_3d_properties([start[2], end[2]])
-
-        # pt.set_data(x[-1:], y[-1:])
-        # pt.set_3d_properties(z[-1:])
+        # line.set_data([start[0], end[0]], [start[1], end[1]])  # 2D version
+        line.set_data_3d([start[0], end[0]], [start[1], end[1]], [start[2], end[2]])
 
     fig.canvas.draw()
     plt.pause(0.0001)

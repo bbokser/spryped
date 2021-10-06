@@ -39,7 +39,7 @@ class Control(control.Control):
         self.DOF = 3  # task space dimensionality
         self.vel_comp = False  # velocity compensation in GC space
         self.null_control = True
-        self.leveler = True
+        self.leveler = False
 
         self.kp = np.zeros((3, 3))
         self.kp[0, 0] = 2000

@@ -14,6 +14,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 import contact
 import simulationbridge
 import leg
@@ -222,7 +223,7 @@ class Runner:
             x_in = np.hstack([theta, p, omega, pdot]).T  # array of the states for MPC
             x_ref = np.hstack([np.zeros(3), np.zeros(3), self.omega_d, self.pdot_des]).T  # reference pose (desired)
 
-            if mpc_counter == mpc_factor:  # check if it's time to restart the mpc
+            if mpc_counter == mpc_factor and self.fixed != True:  # check if it's time to restart the mpc
                 if np.linalg.norm(x_in - x_ref) > 1e-2:  # then check if the error is high enough to warrant it
                     mpc_force = self.force.mpcontrol(b_orient=b_orient, rz_phi=rz_phi, pf_l=pos_l, pf_r=pos_r,
                                                      x_in=x_in, x_ref=x_ref, c_l=sh_l, c_r=sh_r)
@@ -265,7 +266,7 @@ class Runner:
             prev_state_l = state_l
             prev_state_r = state_r
 
-            if self.qvis_animate == True:
+            if self.qvis_animate:
                 q_e = self.controller_left.q_e
                 qvis.animate(q_e)
 

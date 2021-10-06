@@ -92,21 +92,15 @@ class Sim:
         q = np.reshape([j[0] for j in p.getJointStates(1, range(0, self.numJoints))], (-1, 1))
         q_dot = np.reshape([j[1] for j in p.getJointStates(1, range(0, self.numJoints))], (-1, 1))
 
-        command = np.zeros(8)
+        command = np.zeros(self.numJoints)
         command[0:4] = u_l
         command[0] *= -1  # readjust to match motor polarity
         command[4:8] = -u_r
         command[7] *= -1  # readjust to match motor polarity
 
-        torque = np.zeros(8)
-        torque[0] = actuator.actuate(i=command[0], q_dot=q_dot[0])
-        torque[1] = actuator.actuate(i=command[1], q_dot=q_dot[1])
-        torque[2] = actuator.actuate(i=command[2], q_dot=q_dot[2])
-        torque[3] = actuator.actuate(i=command[3], q_dot=q_dot[3])
-        torque[4] = actuator.actuate(i=command[4], q_dot=q_dot[4])
-        torque[5] = actuator.actuate(i=command[5], q_dot=q_dot[5])
-        torque[6] = actuator.actuate(i=command[6], q_dot=q_dot[6])
-        torque[7] = actuator.actuate(i=command[7], q_dot=q_dot[7])
+        torque = np.zeros(self.numJoints)
+        for k in range(self.numJoints):
+            torque[k] = actuator.actuate(i=command[k], q_dot=q_dot[k])
 
         p.setJointMotorControlArray(self.bot, self.jointArray, p.TORQUE_CONTROL, forces=torque)
         velocities = p.getBaseVelocity(self.bot)
