@@ -1,18 +1,5 @@
 """
 Copyright (C) 2020 Benjamin Bokser
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import contact
@@ -271,12 +258,8 @@ class Runner:
                 qvis.animate(q_e)
 
             if self.plot == True and steps <= total-1:
-                # value1[steps-1, :] = self.gait_left.target[0:3]
-                # value2[steps-1, :] = self.gait_right.target[0:3]
-                # value1[steps - 1, :] = mpc_force[0:3]
-                # value2[steps - 1, :] = mpc_force[3:6]
                 value1[steps - 1, :] = c1
-                value2[steps - 1, :] = c2
+                value2[steps - 1, :] = c2  # mpc_force[3:6]  self.gait_right.target[0:3]
                 if steps == total-1:
                     axs[0, 0].plot(range(total-1), value1[:-1, 0], color='blue')
                     # axs[0, 1].plot(range(total-1), value1[:-1, 1], color='blue')
@@ -286,6 +269,7 @@ class Runner:
                     # axs[1, 2].plot(range(total-1), value2[:-1, 2], color='blue')
                     plt.show()
 
+            # print(self.leg_left.q)
             # sys.stdout.write("\033[F")  # back to previous line
             # sys.stdout.write("\033[K")  # clear line
 

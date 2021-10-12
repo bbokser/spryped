@@ -1,18 +1,5 @@
 """
 Copyright (C) 2020 Benjamin Bokser
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import os
@@ -53,7 +40,11 @@ class Sim:
         curdir = os.getcwd()
         path_parent = os.path.dirname(curdir)
         model_path = "res/spryped_urdf_rev06/urdf/spryped_urdf_rev06.urdf"
-        self.bot = p.loadURDF(os.path.join(path_parent, model_path), [0, 0, 0.8],  # 0.31
+        if fixed == True:
+            load_height = 1.2
+        else:
+            load_height = 0.8
+        self.bot = p.loadURDF(os.path.join(path_parent, model_path), [0, 0, load_height],
                               robotStartOrientation, useFixedBase=fixed,
                               flags=p.URDF_USE_INERTIA_FROM_FILE | p.URDF_MAINTAIN_LINK_ORDER)
         self.numJoints = p.getNumJoints(self.bot)
@@ -72,7 +63,7 @@ class Sim:
 
         # Disable the default velocity/position motor:
         for i in range(p.getNumJoints(self.bot)):
-            p.setJointMotorControl2(self.bot, i, p.VELOCITY_CONTROL, force=0.5)
+            p.setJointMotorControl2(self.bot, i, p.VELOCITY_CONTROL, force=0)
             # force=1 allows us to easily mimic joint friction rather than disabling
             p.enableJointForceTorqueSensor(self.bot, i, 1)  # enable joint torque sensing
 

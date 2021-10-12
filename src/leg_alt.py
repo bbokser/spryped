@@ -5,7 +5,7 @@ Copyright (C) 2020 Benjamin Bokser
 
 import os
 import numpy as np
-import sympy as sp
+
 import csv
 
 import transforms3d
@@ -29,12 +29,10 @@ class Leg(LegBase):
 
         curdir = os.getcwd()
         path_parent = os.path.dirname(curdir)
-
         if leg == 1:
             csv_lr_path = 'res/spryped_urdf_rev06/spryped_data_left.csv'
         else:
             csv_lr_path = 'res/spryped_urdf_rev06/spryped_data_right.csv'
-
         data_path = os.path.join(path_parent, csv_lr_path)  # os.path.pardir
         with open(data_path, 'r') as csvfile:
             data = csv.reader(csvfile, delimiter=',')
@@ -61,6 +59,13 @@ class Leg(LegBase):
 
         self.mass = values_direct[7].astype(np.float)
         self.mass = np.delete(self.mass, 0)  # remove body value
+
+        # estimating init link angles
+        # p = 4
+        # dist = math.sqrt((ox[p]**2)+(oz[p]**2))
+        # angle = np.degrees(math.atan(oz[p]/dist))
+        # print("dist = ", dist)
+        # print("angle p = ", angle)
 
         # link masses
         if self.mass[0] != self.mass[4]:
@@ -109,130 +114,40 @@ class Leg(LegBase):
         self.reset()
         self.q_calibration = np.array(init_q)
 
-        # -----------------------#
-        l0 = self.coml[0]
-        l1 = self.coml[1]
-        l2 = self.coml[2]
-        l3 = self.coml[3]
-        sp.var('q0 q1 q2 q3')
-        Torg0 = sp.Matrix([[1, 0, 0, 0],
-                           [0, sp.cos(q0), -sp.sin(q0), L0 * sp.cos(q0)],
-                           [0, sp.sin(q0), sp.cos(q0), L0 * sp.sin(q0)],
-                           [0, 0, 0, 1]])
-
-        T01 = sp.Matrix([[sp.cos(q1), -sp.sin(q1), 0, -L1 * sp.sin(q1)],
-                         [sp.sin(q1), sp.cos(q1), 0, L1 * sp.cos(q1)],
-                         [0, 0, 1, 0],
-                         [0, 0, 0, 1]])
-
-        T12 = sp.Matrix([[sp.cos(q2), -sp.sin(q2), 0, -L2 * sp.sin(q2)],
-                         [sp.sin(q2), sp.cos(q2), 0, L2 * sp.cos(q2)],
-                         [0, 0, 1, 0],
-                         [0, 0, 0, 1]])
-
-        T23 = sp.Matrix([[sp.cos(q3), -sp.sin(q3), 0, -L3 * sp.sin(q3)],
-                         [sp.sin(q3), sp.cos(q3), 0, L3 * sp.cos(q3)],
-                         [0, 0, 1, 0],
-                         [0, 0, 0, 1]])
-
-        com0 = sp.Matrix([[0], [l0 * sp.cos(q0)], [l0 * sp.sin(q0)], [1]])
-
-        com1 = sp.Matrix([[-l1 * sp.sin(q1)], [l1 * sp.cos(q1)], [0], [1]])
-
-        com2 = sp.Matrix([[-l2 * sp.sin(q2)], [l2 * sp.cos(q2)], [0], [1]])
-
-        com3 = sp.Matrix([[-l3 * sp.sin(q3)], [l3 * sp.cos(q3)], [0], [1]])
-
-
-        xee = sp.Matrix([[-L3 * sp.sin(q3)], [L3 * sp.cos(q3)], [0], [1]])
-
-        Torg1 = Torg0 @ T01
-        Torg2 = Torg0 @ T01 @ T12
-
-        # xee = sp.Matrix([[0], [0], [0], [1]])
-        # Torg3 = Torg0 @ T01 @ T12 @ T23
-        # Txee = Torg3 @ xee
-
-        Tcom1 = Torg0 @ com1
-        Tcom2 = Torg1 @ com2
-        Tcom3 = Torg2 @ com3
-        Txee = Torg2 @ xee  # NOT Torg3!
-
-        JCOM0 = com0.jacobian([q0, q1, q2, q3])
-        JCOM0.row_del(3)
-        JCOM0_init = JCOM0.row_insert(4, sp.Matrix([[1, 0, 0, 0],
-                                                    [0, 0, 0, 0],
-                                                    [0, 0, 0, 0]]))
-        self.JCOM0_init = sp.lambdify([q0, q1, q2, q3], JCOM0_init)
-
-        JCOM1 = Tcom1.jacobian([q0, q1, q2, q3])
-        JCOM1.row_del(3)
-        JCOM1_init = JCOM1.row_insert(4, sp.Matrix([[1, 0, 0, 0],
-                                                    [0, 0, 0, 0],
-                                                    [0, 1, 0, 0]]))
-        self.JCOM1_init = sp.lambdify([q0, q1, q2, q3], JCOM1_init)
-
-        JCOM2 = Tcom2.jacobian([q0, q1, q2, q3])
-        JCOM2.row_del(3)
-        JCOM2_init = JCOM2.row_insert(4, sp.Matrix([[1, 0, 0, 0],
-                                                    [0, 0, 0, 0],
-                                                    [0, 1, 1, 0]]))
-        self.JCOM2_init = sp.lambdify([q0, q1, q2, q3], JCOM2_init)
-
-        JCOM3 = Tcom3.jacobian([q0, q1, q2, q3])
-        JCOM3.row_del(3)
-        JCOM3_init = JCOM3.row_insert(4, sp.Matrix([[1, 0, 0, 0],
-                                                    [0, 0, 0, 0],
-                                                    [0, 1, 1, 1]]))
-        self.JCOM3_init = sp.lambdify([q0, q1, q2, q3], JCOM3_init)
-
-        JEE_v = Txee.jacobian([q0, q1, q2, q3])
-
-        JEE_v.row_del(3)
-        JEE_w = sp.Matrix([[1, 0, 0, 0],
-                           [0, 0, 0, 0],
-                           [0, 1, 1, 1]])
-        JEE_init = JEE_v.row_insert(4, JEE_w)
-        self.JEE_init = sp.lambdify([q0, q1, q2, q3], JEE_init)
-
-        # ----Rotation------------#
-        Rorg0 = sp.Matrix([[1, 0, 0],
-                           [0, sp.cos(q0), -sp.sin(q0)],
-                           [0, sp.sin(q0), sp.cos(q0)]])
-
-        R01 = sp.Matrix([[sp.cos(q1), -sp.sin(q1), 0],
-                         [sp.sin(q1), sp.cos(q1), 0],
-                         [0, 0, 1]])
-
-        R12 = sp.Matrix([[sp.cos(q2), -sp.sin(q2), 0],
-                         [sp.sin(q2), sp.cos(q2), 0],
-                         [0, 0, 1]])
-
-        R23 = sp.Matrix([[sp.cos(q3), -sp.sin(q3), 0],
-                         [sp.sin(q3), sp.cos(q3), 0],
-                         [0, 0, 1]])
-
-        # Rorg1 = Rorg0 @ R01
-        # Rorg2 = Rorg0 @ R01 @ R12
-        Rorg3 = Rorg0 @ R01 @ R12 @ R23
-
-        self.REE_init = sp.lambdify([q0, q1, q2, q3], Rorg3)
-
     def gen_jacCOM0(self, q=None):
         """Generates the Jacobian from the COM of the first
         link to the origin frame"""
         q = self.q if q is None else q
+        q0 = q[0]
 
-        JCOM0 = self.JCOM0_init(q[0], q[1], q[2], q[3])
-        JCOM0 = np.array(JCOM0).astype(np.float64)
+        l0 = self.coml[0]
+
+        JCOM0 = np.zeros((6, 4))
+        JCOM0[1, 0] = -l0*np.sin(q0)
+        JCOM0[2, 0] = l0*np.cos(q0)
+        JCOM0[3, 0] = 1
+
         return JCOM0
 
     def gen_jacCOM1(self, q=None):
         """Generates the Jacobian from the COM of the first
         link to the origin frame"""
         q = self.q if q is None else q
-        JCOM1 = self.JCOM1_init(q[0], q[1], q[2], q[3])
-        JCOM1 = np.array(JCOM1).astype(np.float64)
+        q0 = q[0]
+        q1 = q[1]
+
+        L0 = self.L[0]
+
+        l1 = self.coml[1]
+
+        JCOM1 = np.zeros((6, 4))
+        JCOM1[0, 1] = -l1*np.cos(q1)
+        JCOM1[1, 0] = -(L0 + l1*np.cos(q1))*np.sin(q0)
+        JCOM1[1, 1] = -l1*np.sin(q1)*np.cos(q0)
+        JCOM1[2, 0] = (L0 + l1*np.cos(q1))*np.cos(q0)
+        JCOM1[2, 1] = -l1*np.sin(q0)*np.sin(q1)
+        JCOM1[3, 0] = 1
+        JCOM1[5, 1] = 1
 
         return JCOM1
 
@@ -240,8 +155,28 @@ class Leg(LegBase):
         """Generates the Jacobian from the COM of the third
         link to the origin frame"""
         q = self.q if q is None else q
-        JCOM2 = self.JCOM2_init(q[0], q[1], q[2], q[3])
-        JCOM2 = np.array(JCOM2).astype(np.float64)
+
+        q0 = q[0]
+        q1 = q[1]
+        q2 = q[2]
+
+        L0 = self.L[0]
+        L1 = self.L[1]
+
+        l2 = self.coml[2]
+
+        JCOM2 = np.zeros((6, 4))
+        JCOM2[0, 1] = -L1*np.cos(q1) - l2*np.cos(q1 + q2)
+        JCOM2[0, 2] = -l2*np.cos(q1 + q2)
+        JCOM2[1, 0] = -(L0 + L1*np.cos(q1) + l2*np.cos(q1 + q2))*np.sin(q0)
+        JCOM2[1, 1] = -(L1*np.sin(q1) + l2*np.sin(q1 + q2))*np.cos(q0)
+        JCOM2[1, 2] = -l2*np.sin(q1 + q2)*np.cos(q0)
+        JCOM2[2, 0] = (L0 + L1*np.cos(q1) + l2*np.cos(q1 + q2))*np.cos(q0)
+        JCOM2[2, 1] = -(L1*np.sin(q1) + l2*np.sin(q1 + q2))*np.sin(q0)
+        JCOM2[2, 2] = -l2*np.sin(q0)*np.sin(q1 + q2)
+        JCOM2[3, 0] = 1
+        JCOM2[5, 1] = 1
+        JCOM2[5, 2] = 1
 
         return JCOM2
 
@@ -249,16 +184,67 @@ class Leg(LegBase):
         """Generates the Jacobian from the COM of the fourth
         link to the origin frame"""
         q = self.q if q is None else q
-        JCOM3 = self.JCOM3_init(q[0], q[1], q[2], q[3])
-        JCOM3 = np.array(JCOM3).astype(np.float64)
+
+        q0 = q[0]
+        q1 = q[1]
+        q2 = q[2]
+        q3 = q[3]
+
+        L0 = self.L[0]
+        L1 = self.L[1]
+        L2 = self.L[2]
+
+        l3 = self.coml[3]
+
+        JCOM3 = np.zeros((6, 4))
+        JCOM3[0, 1] = -L1*np.cos(q1) - L2*np.cos(q1 + q2) - l3*np.cos(q1 + q2 + q3)
+        JCOM3[0, 2] = -L2*np.cos(q1 + q2) - l3*np.cos(q1 + q2 + q3)
+        JCOM3[0, 3] = -l3*np.cos(q1 + q2 + q3)
+        JCOM3[1, 0] = -(L0 + L1*np.cos(q1) + L2*np.cos(q1 + q2) + l3*np.cos(q1 + q2 + q3))*np.sin(q0)
+        JCOM3[1, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 + q2) + l3*np.sin(q1 + q2 + q3))*np.cos(q0)
+        JCOM3[1, 2] = -(L2*np.sin(q1 + q2) + l3*np.sin(q1 + q2 + q3))*np.cos(q0)
+        JCOM3[1, 3] = -l3*np.sin(q1 + q2 + q3)*np.cos(q0)
+        JCOM3[2, 0] = (L0 + L1*np.cos(q1) + L2*np.cos(q1 + q2) + l3*np.cos(q1 + q2 + q3))*np.cos(q0)
+        JCOM3[2, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 + q2) + l3*np.sin(q1 + q2 + q3))*np.sin(q0)
+        JCOM3[2, 2] = -(L2*np.sin(q1 + q2) + l3*np.sin(q1 + q2 + q3))*np.sin(q0)
+        JCOM3[2, 3] = -l3*np.sin(q0)*np.sin(q1 + q2 + q3)
+        JCOM3[3, 0] = 1
+        JCOM3[5, 1] = 1
+        JCOM3[5, 2] = 1
+        JCOM3[5, 3] = 1
 
         return JCOM3
 
     def gen_jacEE(self, q=None):
         """Generates the Jacobian from the end effector to the origin frame"""
         q = self.q if q is None else q
-        JEE = self.JEE_init(q[0], q[1], q[2], q[3])
-        JEE = np.array(JEE).astype(np.float64)
+
+        q0 = q[0]
+        q1 = q[1]
+        q2 = q[2]
+        q3 = q[3]
+
+        L0 = self.L[0]
+        L1 = self.L[1]
+        L2 = self.L[2]
+        L3 = self.L[3]
+
+        JEE = np.zeros((6, 4))  # (3, 4) if only x, y, z forces controlled, others dropped
+        JEE[0, 1] = -L1*np.cos(q1) - L2*np.cos(q1 + q2) - L3*np.cos(q1 + q2 + q3)
+        JEE[0, 2] = -L2*np.cos(q1 + q2) - L3*np.cos(q1 + q2 + q3)
+        JEE[0, 3] = -L3*np.cos(q1 + q2 + q3)
+        JEE[1, 0] = -(L0 + L1*np.cos(q1) + L2*np.cos(q1 + q2) + L3*np.cos(q1 + q2 + q3))*np.sin(q0)
+        JEE[1, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 + q2) + L3*np.sin(q1 + q2 + q3))*np.cos(q0)
+        JEE[1, 2] = -(L2*np.sin(q1 + q2) + L3*np.sin(q1 + q2 + q3))*np.cos(q0)
+        JEE[1, 3] = -L3*np.sin(q1 + q2 + q3)*np.cos(q0)
+        JEE[2, 0] = (L0 + L1*np.cos(q1) + L2*np.cos(q1 + q2) + L3*np.cos(q1 + q2 + q3))*np.cos(q0)
+        JEE[2, 1] = -(L1*np.sin(q1) + L2*np.sin(q1 + q2) + L3*np.sin(q1 + q2 + q3))*np.sin(q0)
+        JEE[2, 2] = -(L2*np.sin(q1 + q2) + L3*np.sin(q1 + q2 + q3))*np.sin(q0)
+        JEE[2, 3] = -L3*np.sin(q0)*np.sin(q1 + q2 + q3)
+        JEE[3, 0] = 1
+        JEE[5, 1] = 1
+        JEE[5, 2] = 1
+        JEE[5, 3] = 1
 
         return JEE
 
@@ -362,17 +348,34 @@ class Leg(LegBase):
 
     def velocity(self):  # dq=None
         # Calculate operational space linear velocity vector
-
-        JEE = self.gen_jacEE(q=self.q)
+        # if dq is None:
+        #     dq = self.dq
+        JEE = self.gen_jacEE(q=q)
         return np.dot(JEE, self.dq).flatten()
 
     def orientation(self, b_orient, q=None):
         # Calculate orientation of end effector in quaternions
-        q = self.q if q is None else q
+        if q is None:
+            q0 = self.q[0]
+            q1 = self.q[1]
+            q2 = self.q[2]
+            q3 = self.q[3]
+        else:
+            q0 = q[0]
+            q1 = q[1]
+            q2 = q[2]
+            q3 = q[3]
 
-        REE = self.REE_init(q[0], q[1], q[2], q[3])
-        REE = np.array(REE).astype(np.float64)
-
+        REE = np.zeros((3, 3))  # rotation matrix
+        REE[0, 0] = np.cos(q1 + q2 + q3)
+        REE[0, 1] = -np.sin(q1 + q2 + q3)
+        REE[1, 0] = np.sin(q1 + q2 + q3)*np.cos(q0)
+        REE[1, 1] = np.cos(q0)*np.cos(q1 + q2 + q3)
+        REE[1, 2] = -np.sin(q0)
+        REE[2, 0] = np.sin(q0)*np.sin(q1 + q2 + q3)
+        REE[2, 1] = np.sin(q0)*np.cos(q1 + q2 + q3)
+        REE[2, 2] = np.cos(q0)
+        # REE[3, 3] = 1
         REE = np.dot(b_orient, REE)
         q_e = transforms3d.quaternions.mat2quat(REE)
         q_e = q_e / np.linalg.norm(q_e)  # convert to unit vector quaternion
